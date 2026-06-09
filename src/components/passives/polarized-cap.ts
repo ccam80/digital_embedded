@@ -409,6 +409,10 @@ export const PolarizedCapDefinition: StandaloneComponentDefinition = {
       netlist: POLARIZED_CAP_NETLIST_BUILDER,
       paramDefs: POLARIZED_CAP_PARAM_DEFS,
       params: {},
+      // Composite (expands to a Capacitor plus clamp sub-elements): buckets as a
+      // CAP, but declares NO deckNodeTokens — its outer-pin node numbering comes
+      // from the sub-element expansion, not a single deck line.
+      spice: { device: "CAP" },
     },
   },
   analogWrapperHook: polarizedCapWrapperHook,

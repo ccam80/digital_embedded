@@ -28,8 +28,9 @@ import {
   type StandaloneComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
-import type { MnaSubcircuitNetlist, SubcircuitElement } from "../../core/mna-subcircuit-netlist.js";
+import type { MnaSubcircuitNetlist } from "../../core/mna-subcircuit-netlist.js";
 import { defineModelParams } from "../../core/model-params.js";
+import { buildBehavioralGateNetlist } from "./gate-shared.js";
 
 // ---------------------------------------------------------------------------
 // Layout constants
@@ -52,7 +53,7 @@ const OUTPUT_BUBBLE_OFFSET = 1;
 
 function buildPinDeclarations(bitWidth: number, wideShape: boolean = true): PinDeclaration[] {
   const { bodyHeight } = gateBodyMetrics(1);
-  return standardGatePinLayout(["in"], "out", compWidth(wideShape), bodyHeight, bitWidth, OUTPUT_BUBBLE_OFFSET);
+  return standardGatePinLayout(["In_1"], "out", compWidth(wideShape), bodyHeight, bitWidth, OUTPUT_BUBBLE_OFFSET);
 }
 
 // ---------------------------------------------------------------------------
@@ -236,15 +237,16 @@ const NOT_PROPERTY_DEFS: PropertyDefinition[] = [
 
 export const { paramDefs: NOT_BEHAVIORAL_PARAM_DEFS, defaults: NOT_BEHAVIORAL_DEFAULTS } = defineModelParams({
   primary: {
-    loaded: { default: 1,     unit: "",  description: "1 = loaded pins (DigitalInputPinLoaded / DigitalOutputPinLoaded), 0 = unloaded" },
-    vIH:    { default: 2.0,   unit: "V", description: "Input high threshold (CMOS spec)" },
-    vIL:    { default: 0.8,   unit: "V", description: "Input low threshold (CMOS spec)" },
-    rIn:    { default: 1e6,   unit: "Ω", description: "Input impedance" },
-    cIn:    { default: 1e-12, unit: "F", description: "Input capacitance" },
-    rOut:   { default: 100,   unit: "Ω", description: "Output drive resistance" },
-    cOut:   { default: 1e-12, unit: "F", description: "Output companion capacitance" },
-    vOH:    { default: 5.0,   unit: "V", description: "Output high voltage" },
-    vOL:    { default: 0.0,   unit: "V", description: "Output low voltage" },
+    inputCount: { default: 1,     unit: "",  description: "Number of inputs (structural; fixed at 1 for Not)" },
+    loaded:     { default: 1,     unit: "",  description: "1 = loaded pins (DigitalInputPinLoaded / DigitalOutputPinLoaded), 0 = unloaded" },
+    vIH:        { default: 2.0,   unit: "V", description: "Input high threshold (CMOS spec)" },
+    vIL:        { default: 0.8,   unit: "V", description: "Input low threshold (CMOS spec)" },
+    rIn:        { default: 1e6,   unit: "Ω", description: "Input impedance" },
+    cIn:        { default: 1e-12, unit: "F", description: "Input capacitance" },
+    rOut:       { default: 100,   unit: "Ω", description: "Output drive resistance" },
+    cOut:       { default: 1e-12, unit: "F", description: "Output companion capacitance" },
+    vOH:        { default: 5.0,   unit: "V", description: "Output high voltage" },
+    vOL:        { default: 0.0,   unit: "V", description: "Output low voltage" },
   },
 });
 
@@ -259,61 +261,7 @@ export const { paramDefs: NOT_BEHAVIORAL_PARAM_DEFS, defaults: NOT_BEHAVIORAL_DE
 // ---------------------------------------------------------------------------
 
 export function buildNotNetlist(params: PropertyBag): MnaSubcircuitNetlist {
-  const loaded        = params.getModelParam<number>("loaded") >= 0.5;
-  const inputPinType  = loaded ? "DigitalInputPinLoaded"  : "DigitalInputPinUnloaded";
-  const outputPinType = loaded ? "DigitalOutputPinLoaded" : "DigitalOutputPinUnloaded";
-
-  // ports: in=0, out=1, gnd=2. Internal nets: ctrl_out=3, result_1=4.
-  const ports = ["in", "out", "gnd"];
-  const outIdx = 1, gndIdx = 2, ctrlOutNet = 3, resultNet = 4;
-
-  const elements: SubcircuitElement[] = [];
-  const netlist: number[][] = [];
-
-  // Driver leaf reads the result-net (not the raw input port).
-  elements.push({
-    typeId: "BehavioralNotDriver",
-    modelRef: "default",
-    subElementName: "drv",
-    params: {},
-  });
-  netlist.push([resultNet, ctrlOutNet, gndIdx]);
-
-  // 3-port DIPL on the single input, string-bound.
-  elements.push({
-    typeId: inputPinType,
-    modelRef: "default",
-    subElementName: "inPin_1",
-    params: { vIH: "vIH", vIL: "vIL", rIn: "rIn", cIn: "cIn" },
-  });
-  netlist.push([0, gndIdx, resultNet]);
-
-  elements.push({
-    typeId: outputPinType,
-    modelRef: "default",
-    subElementName: "outPin",
-    params: {
-      rOut: params.getModelParam<number>("rOut"),
-      cOut: params.getModelParam<number>("cOut"),
-      vOH:  params.getModelParam<number>("vOH"),
-      vOL:  params.getModelParam<number>("vOL"),
-    },
-  });
-  netlist.push([outIdx, gndIdx, ctrlOutNet]);
-
-  return {
-    ports,
-    params: {
-      vIH: params.getModelParam<number>("vIH"),
-      vIL: params.getModelParam<number>("vIL"),
-      rIn: params.getModelParam<number>("rIn"),
-      cIn: params.getModelParam<number>("cIn"),
-    },
-    elements,
-    internalNetCount: 2,
-    internalNetLabels: ["ctrl_out", "result_1"],
-    netlist,
-  };
+  return buildBehavioralGateNetlist(params, (vars) => `1-${vars[0]}`);
 }
 
 // ---------------------------------------------------------------------------
@@ -324,7 +272,7 @@ export function buildNotNetlist(params: PropertyBag): MnaSubcircuitNetlist {
 // ---------------------------------------------------------------------------
 
 const CMOS_INVERTER_NETLIST: MnaSubcircuitNetlist = {
-  ports: ["in", "out", "VDD", "GND"],
+  ports: ["In_1", "out", "VDD", "GND"],
   params: { WP: 20e-6, WN: 10e-6, L: 1e-6 },
   elements: [
     { typeId: "PMOS", branchCount: 0, params: { W: "WP", L: "L" } },
@@ -386,7 +334,7 @@ export const NotDefinition: StandaloneComponentDefinition = {
   models: {
     digital: {
       executeFn: executeNot,
-      inputSchema: ["in"],
+      inputSchema: ["In_1"],
       outputSchema: ["out"],
     },
   },

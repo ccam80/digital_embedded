@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "lastScanned": 1780865800219,
+  "lastScanned": 1780966098055,
   "projectRoot": "C:\\local_working_projects\\digital_in_browser",
   "techStack": {
     "languages": [
@@ -42,8 +42,8 @@
     "runtime": null
   },
   "build": {
-    "buildCommand": "cd C:/local_working_projects/digital_in_browser && echo \"=== tsc ===\" && npx tsc --noEmit 2>&1 | node -e \"const l=require('fs').readFileSync(0,'utf8').split('\\n').filter(x=>/error TS/.test(x)); console.log('tsc errors:',l.length);\"; echo \"=== suite ===\" && npm run test:q -- src/ > .pv.txt 2>&1; node -e \"console.log(JSON.stringify(require('./.vitest-failures.json').summary))\"; echo \"=== baseline diff ===\"; node scripts/triage/diff-baseline.mjs 2>&1 | head -4; rm -f .pv.txt",
-    "testCommand": "cd C:/local_working_projects/digital_in_browser && echo \"=== tsc ===\" && npx tsc --noEmit 2>&1 | node -e \"const l=require('fs').readFileSync(0,'utf8').split('\\n').filter(x=>/error TS/.test(x)); console.log('tsc errors:',l.length);\"; echo \"=== suite ===\" && npm run test:q -- src/ > .pv.txt 2>&1; node -e \"console.log(JSON.stringify(require('./.vitest-failures.json').summary))\"; echo \"=== baseline diff ===\"; node scripts/triage/diff-baseline.mjs 2>&1 | head -4; rm -f .pv.txt",
+    "buildCommand": "cd C:/local_working_projects/digital_in_browser && npx tsc --noEmit 2>&1 | node -e \"const l=require('fs').readFileSync(0,'utf8').split('\\n').filter(x=>/error TS/.test(x)); console.log('tsc errors:',l.length); l.forEach(x=>console.log(x));\"",
+    "testCommand": "cd C:/local_working_projects/digital_in_browser && echo \"=== UNTRACKED (??) ===\" && git ls-files --others --exclude-standard | cat && echo \"=== .gitignore has ref/ngspice? ===\" && (git check-ignore ref/ngspice output vitest-relo.txt .claude/scheduled_tasks.lock 2>&1 | cat || echo \"none ignored\")",
     "lintCommand": "npm run lint",
     "devCommand": "npm run dev",
     "scripts": {
@@ -87,14 +87,14 @@
       "path": "app",
       "purpose": "Application code",
       "fileCount": 0,
-      "lastAccessed": 1780865800185,
+      "lastAccessed": 1780966098023,
       "keyFiles": []
     },
     "circuits": {
       "path": "circuits",
       "purpose": null,
       "fileCount": 6,
-      "lastAccessed": 1780865800186,
+      "lastAccessed": 1780966098023,
       "keyFiles": [
         "and-gate.dig",
         "half-adder.dig",
@@ -107,7 +107,7 @@
       "path": "dist",
       "purpose": "Distribution/build output",
       "fileCount": 1,
-      "lastAccessed": 1780865800186,
+      "lastAccessed": 1780966098024,
       "keyFiles": [
         "index.html"
       ]
@@ -116,55 +116,64 @@
       "path": "docs",
       "purpose": "Documentation",
       "fileCount": 0,
-      "lastAccessed": 1780865800187,
+      "lastAccessed": 1780966098039,
       "keyFiles": []
     },
     "e2e": {
       "path": "e2e",
       "purpose": null,
       "fileCount": 0,
-      "lastAccessed": 1780865800203,
+      "lastAccessed": 1780966098040,
       "keyFiles": []
     },
     "fixtures": {
       "path": "fixtures",
       "purpose": "Test fixtures",
-      "fileCount": 18,
-      "lastAccessed": 1780865800203,
+      "fileCount": 19,
+      "lastAccessed": 1780966098040,
       "keyFiles": [
+        "ac_rlc.dts",
         "analog-rc-workflow.dig",
         "bjt-quasisat-harness.dts",
         "bjt-tlev-harness.dts",
-        "broken_chain.dig",
-        "buckbjt.dts"
+        "broken_chain.dig"
       ]
     },
     "lib": {
       "path": "lib",
       "purpose": "Library code",
       "fileCount": 0,
-      "lastAccessed": 1780865800203,
+      "lastAccessed": 1780966098040,
       "keyFiles": []
     },
     "modules": {
       "path": "modules",
       "purpose": null,
       "fileCount": 0,
-      "lastAccessed": 1780865800203,
+      "lastAccessed": 1780966098040,
       "keyFiles": []
+    },
+    "output": {
+      "path": "output",
+      "purpose": null,
+      "fileCount": 1,
+      "lastAccessed": 1780966098040,
+      "keyFiles": [
+        "and-bv-pilot.dts"
+      ]
     },
     "ref": {
       "path": "ref",
       "purpose": null,
       "fileCount": 0,
-      "lastAccessed": 1780865800204,
+      "lastAccessed": 1780966098041,
       "keyFiles": []
     },
     "rename-maps": {
       "path": "rename-maps",
       "purpose": null,
       "fileCount": 8,
-      "lastAccessed": 1780865800204,
+      "lastAccessed": 1780966098041,
       "keyFiles": [
         "cccs.md",
         "ccvs.md",
@@ -177,7 +186,7 @@
       "path": "scratch",
       "purpose": null,
       "fileCount": 5,
-      "lastAccessed": 1780865800204,
+      "lastAccessed": 1780966098041,
       "keyFiles": [
         "analysis-engine.diff",
         "baseline-failures.json",
@@ -190,7 +199,7 @@
       "path": "scripts",
       "purpose": "Build/utility scripts",
       "fileCount": 14,
-      "lastAccessed": 1780865800204,
+      "lastAccessed": 1780966098041,
       "keyFiles": [
         "categorize-failures.mjs",
         "circuit-mcp-server.ts",
@@ -203,7 +212,7 @@
       "path": "spec",
       "purpose": "Test specifications",
       "fileCount": 6,
-      "lastAccessed": 1780865800204,
+      "lastAccessed": 1780966098042,
       "keyFiles": [
         "dig-format-excision.md",
         "spice-import-pipeline-gaps.md",
@@ -216,7 +225,7 @@
       "path": "src",
       "purpose": "Source code",
       "fileCount": 1,
-      "lastAccessed": 1780865800205,
+      "lastAccessed": 1780966098042,
       "keyFiles": [
         "main.ts"
       ]
@@ -224,10 +233,9 @@
     "test-results": {
       "path": "test-results",
       "purpose": null,
-      "fileCount": 3,
-      "lastAccessed": 1780865800205,
+      "fileCount": 2,
+      "lastAccessed": 1780966098043,
       "keyFiles": [
-        "playwright-failures.json",
         "test-failures.json"
       ]
     },
@@ -235,7 +243,7 @@
       "path": "tutorials",
       "purpose": null,
       "fileCount": 1,
-      "lastAccessed": 1780865800206,
+      "lastAccessed": 1780966098043,
       "keyFiles": [
         "index.json"
       ]
@@ -244,21 +252,21 @@
       "path": "vendor",
       "purpose": "Third-party code",
       "fileCount": 0,
-      "lastAccessed": 1780865800206,
+      "lastAccessed": 1780966098043,
       "keyFiles": []
     },
     "dist\\app": {
       "path": "dist\\app",
       "purpose": "Application code",
       "fileCount": 0,
-      "lastAccessed": 1780865800207,
+      "lastAccessed": 1780966098044,
       "keyFiles": []
     },
     "dist\\assets": {
       "path": "dist\\assets",
       "purpose": "Static assets",
       "fileCount": 5,
-      "lastAccessed": 1780865800207,
+      "lastAccessed": 1780966098044,
       "keyFiles": [
         "main-BzvxYKS9.js",
         "memory-editor-DEA45Iu0.js",
@@ -269,7 +277,7 @@
       "path": "e2e\\fixtures",
       "purpose": "Test fixtures",
       "fileCount": 8,
-      "lastAccessed": 1780865800208,
+      "lastAccessed": 1780966098045,
       "keyFiles": [
         "harness.html",
         "master1-digital.dts",
@@ -280,7 +288,7 @@
       "path": "src\\app",
       "purpose": "Application code",
       "fileCount": 25,
-      "lastAccessed": 1780865800209,
+      "lastAccessed": 1780966098046,
       "keyFiles": [
         "analysis-dialogs.ts",
         "app-context.ts",
@@ -291,7 +299,7 @@
       "path": "src\\components",
       "purpose": "UI components",
       "fileCount": 4,
-      "lastAccessed": 1780865800209,
+      "lastAccessed": 1780966098046,
       "keyFiles": [
         "draw-helpers.ts",
         "generic-shape.ts",
@@ -302,27 +310,27 @@
       "path": "src\\fixtures",
       "purpose": "Test fixtures",
       "fileCount": 0,
-      "lastAccessed": 1780865800209,
+      "lastAccessed": 1780966098046,
       "keyFiles": []
     }
   },
   "hotPaths": [
     {
       "path": "src\\components\\semiconductors\\diode.ts",
-      "accessCount": 329,
-      "lastAccessed": 1780896994748,
+      "accessCount": 331,
+      "lastAccessed": 1780976219207,
       "type": "file"
     },
     {
       "path": "src\\core\\registry.ts",
-      "accessCount": 164,
-      "lastAccessed": 1780893585962,
+      "accessCount": 172,
+      "lastAccessed": 1780980507021,
       "type": "file"
     },
     {
       "path": "src\\compile\\extract-connectivity.ts",
-      "accessCount": 56,
-      "lastAccessed": 1780874707523,
+      "accessCount": 59,
+      "lastAccessed": 1781000155625,
       "type": "file"
     },
     {
@@ -369,9 +377,15 @@
     },
     {
       "path": "src\\components\\semiconductors\\schottky.ts",
-      "accessCount": 28,
-      "lastAccessed": 1780894396454,
+      "accessCount": 31,
+      "lastAccessed": 1780976223129,
       "type": "file"
+    },
+    {
+      "path": "src/core/registry.ts",
+      "accessCount": 23,
+      "lastAccessed": 1780975952426,
+      "type": "directory"
     },
     {
       "path": "src/components/semiconductors/diode.ts",
@@ -386,21 +400,15 @@
       "type": "file"
     },
     {
-      "path": "src/core/registry.ts",
-      "accessCount": 20,
-      "lastAccessed": 1780864694196,
-      "type": "directory"
+      "path": "src\\components\\semiconductors\\varactor.ts",
+      "accessCount": 19,
+      "lastAccessed": 1780976221162,
+      "type": "file"
     },
     {
       "path": "src\\components\\memory\\__tests__\\register.test.ts",
       "accessCount": 17,
       "lastAccessed": 1780837510392,
-      "type": "file"
-    },
-    {
-      "path": "src\\components\\semiconductors\\varactor.ts",
-      "accessCount": 16,
-      "lastAccessed": 1780894396888,
       "type": "file"
     },
     {
@@ -423,8 +431,8 @@
     },
     {
       "path": "src\\headless\\__tests__\\default-facade.test.ts",
-      "accessCount": 10,
-      "lastAccessed": 1778627948148,
+      "accessCount": 12,
+      "lastAccessed": 1780997680917,
       "type": "file"
     },
     {
@@ -482,6 +490,12 @@
       "type": "directory"
     },
     {
+      "path": "src/headless/__tests__/default-facade.test.ts",
+      "accessCount": 5,
+      "lastAccessed": 1780997428971,
+      "type": "directory"
+    },
+    {
       "path": "src\\headless\\netlist.ts",
       "accessCount": 4,
       "lastAccessed": 1778323801969,
@@ -501,8 +515,8 @@
     },
     {
       "path": "src/core/element.ts",
-      "accessCount": 3,
-      "lastAccessed": 1780874254195,
+      "accessCount": 4,
+      "lastAccessed": 1781001533875,
       "type": "directory"
     },
     {
@@ -515,12 +529,6 @@
       "path": "src/editor/__tests__/wire-current-resolver.test.ts",
       "accessCount": 2,
       "lastAccessed": 1778213373844,
-      "type": "directory"
-    },
-    {
-      "path": "src/headless/__tests__/default-facade.test.ts",
-      "accessCount": 2,
-      "lastAccessed": 1778213607068,
       "type": "directory"
     },
     {
@@ -542,6 +550,18 @@
       "type": "directory"
     },
     {
+      "path": "src/components/wiring/__tests__",
+      "accessCount": 2,
+      "lastAccessed": 1780991416948,
+      "type": "directory"
+    },
+    {
+      "path": "src/app/menu-toolbar.ts",
+      "accessCount": 2,
+      "lastAccessed": 1781000314908,
+      "type": "directory"
+    },
+    {
       "path": "src\\components\\wiring\\__tests__\\priority-encoder-partition-drop-probe.test.ts",
       "accessCount": 1,
       "lastAccessed": 1778204670475,
@@ -551,18 +571,6 @@
       "path": "src/components/wiring/__tests__/wiring.test.ts",
       "accessCount": 1,
       "lastAccessed": 1778204776304,
-      "type": "directory"
-    },
-    {
-      "path": "src/components/wiring/__tests__",
-      "accessCount": 1,
-      "lastAccessed": 1778205560399,
-      "type": "directory"
-    },
-    {
-      "path": "src/app/menu-toolbar.ts",
-      "accessCount": 1,
-      "lastAccessed": 1778205942109,
       "type": "directory"
     },
     {

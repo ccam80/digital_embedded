@@ -3,47 +3,34 @@ import { buildFixture } from "../../__tests__/fixtures/build-fixture.js";
 import { DefaultSimulatorFacade } from "../../../../headless/default-facade.js";
 import type { ComponentRegistry } from "../../../../core/registry.js";
 import type { Circuit } from "../../../../core/circuit.js";
-import { BehavioralAndDriverElement }  from "../and-driver.js";
-import { BehavioralOrDriverElement }   from "../or-driver.js";
-import { BehavioralNandDriverElement } from "../nand-driver.js";
-import { BehavioralNorDriverElement }  from "../nor-driver.js";
-import { BehavioralXorDriverElement }  from "../xor-driver.js";
-import { BehavioralXnorDriverElement } from "../xnor-driver.js";
-import { BehavioralNotDriverElement }  from "../not-driver.js";
-import { BehavioralBufDriverElement }  from "../buf-driver.js";
+import { BIAnalogElement } from "../../../../components/active/bsource.js";
 import type { AnalogElement } from "../../element.js";
 
 // Input drive voltages (rail levels applied to DC source inputs).
 const VDD = 5.0;
 const GND = 0.0;
-// MID is well above the 0.5 V driver threshold, so under the {0,1}
-// contract it is classified as HIGH — same as VDD. There is no
-// indeterminate-hold band any more (see and-driver.ts).
-const MID = 1.5;
-// Expected ctrl_out voltages — drivers stamp normalized {0, 1} V.
+// MID sits above the CMOS input-high threshold vIH = 2.0 V (the digital input
+// pin's classifier threshold), so it resolves to logic HIGH — same as VDD —
+// while exercising a valid-HIGH level below the supply rail.
+const MID = 3.0;
+// Expected ctrl_out voltages — BehavioralLogic B-source stamps normalized {0, 1} V.
 const HI = 1.0;
 const LO = 0.0;
 const LOAD_R = 1_000_000;
 
-type DriverClass =
-  | typeof BehavioralAndDriverElement
-  | typeof BehavioralOrDriverElement
-  | typeof BehavioralNandDriverElement
-  | typeof BehavioralNorDriverElement
-  | typeof BehavioralXorDriverElement
-  | typeof BehavioralXnorDriverElement
-  | typeof BehavioralNotDriverElement
-  | typeof BehavioralBufDriverElement;
-
 function findDriverElement(
   fix: ReturnType<typeof buildFixture>,
-  DriverCls: DriverClass,
 ): AnalogElement {
+  // The gate's truth-function driver and every digital input pin are all
+  // BehavioralLogic B-sources (BIAnalogElement). They are distinguished by their
+  // controllers: the gate drv reads the input result-nets r1..rN, while a pin
+  // thresholder reads (in, vih, vil). Select the unique B-source carrying an
+  // "r1" controller pin — the gate drv.
   for (let i = 0; i < fix.circuit.elements.length; i++) {
     const el = fix.circuit.elements[i]!;
-    if (el instanceof DriverCls) return el;
+    if (el instanceof BIAnalogElement && el.pinNodes.has("r1")) return el;
   }
-  throw new Error("No " + DriverCls.name + " found in compiled circuit");
+  throw new Error("No gate-driver BIAnalogElement (controller 'r1') found in compiled circuit");
 }
 
 function build2InputGate(gateType: string, vA: number, vB: number) {
@@ -87,135 +74,134 @@ function build1InputGate(gateType: string, inputPin: string, vIn: number) {
 
 function assertCtrlOutV(
   fix: ReturnType<typeof buildFixture>,
-  DriverCls: DriverClass,
   expected: number,
   precision = 4,
 ): void {
-  const el = findDriverElement(fix, DriverCls);
-  const ctrlOutNode = el.pinNodes.get("ctrl_out");
-  const gndNode     = el.pinNodes.get("gnd");
-  if (ctrlOutNode === undefined) throw new Error("ctrl_out pin not found on driver");
-  if (gndNode === undefined)     throw new Error("gnd pin not found on driver");
+  const el = findDriverElement(fix);
+  const ctrlOutNode = el.pinNodes.get("out-");
+  const gndNode     = el.pinNodes.get("out+");
+  if (ctrlOutNode === undefined) throw new Error("out- pin not found on BIAnalogElement");
+  if (gndNode === undefined)     throw new Error("out+ pin not found on BIAnalogElement");
   const vCtrl = fix.engine.getNodeVoltage(ctrlOutNode) - fix.engine.getNodeVoltage(gndNode);
   expect(vCtrl).toBeCloseTo(expected, precision);
 }
 
-describe("BehavioralAndDriver ctrl_out stamp (Cat 2 DCOP)", () => {
+describe("BehavioralLogic AND ctrl_out stamp (Cat 2 DCOP)", () => {
   it("stamps HI at ctrl_out when all inputs are high (A=VDD, B=VDD)", () => {
     const fix = buildFixture({ build: build2InputGate("And", VDD, VDD) });
-    assertCtrlOutV(fix, BehavioralAndDriverElement, HI);
+    assertCtrlOutV(fix, HI);
   });
   it("stamps LO at ctrl_out when any input is low (A=GND, B=GND)", () => {
     const fix = buildFixture({ build: build2InputGate("And", GND, GND) });
-    assertCtrlOutV(fix, BehavioralAndDriverElement, LO);
+    assertCtrlOutV(fix, LO);
   });
   it("treats above-threshold input as HIGH (A=MID, B=MID): AND → HI", () => {
     const fix = buildFixture({ build: build2InputGate("And", MID, MID) });
-    assertCtrlOutV(fix, BehavioralAndDriverElement, HI);
+    assertCtrlOutV(fix, HI);
   });
 });
 
-describe("BehavioralOrDriver ctrl_out stamp (Cat 2 DCOP)", () => {
+describe("BehavioralLogic OR ctrl_out stamp (Cat 2 DCOP)", () => {
   it("stamps HI at ctrl_out when any input is high (A=VDD, B=GND)", () => {
     const fix = buildFixture({ build: build2InputGate("Or", VDD, GND) });
-    assertCtrlOutV(fix, BehavioralOrDriverElement, HI);
+    assertCtrlOutV(fix, HI);
   });
   it("stamps LO at ctrl_out when all inputs are low (A=GND, B=GND)", () => {
     const fix = buildFixture({ build: build2InputGate("Or", GND, GND) });
-    assertCtrlOutV(fix, BehavioralOrDriverElement, LO);
+    assertCtrlOutV(fix, LO);
   });
   it("treats above-threshold input as HIGH (A=MID, B=MID): OR → HI", () => {
     const fix = buildFixture({ build: build2InputGate("Or", MID, MID) });
-    assertCtrlOutV(fix, BehavioralOrDriverElement, HI);
+    assertCtrlOutV(fix, HI);
   });
 });
 
-describe("BehavioralNandDriver ctrl_out stamp (Cat 2 DCOP)", () => {
+describe("BehavioralLogic NAND ctrl_out stamp (Cat 2 DCOP)", () => {
   it("stamps LO at ctrl_out when all inputs are high (A=VDD, B=VDD)", () => {
     const fix = buildFixture({ build: build2InputGate("NAnd", VDD, VDD) });
-    assertCtrlOutV(fix, BehavioralNandDriverElement, LO);
+    assertCtrlOutV(fix, LO);
   });
   it("stamps HI at ctrl_out when any input is low (A=GND, B=GND)", () => {
     const fix = buildFixture({ build: build2InputGate("NAnd", GND, GND) });
-    assertCtrlOutV(fix, BehavioralNandDriverElement, HI);
+    assertCtrlOutV(fix, HI);
   });
   it("treats above-threshold input as HIGH (A=MID, B=MID): NAND → LO", () => {
     const fix = buildFixture({ build: build2InputGate("NAnd", MID, MID) });
-    assertCtrlOutV(fix, BehavioralNandDriverElement, LO);
+    assertCtrlOutV(fix, LO);
   });
 });
 
-describe("BehavioralNorDriver ctrl_out stamp (Cat 2 DCOP)", () => {
+describe("BehavioralLogic NOR ctrl_out stamp (Cat 2 DCOP)", () => {
   it("stamps LO at ctrl_out when any input is high (A=VDD, B=GND)", () => {
     const fix = buildFixture({ build: build2InputGate("NOr", VDD, GND) });
-    assertCtrlOutV(fix, BehavioralNorDriverElement, LO);
+    assertCtrlOutV(fix, LO);
   });
   it("stamps HI at ctrl_out when all inputs are low (A=GND, B=GND)", () => {
     const fix = buildFixture({ build: build2InputGate("NOr", GND, GND) });
-    assertCtrlOutV(fix, BehavioralNorDriverElement, HI);
+    assertCtrlOutV(fix, HI);
   });
   it("treats above-threshold input as HIGH (A=MID, B=MID): NOR → LO", () => {
     const fix = buildFixture({ build: build2InputGate("NOr", MID, MID) });
-    assertCtrlOutV(fix, BehavioralNorDriverElement, LO);
+    assertCtrlOutV(fix, LO);
   });
 });
 
-describe("BehavioralXorDriver ctrl_out stamp (Cat 2 DCOP)", () => {
+describe("BehavioralLogic XOR ctrl_out stamp (Cat 2 DCOP)", () => {
   it("stamps HI at ctrl_out when inputs differ (A=VDD, B=GND)", () => {
     const fix = buildFixture({ build: build2InputGate("XOr", VDD, GND) });
-    assertCtrlOutV(fix, BehavioralXorDriverElement, HI);
+    assertCtrlOutV(fix, HI);
   });
   it("stamps LO at ctrl_out when inputs are equal (A=VDD, B=VDD)", () => {
     const fix = buildFixture({ build: build2InputGate("XOr", VDD, VDD) });
-    assertCtrlOutV(fix, BehavioralXorDriverElement, LO);
+    assertCtrlOutV(fix, LO);
   });
   it("treats above-threshold input as HIGH (A=MID, B=MID): XOR → LO (equal)", () => {
     const fix = buildFixture({ build: build2InputGate("XOr", MID, MID) });
-    assertCtrlOutV(fix, BehavioralXorDriverElement, LO);
+    assertCtrlOutV(fix, LO);
   });
 });
 
-describe("BehavioralXnorDriver ctrl_out stamp (Cat 2 DCOP)", () => {
+describe("BehavioralLogic XNOR ctrl_out stamp (Cat 2 DCOP)", () => {
   it("stamps HI at ctrl_out when inputs are equal (A=VDD, B=VDD)", () => {
     const fix = buildFixture({ build: build2InputGate("XNOr", VDD, VDD) });
-    assertCtrlOutV(fix, BehavioralXnorDriverElement, HI);
+    assertCtrlOutV(fix, HI);
   });
   it("stamps LO at ctrl_out when inputs differ (A=VDD, B=GND)", () => {
     const fix = buildFixture({ build: build2InputGate("XNOr", VDD, GND) });
-    assertCtrlOutV(fix, BehavioralXnorDriverElement, LO);
+    assertCtrlOutV(fix, LO);
   });
   it("treats above-threshold input as HIGH (A=MID, B=MID): XNOR → HI (equal)", () => {
     const fix = buildFixture({ build: build2InputGate("XNOr", MID, MID) });
-    assertCtrlOutV(fix, BehavioralXnorDriverElement, HI);
+    assertCtrlOutV(fix, HI);
   });
 });
 
-describe("BehavioralNotDriver ctrl_out stamp (Cat 2 DCOP)", () => {
-  it("stamps LO at ctrl_out when input is high (in=VDD)", () => {
-    const fix = buildFixture({ build: build1InputGate("Not", "in", VDD) });
-    assertCtrlOutV(fix, BehavioralNotDriverElement, LO);
+describe("BehavioralLogic NOT ctrl_out stamp (Cat 2 DCOP)", () => {
+  it("stamps LO at ctrl_out when input is high (In_1=VDD)", () => {
+    const fix = buildFixture({ build: build1InputGate("Not", "In_1", VDD) });
+    assertCtrlOutV(fix, LO);
   });
-  it("stamps HI at ctrl_out when input is low (in=GND)", () => {
-    const fix = buildFixture({ build: build1InputGate("Not", "in", GND) });
-    assertCtrlOutV(fix, BehavioralNotDriverElement, HI);
+  it("stamps HI at ctrl_out when input is low (In_1=GND)", () => {
+    const fix = buildFixture({ build: build1InputGate("Not", "In_1", GND) });
+    assertCtrlOutV(fix, HI);
   });
-  it("treats above-threshold input as HIGH (in=MID): NOT → LO", () => {
-    const fix = buildFixture({ build: build1InputGate("Not", "in", MID) });
-    assertCtrlOutV(fix, BehavioralNotDriverElement, LO);
+  it("treats above-threshold input as HIGH (In_1=MID): NOT → LO", () => {
+    const fix = buildFixture({ build: build1InputGate("Not", "In_1", MID) });
+    assertCtrlOutV(fix, LO);
   });
 });
 
-describe("BehavioralBufDriver ctrl_out stamp (Cat 2 DCOP)", () => {
+describe("BehavioralLogic BUF ctrl_out stamp (Cat 2 DCOP)", () => {
   it("stamps HI at ctrl_out when input is high (In_1=VDD)", () => {
     const fix = buildFixture({ build: build1InputGate("Buf", "In_1", VDD) });
-    assertCtrlOutV(fix, BehavioralBufDriverElement, HI);
+    assertCtrlOutV(fix, HI);
   });
   it("stamps LO at ctrl_out when input is low (In_1=GND)", () => {
     const fix = buildFixture({ build: build1InputGate("Buf", "In_1", GND) });
-    assertCtrlOutV(fix, BehavioralBufDriverElement, LO);
+    assertCtrlOutV(fix, LO);
   });
   it("treats above-threshold input as HIGH (In_1=MID): BUF → HI", () => {
     const fix = buildFixture({ build: build1InputGate("Buf", "In_1", MID) });
-    assertCtrlOutV(fix, BehavioralBufDriverElement, HI);
+    assertCtrlOutV(fix, HI);
   });
 });

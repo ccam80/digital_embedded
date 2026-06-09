@@ -20,6 +20,7 @@ import type {
   SubcircuitElementParam,
 } from "../../../../core/mna-subcircuit-netlist.js";
 import { deckOrder } from "../../ngspice-load-order.js";
+import { buildBSourceTree } from "../../expression.js";
 import {
   enumWaveformCoeffs,
   FunctionType,
@@ -83,6 +84,9 @@ export const ELEMENT_SPECS: Record<string, ElementSpec> = {
   // ASRC behavioural B-source: `B<name> n+ n- V=expr` (BV) / `I=expr` (BI).
   BV:              { prefix: "B" },
   BI:              { prefix: "B" },
+  // BV-backed behavioural logic leaf (gate/mux/decoder driver): emits the same
+  // `B<name> n+ n- V=expr` B-card; controllers bind by pin, not net name.
+  BehavioralLogic: { prefix: "B" },
   // InternalCccs is the internal-only flavour of CCCS used inside composites
   // (e.g. Optocoupler). Same ngspice F-card; the sense V-source is identified
   // by a `{ kind: "ref" }` peer reference rather than user-facing sense pins.
@@ -205,6 +209,11 @@ function resolveSubElementProps(
       }
     } else if (typeof v === "object" && v !== null && "kind" in v && v.kind === "ref") {
       bag.set(subKey, resolveRefToSpiceLabel(v, parentSubckt, parentRawLabel));
+      continue;
+    } else if (typeof v === "object" && v !== null && "kind" in v && v.kind === "literal") {
+      // Verbatim string (e.g. a BehavioralLogic B-source's `expression`) into
+      // the regular property partition — mirrors compiler.ts expandCompositeInstance.
+      bag.set(subKey, (v as { kind: "literal"; value: string }).value);
       continue;
     } else {
       throw new Error(
@@ -361,7 +370,7 @@ export function generateSpiceNetlist(
     const pinNodesByLabel = new Map(el.pinNodes);
 
     lines.push(...emitElement(
-      rawLabel, typeId, pinNodes, pinNodesByLabel,
+      rawLabel, rawLabel, typeId, pinNodes, pinNodesByLabel,
       props, modelKey, registry, modelCards, emitCtx,
     ));
   }
@@ -440,6 +449,7 @@ export function generateSpiceNetlist(
  */
 function emitElement(
   rawLabel: string,
+  nodeKeyLabel: string,
   typeId: string,
   pinNodes: number[],
   pinNodesByLabel: ReadonlyMap<string, number>,
@@ -477,16 +487,18 @@ function emitElement(
     });
 
     // Internal-net IDs reuse what `expandCompositeInstance` (compiler.ts)
-    // pre-allocated for this composite instance — keyed by ${rawLabel}#${suffix}
-    // in compiled.preAllocatedNodes. Falling back to allocateInternalNet would
-    // give the deck a fresh ID that doesn't match digiTS's node ID, breaking
-    // the harness's nodeMap correlation. Walks elements in deck order so that
-    // ngspice's first-encounter parser semantics still produce the same hash
-    // insertion order as our compile-time allocation.
+    // pre-allocated for this composite instance — keyed by `${nodeKeyLabel}#${suffix}`
+    // in compiled.preAllocatedNodes. The key uses the colon-joined nesting path
+    // (matching the compiler's `${parentLabel}:${subName}` childLabel), distinct
+    // from the underscore-joined `rawLabel` SPICE element name. Falling back to
+    // allocateInternalNet would give the deck a fresh ID that doesn't match
+    // digiTS's node ID, breaking the harness's nodeMap correlation. Walks
+    // elements in deck order so ngspice's first-encounter parser semantics still
+    // produce the same hash insertion order as our compile-time allocation.
     const internalNets: number[] = new Array(subckt.internalNetCount);
     for (let slot = 0; slot < subckt.internalNetCount; slot++) {
       const suffix = subckt.internalNetLabels?.[slot] ?? `int${slot}`;
-      internalNets[slot] = resolveCompositeInternalNet(ctx, rawLabel, suffix);
+      internalNets[slot] = resolveCompositeInternalNet(ctx, nodeKeyLabel, suffix);
     }
 
     const lines: string[] = [];
@@ -526,11 +538,13 @@ function emitElement(
       }
 
       const subProps = resolveSubElementProps(sub, subckt, props, rawLabel);
-      const subRawLabel = `${rawLabel}_${sub.subElementName ?? `e${i}`}`;
+      const subName = sub.subElementName ?? `e${i}`;
+      const subRawLabel = `${rawLabel}_${subName}`;
+      const subNodeKeyLabel = `${nodeKeyLabel}:${subName}`;
       const subModelKey = sub.modelRef ?? subDef.defaultModel ?? "";
 
       lines.push(...emitElement(
-        subRawLabel, sub.typeId, subPinNodes, subPinNodesByLabel,
+        subRawLabel, subNodeKeyLabel, sub.typeId, subPinNodes, subPinNodesByLabel,
         subProps, subModelKey, registry, modelCards, ctx,
       ));
     }
@@ -791,6 +805,25 @@ function emitPrimitive(
     const gain = requireParam(props, def, modelKey, "gain", rawLabel);
     const senseRef = props.get<string>("sense");
     return [`${label} ${nodeAt(nodes, 0, rawLabel, "pos")} ${nodeAt(nodes, 1, rawLabel, "neg")} ${senseRef} ${gain}`];
+  }
+
+  if (typeId === "BehavioralLogic") {
+    // I-mode B-source behavioural logic leaf inside a gate/mux/decoder composite,
+    // paired with a parent-supplied 1Ω resistor on the logic-out net (the Norton).
+    // Controllers are pin labels (r1, r2, … / sel, d0, …) wired by the parent, so
+    // resolve each V(label) against this element's pin map → V(<node id>), then
+    // emit the B-card digiTS's BIAnalogElement realizes: `B<name> out+ out- I=expr`
+    // (out+ = gnd, out- = logic-out). Pin order is [controllers…, out+, out-].
+    const exprText = props.getOrDefault<string>("expression", "0");
+    const nodeVars = buildBSourceTree(exprText).vars.filter((v) => v.kind === "node");
+    const controllerNodes = new Map<string, number>();
+    for (let i = 0; i < nodeVars.length; i++) {
+      controllerNodes.set(nodeVars[i]!.label, nodeAt(nodes, i, rawLabel, nodeVars[i]!.label));
+    }
+    const deckExpr = rewriteBSourceExpression(exprText, ctx, controllerNodes);
+    const outP = nodeAt(nodes, nodeVars.length, rawLabel, "out+");
+    const outN = nodeAt(nodes, nodeVars.length + 1, rawLabel, "out-");
+    return [`${label} ${outP} ${outN} I=${deckExpr}${instanceParamSuffix(paramDefs, props)}`];
   }
 
   if (typeId === "BV" || typeId === "BI") {
@@ -1538,11 +1571,20 @@ function resolveSubElementNumeric(
  * whose label has no node id is left verbatim so ngspice surfaces the unknown
  * net rather than silently mapping it to ground.
  */
-function rewriteBSourceExpression(expr: string, ctx: EmitCtx): string {
+function rewriteBSourceExpression(
+  expr: string,
+  ctx: EmitCtx,
+  controllerNodes?: ReadonlyMap<string, number>,
+): string {
   // V(label) — node-voltage controller.
   let out = expr.replace(/\bV\(\s*([A-Za-z_][A-Za-z0-9_]*)\s*\)/g, (_m, net: string) => {
     const lower = net.toLowerCase();
     if (net === "0" || lower === "gnd" || lower === "ground") return "V(0)";
+    // Pin-bound controllers (a composite BehavioralLogic leaf) resolve against
+    // the element's own pin map; flat standalone B-sources fall back to the
+    // circuit's net-label map.
+    const pinId = controllerNodes?.get(net);
+    if (pinId !== undefined) return `V(${pinId})`;
     const id = ctx.labelToNodeId.get(net);
     return id === undefined ? `V(${net})` : `V(${id})`;
   });

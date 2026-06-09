@@ -29,6 +29,7 @@ import {
 } from "../../core/registry.js";
 import type { MnaSubcircuitNetlist, SubcircuitElement } from "../../core/mna-subcircuit-netlist.js";
 import { defineModelParams } from "../../core/model-params.js";
+import { buildBSourceTree } from "../../solver/analog/expression.js";
 
 // ---------------------------------------------------------------------------
 // Layout constants
@@ -305,6 +306,25 @@ export const { paramDefs: MUX_BEHAVIORAL_PARAM_DEFS, defaults: MUX_BEHAVIORAL_DE
 //   outPin    : DigitalOutputPin{Loaded|Unloaded}
 // ---------------------------------------------------------------------------
 
+/**
+ * Strong-Kleene mux truth function as a B-source expression over controllers
+ * V(d_i) (data) and V(s_b) (selector bits):
+ *   out = max_i min( V(d_i), weight_i ),  weight_i = min_b( (i>>b)&1 ? V(s_b) : 1-V(s_b) )
+ * the Kleene OR over data inputs each gated by its decoded selector literal- the
+ * continuous {0,0.5,1}-lattice generalization of (sel ? d1 : d0) to N = 2^K.
+ */
+function buildMuxExpr(N: number, K: number): string {
+  const nest = (fn: string, terms: string[]): string =>
+    terms.length === 1 ? terms[0]! : `${fn}(${terms[0]},${nest(fn, terms.slice(1))})`;
+  const lit = (i: number, b: number): string =>
+    ((i >>> b) & 1) === 1 ? `V(s${b})` : `(1-V(s${b}))`;
+  const terms = Array.from({ length: N }, (_, i) => {
+    const weight = nest("min", Array.from({ length: K }, (_, b) => lit(i, b)));
+    return `min(V(d${i}),${weight})`;
+  });
+  return nest("max", terms);
+}
+
 export function buildMuxNetlist(params: PropertyBag): MnaSubcircuitNetlist {
   const K        = params.getModelParam<number>("selectorBits");
   const N        = 1 << K;
@@ -341,21 +361,33 @@ export function buildMuxNetlist(params: PropertyBag): MnaSubcircuitNetlist {
   const elements: SubcircuitElement[] = [];
   const netlist: number[][] = [];
 
-  // Driver leaf reads result-nets for data and sel inputs.
-  // Pin order in driver: data_0..data_{N-1}, sel_0..sel_{K-1}, ctrl_out, gnd
-  const driverPins: number[] = [];
-  for (let i = 0; i < N; i++) driverPins.push(resultDataBase + i);
-  for (let b = 0; b < K; b++) driverPins.push(resultSelBase + b);
-  driverPins.push(ctrlOutNet, gndPortIdx);
+  // Driver: BehavioralLogic I-mode B-source over the data/sel result-nets, plus
+  // a 1Ω drvR Norton (I + 1Ω -> V(ctrl_out) = expr). Bind the controller pins in
+  // the expression's V() first-encounter order (parsed here) so the netlist row
+  // always matches BehavioralLogic's pinLayoutFactory regardless of expression
+  // shape; out+ -> gnd, out- -> ctrl_out (current injected into ctrl_out).
+  const expr = buildMuxExpr(N, K);
+  const nodeVars = buildBSourceTree(expr).vars.filter((v) => v.kind === "node").map((v) => v.label);
+  const netForVar = (label: string): number => {
+    const idx = Number(label.slice(1));
+    return label[0] === "d" ? resultDataBase + idx : resultSelBase + idx;
+  };
+  const driverPins: number[] = nodeVars.map(netForVar);
+  driverPins.push(gndPortIdx, ctrlOutNet);
   elements.push({
-    typeId: "BehavioralMuxDriver",
+    typeId: "BehavioralLogic",
     modelRef: "default",
     subElementName: "drv",
-    params: {
-      selectorBits: K,
-    },
+    params: { expression: { kind: "literal", value: expr } },
   });
   netlist.push(driverPins);
+  elements.push({
+    typeId: "Resistor",
+    modelRef: "behavioral",
+    subElementName: "drvR",
+    params: { resistance: 1 },
+  });
+  netlist.push([ctrlOutNet, gndPortIdx]);
 
   // Data input pins — 3-port DIPL, string-bound.
   for (let i = 0; i < N; i++) {

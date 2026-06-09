@@ -13,8 +13,9 @@ import {
   gateBodyMetrics,
 } from "../../core/pin.js";
 import { PropertyType, LABEL_PROPERTY_DEF } from "../../core/properties.js";
-import type { PropertyDefinition } from "../../core/properties.js";
+import type { PropertyDefinition, PropertyBag } from "../../core/properties.js";
 import type { AttributeMapping } from "../../core/registry.js";
+import type { MnaSubcircuitNetlist, SubcircuitElement } from "../../core/mna-subcircuit-netlist.js";
 
 // ---------------------------------------------------------------------------
 // Layout helpers- identical across all 6 multi-input gates
@@ -67,6 +68,120 @@ export function buildInvertedPinDeclarations(
 ): PinDeclaration[] {
   const h = componentHeight(inputCount);
   return standardGatePinLayout(buildInputLabels(inputCount), "out", compWidth(wideShape), h, bitWidth, OUTPUT_BUBBLE_OFFSET);
+}
+
+// ---------------------------------------------------------------------------
+// Behavioural gate netlist- shared builder for all combinational logic gates
+//
+// Every behavioural gate (And/Or/NAnd/NOr/XOr/XNOr/Not/Buf) has the identical
+// structure: one BehavioralLogic I-mode B-source `drv` evaluating the gate's
+// truth function over N normalized input levels V(r1)..V(rN); a 1Ω `drvR`
+// Norton resistor (I-source + 1Ω -> V(ctrl_out) = expr); one DigitalInputPin
+// per input; one DigitalOutputPin. Only the truth-function expression differs,
+// supplied by `buildExpr`. The B-source is a true Newton device (asrcload.c
+// stamps the analytic Jacobian) and is harness-comparable bit-exact to ngspice.
+// ---------------------------------------------------------------------------
+
+/** Right-fold a binary B-source function over N terms (min/max are 2-ary). */
+export function nestBinary(fn: string, terms: string[]): string {
+  if (terms.length === 1) return terms[0]!;
+  return `${fn}(${terms[0]},${nestBinary(fn, terms.slice(1))})`;
+}
+
+/** Left-fold the fuzzy XOR (a XOR b = a + b - 2ab) over N terms. */
+export function xorFold(terms: string[]): string {
+  let expr = terms[0]!;
+  for (let i = 1; i < terms.length; i++) {
+    const b = terms[i]!;
+    expr = `(${expr}+${b}-2*(${expr})*${b})`;
+  }
+  return expr;
+}
+
+/**
+ * Build the behavioural-model netlist for a combinational gate. `buildExpr`
+ * receives the controller references `["V(r1)", …, "V(rN)"]` and returns the
+ * gate's I-mode B-source truth-function expression.
+ */
+export function buildBehavioralGateNetlist(
+  params: PropertyBag,
+  buildExpr: (vars: string[]) => string,
+): MnaSubcircuitNetlist {
+  const N = params.getModelParam<number>("inputCount");
+  const loaded = params.getModelParam<number>("loaded") >= 0.5;
+  const inputPinType = loaded ? "DigitalInputPinLoaded" : "DigitalInputPinUnloaded";
+  const outputPinType = loaded ? "DigitalOutputPinLoaded" : "DigitalOutputPinUnloaded";
+
+  const ports: string[] = [];
+  for (let i = 0; i < N; i++) ports.push(`In_${i + 1}`);
+  ports.push("out", "gnd");
+  const outIdx = N;
+  const gndIdx = N + 1;
+  const ctrlOutNet = N + 2;
+  const resultNets: number[] = [];
+  for (let i = 0; i < N; i++) resultNets.push(N + 3 + i);
+
+  const elements: SubcircuitElement[] = [];
+  const netlist: number[][] = [];
+
+  // Truth-function driver: I-mode B-source over controllers r1..rN. Pin order is
+  // [controllers…, out+, out-]; out+ -> gnd, out- -> ctrl_out (current injected
+  // into ctrl_out) plus the 1Ω drvR Norton (G=1 -> V(ctrl_out) = expr).
+  const driverPins: number[] = [];
+  for (let i = 0; i < N; i++) driverPins.push(resultNets[i]!);
+  const expr = buildExpr(Array.from({ length: N }, (_, i) => `V(r${i + 1})`));
+  driverPins.push(gndIdx, ctrlOutNet);
+  elements.push({
+    typeId: "BehavioralLogic",
+    modelRef: "default",
+    subElementName: "drv",
+    params: { expression: { kind: "literal", value: expr } },
+  });
+  netlist.push(driverPins);
+  elements.push({
+    typeId: "Resistor",
+    modelRef: "behavioral",
+    subElementName: "drvR",
+    params: { resistance: 1 },
+  });
+  netlist.push([ctrlOutNet, gndIdx]);
+
+  for (let i = 0; i < N; i++) {
+    elements.push({
+      typeId: inputPinType,
+      modelRef: "default",
+      subElementName: `inPin_${i + 1}`,
+      params: { vIH: "vIH", vIL: "vIL", rIn: "rIn", cIn: "cIn" },
+    });
+    netlist.push([i, gndIdx, resultNets[i]!]);
+  }
+
+  elements.push({
+    typeId: outputPinType,
+    modelRef: "default",
+    subElementName: "outPin",
+    params: {
+      rOut: params.getModelParam<number>("rOut"),
+      cOut: params.getModelParam<number>("cOut"),
+      vOH: params.getModelParam<number>("vOH"),
+      vOL: params.getModelParam<number>("vOL"),
+    },
+  });
+  netlist.push([outIdx, gndIdx, ctrlOutNet]);
+
+  return {
+    ports,
+    params: {
+      vIH: params.getModelParam<number>("vIH"),
+      vIL: params.getModelParam<number>("vIL"),
+      rIn: params.getModelParam<number>("rIn"),
+      cIn: params.getModelParam<number>("cIn"),
+    },
+    elements,
+    internalNetCount: 1 + N,
+    internalNetLabels: ["ctrl_out", ...Array.from({ length: N }, (_, i) => `result_${i + 1}`)],
+    netlist,
+  };
 }
 
 // ---------------------------------------------------------------------------

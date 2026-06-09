@@ -287,6 +287,7 @@ export const TransmissionLineDefinition: StandaloneComponentDefinition = {
       factory: createTransmissionLineElement,
       paramDefs: TRANSMISSION_LINE_PARAM_DEFS,
       params: TRANSMISSION_LINE_DEFAULTS,
+      spice: { device: "TRA", deckNodeTokens: ["P1b", "P1a", "P2b", "P2a"] },
     },
   },
   defaultModel: "default",

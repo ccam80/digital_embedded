@@ -731,6 +731,7 @@ export const CapacitorDefinition: StandaloneComponentDefinition = {
       factory: createCapacitorElement,
       paramDefs: CAPACITOR_PARAM_DEFS,
       params: CAPACITOR_DEFAULTS,
+      spice: { device: "CAP", deckNodeTokens: ["pos", "neg"] },
     },
   },
   defaultModel: "behavioral",

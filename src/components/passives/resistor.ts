@@ -701,6 +701,7 @@ export const ResistorDefinition: StandaloneComponentDefinition = {
       factory: createResistorElement,
       paramDefs: RESISTOR_PARAM_DEFS,
       params: RESISTOR_DEFAULTS,
+      spice: { device: "RES", deckNodeTokens: ["pos", "neg"] },
     },
   },
   defaultModel: "behavioral",

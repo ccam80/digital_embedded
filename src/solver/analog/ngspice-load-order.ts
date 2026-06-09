@@ -1,3 +1,5 @@
+import type { ComponentRegistry } from "../../core/registry.js";
+
 /**
  * NGSPICE_LOAD_ORDER- device-type ordinals for cktLoad order parity (A1).
  *
@@ -116,205 +118,116 @@ export type DeviceFamily =
  * parity-tested against ngspice; primitives in fixtures (R, C, L, V, I, Q, M,
  * D, J) all have unambiguous entries here.
  */
-export const TYPE_ID_TO_NGSPICE_LOAD_ORDER: Readonly<Record<string, number>> = {
-  // Primitives
-  Resistor:        NGSPICE_LOAD_ORDER.RES,
-  Capacitor:       NGSPICE_LOAD_ORDER.CAP,
-  PolarizedCap:    NGSPICE_LOAD_ORDER.CAP,
-  Inductor:        NGSPICE_LOAD_ORDER.IND,
-  MutualInductor:  NGSPICE_LOAD_ORDER.MUT,
-  Transformer:     NGSPICE_LOAD_ORDER.IND,
-  TappedTransformer: NGSPICE_LOAD_ORDER.IND,
-  TransmissionLine: NGSPICE_LOAD_ORDER.TRA,
-  DcVoltageSource: NGSPICE_LOAD_ORDER.VSRC,
-  AcVoltageSource: NGSPICE_LOAD_ORDER.VSRC,
-  DcCurrentSource: NGSPICE_LOAD_ORDER.ISRC,
-  AcCurrentSource: NGSPICE_LOAD_ORDER.ISRC,
-  Diode:           NGSPICE_LOAD_ORDER.DIO,
-  ZenerDiode:      NGSPICE_LOAD_ORDER.DIO,
-  VaractorDiode:   NGSPICE_LOAD_ORDER.DIO,
-  SchottkyDiode:NGSPICE_LOAD_ORDER.DIO,
-  NpnBJT:          NGSPICE_LOAD_ORDER.BJT,
-  PnpBJT:          NGSPICE_LOAD_ORDER.BJT,
-  NMOS:            NGSPICE_LOAD_ORDER.MOS,
-  PMOS:            NGSPICE_LOAD_ORDER.MOS,
-  NMOS3:           NGSPICE_LOAD_ORDER.MOS,
-  PMOS3:           NGSPICE_LOAD_ORDER.MOS,
-  NJFET:           NGSPICE_LOAD_ORDER.JFET,
-  PJFET:           NGSPICE_LOAD_ORDER.JFET,
-  NMESFET:         NGSPICE_LOAD_ORDER.MES,
-  PMESFET:         NGSPICE_LOAD_ORDER.MES,
-  JFET2N:          NGSPICE_LOAD_ORDER.JFET2,
-  JFET2P:          NGSPICE_LOAD_ORDER.JFET2,
-  // Switches
-  CurrentControlledSwitch: NGSPICE_LOAD_ORDER.CSW,
-  // Behavioral / controlled sources
-  VCCS:            NGSPICE_LOAD_ORDER.VCCS,
-  VCVS:            NGSPICE_LOAD_ORDER.VCVS,
-  CCCS:            NGSPICE_LOAD_ORDER.CCCS,
-  CCVS:            NGSPICE_LOAD_ORDER.CCVS,
-  // ASRC behavioural B-source (dev.c:153) — V-mode (BV) and I-mode (BI).
-  BV:              NGSPICE_LOAD_ORDER.ASRC,
-  BI:              NGSPICE_LOAD_ORDER.ASRC,
-};
+/**
+ * Netlist-device metadata for one typeId, derived at registration from the
+ * emitting model entry's `spice` block. `family` is the ngspice DEVices[]
+ * bucket; load order is `NGSPICE_LOAD_ORDER[family]`. `deckNodeTokens` is the
+ * pin order whose node IDs the device line mints (absent for a multi-line
+ * composite such as a Transformer, whose sub-element lines supply the order).
+ */
+export interface NetlistDeviceInfo {
+  family: DeviceFamily;
+  deckNodeTokens?: readonly string[];
+}
 
 /**
- * Look up ngspice load order by typeId. Returns a high sentinel for
- * unknown / composite typeIds so they sort to the end of the deck walk used
- * for node numbering. Composite components in fixtures share that sentinel
- * bucket; ngspice-parity for composites is not established.
+ * typeId → NetlistDeviceInfo, rebuilt from the registry whenever components are
+ * registered (`buildNetlistDeviceIndex`). The single source of truth is each
+ * model entry's `spice.device` / `spice.deckNodeTokens`; this index replaces the
+ * former hand-kept per-typeId load-order / device-family / deck-pin tables.
+ */
+const NETLIST_DEVICE_BY_TYPE = new Map<string, NetlistDeviceInfo>();
+
+/**
+ * Populate the typeId → NetlistDeviceInfo index from every registered
+ * definition's model entries. Called once after registration
+ * (registerAllComponents). A typeId is recorded from the first model entry that
+ * declares `spice.device`; a device's models share one family and node-token
+ * order, so one entry suffices for these typeId-level lookups (per-model
+ * precision, where it matters, reads the resolved model entry directly).
+ */
+export function buildNetlistDeviceIndex(registry: ComponentRegistry): void {
+  NETLIST_DEVICE_BY_TYPE.clear();
+  for (const def of registry.getAll()) {
+    if (!def.modelRegistry) continue;
+    for (const entry of Object.values(def.modelRegistry)) {
+      const device = entry.spice?.device;
+      if (device === undefined) continue;
+      NETLIST_DEVICE_BY_TYPE.set(def.name, {
+        family: device,
+        ...(entry.spice?.deckNodeTokens !== undefined
+          ? { deckNodeTokens: entry.spice.deckNodeTokens }
+          : {}),
+      });
+      break;
+    }
+  }
+}
+
+/**
+ * Look up ngspice load order by typeId, as `NGSPICE_LOAD_ORDER[family]` from the
+ * registration-built index. Returns a high sentinel (1000) for unknown /
+ * composite / behavioural-only typeIds so they sort to the end of the deck walk
+ * used for node numbering.
  */
 export function getNgspiceLoadOrderByTypeId(typeId: string): number {
-  return TYPE_ID_TO_NGSPICE_LOAD_ORDER[typeId] ?? 1000;
+  const info = NETLIST_DEVICE_BY_TYPE.get(typeId);
+  if (info === undefined) return 1000;
+  return (NGSPICE_LOAD_ORDER as Record<string, number>)[info.family] ?? 1000;
 }
 
 /**
- * Per-`typeId` DeviceFamily lookup, derived from the same DEVices[] position
- * mapping as TYPE_ID_TO_NGSPICE_LOAD_ORDER.
- */
-export const TYPE_ID_TO_DEVICE_FAMILY: Readonly<Record<string, DeviceFamily>> = {
-  // Primitives
-  Resistor:        "RES",
-  Capacitor:       "CAP",
-  PolarizedCap:    "CAP",
-  Inductor:        "IND",
-  MutualInductor:  "MUT",
-  Transformer:     "IND",
-  TappedTransformer: "IND",
-  TransmissionLine: "TRA",
-  DcVoltageSource: "VSRC",
-  AcVoltageSource: "VSRC",
-  DcCurrentSource: "ISRC",
-  AcCurrentSource: "ISRC",
-  Diode:           "DIO",
-  ZenerDiode:      "DIO",
-  VaractorDiode:   "DIO",
-  SchottkyDiode:   "DIO",
-  NpnBJT:          "BJT",
-  PnpBJT:          "BJT",
-  NMOS:            "MOS",
-  PMOS:            "MOS",
-  NMOS3:           "MOS",
-  PMOS3:           "MOS",
-  NJFET:           "JFET",
-  PJFET:           "JFET",
-  NMESFET:         "MES",
-  PMESFET:         "MES",
-  JFET2N:          "JFET2",
-  JFET2P:          "JFET2",
-  // Switches
-  CurrentControlledSwitch: "CSW",
-  // Behavioral / controlled sources
-  VCCS:            "VCCS",
-  VCVS:            "VCVS",
-  CCCS:            "CCCS",
-  CCVS:            "CCVS",
-  BV:              "ASRC",
-  BI:              "ASRC",
-};
-
-/**
- * Look up DeviceFamily by typeId. Returns "BEHAVIORAL" for unknown / composite
- * typeIds so they sort to the BEHAVIORAL bucket.
+ * Look up DeviceFamily by typeId from the registration-built index. Returns
+ * "BEHAVIORAL" for unknown / composite / behavioural-only typeIds so they sort
+ * to the BEHAVIORAL bucket.
  */
 export function getDeviceFamilyByTypeId(typeId: string): DeviceFamily {
-  return TYPE_ID_TO_DEVICE_FAMILY[typeId] ?? "BEHAVIORAL";
+  return NETLIST_DEVICE_BY_TYPE.get(typeId)?.family ?? "BEHAVIORAL";
 }
 
 /**
- * Per-`typeId` SPICE deck pin-emission order.
- *
- * Each entry lists the digiTS pin labels in the order their corresponding
- * node IDs appear on the element's SPICE deck line- i.e. the order ngspice's
- * parser visits each node name. This MUST match exactly what
- * `__tests__/harness/netlist-generator.ts` emits, because ngspice numbers MNA
- * nodes during deck PARSE (cktnewn.c via INPtermInsert from the per-type
- * `INP2*` parsers). Pin labels not listed here, or pin labels that the deck
- * line repeats (e.g. NMOS body pin tied to source), do not contribute new
- * node IDs and are omitted from the entry.
- *
- * Identity entries are listed explicitly rather than omitted so a
- * registry-startup audit can assert every analog typeId in `pinLayout` is
- * accounted for here.
+ * DeviceFamilies whose leaves emit a primitive device that is matched against
+ * ngspice (one deck line per leaf). A leaf in one of these families must declare
+ * its node-token order in its model entry's `spice.deckNodeTokens` so the
+ * compiler's node-allocation walk numbers its nodes in ngspice's INPpas2
+ * first-encounter order. Behavioural-only leaves (family `BEHAVIORAL`) have no
+ * ngspice counterpart and are never harness-compared, so they carry no tokens.
+ * Single source of truth, shared by the registry audit and the compiler enumerator.
  */
-export const TYPE_ID_TO_DECK_PIN_LABEL_ORDER: Readonly<Record<string, readonly string[]>> = {
-  // Two-terminal passives (deck: name n+ n- value)- pinLayout matches
-  Resistor:        ["pos", "neg"],
-  Capacitor:       ["pos", "neg"],
-  PolarizedCap:    ["pos", "neg"],
-  Inductor:        ["pos", "neg"],
-  // Vname pos neg <spec>
-  DcVoltageSource: ["pos", "neg"],
-  AcVoltageSource: ["pos", "neg"],
-  // Iname pos neg <spec>
-  DcCurrentSource: ["pos", "neg"],
-  AcCurrentSource: ["pos", "neg"],
-  // D name A K model
-  Diode:           ["A", "K"],
-  ZenerDiode:      ["A", "K"],
-  VaractorDiode:   ["A", "K"],
-  SchottkyDiode:["A", "K"],
-  // Q name C B E model
-  NpnBJT:          ["C", "B", "E"],
-  PnpBJT:          ["C", "B", "E"],
-  // M name D G S B model- body tied to source by netlist-generator, so
-  // numbering only sees three distinct nodes
-  NMOS:            ["D", "G", "S"],
-  PMOS:            ["D", "G", "S"],
-  // M name D G S B model (level=3 MOS3; same three external nodes as MOS1)
-  NMOS3:           ["D", "G", "S"],
-  PMOS3:           ["D", "G", "S"],
-  // J name D G S model
-  NJFET:           ["D", "G", "S"],
-  PJFET:           ["D", "G", "S"],
-  // Z name D G S model (mes.c:66-70 MESnames = Drain/Gate/Source)
-  NMESFET:         ["D", "G", "S"],
-  PMESFET:         ["D", "G", "S"],
-  // J name D G S model (PS JFET2, NJF/PJF level=2)
-  JFET2N:          ["D", "G", "S"],
-  JFET2P:          ["D", "G", "S"],
-  // T name pos1 neg1 pos2 neg2 Z0=... TD=...
-  // ngspice TRAnames (tra.c:32-37): ["P1+","P1-","P2+","P2-"] → digiTS [P1b,P1a,P2b,P2a].
-  TransmissionLine: ["P1b", "P1a", "P2b", "P2a"],
-  // F/H sense-via-label: only out pins appear on the deck card; the sense
-  // V-source is referenced by device name. Deck: `F/Hname out+ out- VSENSE gain`.
-  CCCS:            ["out+", "out-"],
-  CCVS:            ["out+", "out-"],
-  // E/G ctrl-as-nodes: ctrl pins follow out pins on the deck card.
-  // Deck: `E/Gname out+ out- ctrl+ ctrl- gain`.
-  VCCS:            ["out+", "out-", "ctrl+", "ctrl-"],
-  VCVS:            ["out+", "out-", "ctrl+", "ctrl-"],
-  // ASRC B-card: `B<name> n+ n- V=expr` / `I=expr`. Controllers are referenced
-  // symbolically inside the expression (V(node) / I(source)), not as deck node
-  // tokens, so only the two output nodes appear on the card.
-  BV:              ["out+", "out-"],
-  BI:              ["out+", "out-"],
-  // Transformer / TappedTransformer are MULTI-LINE composites (see
-  // MULTI_LINE_COMPOSITES below): they decompose into per-winding `L` cards plus a
-  // `K` coupling, so there is NO single deck card with a fixed node-token order.
-  // Node numbering comes from the winding sub-element lines (each an Inductor
-  // ["pos","neg"]) via the composite node-alloc walk- they carry no row here.
-  // K-card mutual coupling (`Kname Lname1 Lname2 k`, inp2k.c) references the two
-  // inductors by device name and reads NO node tokens, so it mints no node IDs.
-  MutualInductor:    [],
-  // W-card current-controlled switch (`Wname out+ out- VSENSE model`, inp2w.c):
-  // the sense element is referenced by device name, so only the two output
-  // node tokens appear on the card.
-  CurrentControlledSwitch: ["out+", "out-"],
+export const DECK_EMITTING_FAMILIES: ReadonlySet<DeviceFamily> = new Set<DeviceFamily>([
+  "RES", "CAP", "IND", "VSRC", "ISRC", "DIO", "BJT", "MOS", "JFET", "MES",
+  "JFET2", "TRA", "CCCS", "CCVS", "VCCS", "VCVS", "ASRC", "CSW", "MUT",
+]);
+
+/**
+ * Canonical DeviceFamily -> SPICE card-letter map- the single source of truth for
+ * the prefix ngspice's parser keys each device line on. The SPICE prefix is a
+ * property of the device FAMILY (every MOS variant is `M`, every diode `D`,
+ * ASRC `B`), so it lives here next to the family ordinals rather than being
+ * duplicated per typeId. The harness label canonicalizer and the topology-diff
+ * element matcher derive from this; the emitter's per-typeId ELEMENT_SPECS
+ * additionally carries model-type/level plus a few typeId aliases (e.g. LDR->R)
+ * that are not family-derivable. Behavioural-only families have no card, no entry.
+ */
+export const SPICE_PREFIX_BY_FAMILY: Partial<Record<DeviceFamily, string>> = {
+  RES: "R", CAP: "C", IND: "L", MUT: "K",
+  VSRC: "V", ISRC: "I", ASRC: "B",
+  DIO: "D", BJT: "Q", MOS: "M", JFET: "J", JFET2: "J", MES: "Z",
+  VCVS: "E", VCCS: "G", CCVS: "H", CCCS: "F",
+  SW: "S", CSW: "W", TRA: "T", URC: "U",
 };
 
 /**
- * Multi-line composite typeIds: devices that decompose into MULTIPLE deck cards
- * (a Transformer -> per-winding `L` lines + a `K`), so they have no single
- * deck-pin-order row- their node numbering comes from their sub-element lines via
- * the composite node-alloc walk. Both the registry self-check
- * (ngspice-load-order-audit.ts) and `auditDeckPinOrderCoverage` below exempt these
- * from the "must have a deck-pin row" rule. Single source of truth for the set.
+ * Look up a typeId's SPICE deck node-token order — the pin labels whose node
+ * IDs the device line mints, in deck order (ngspice's INP2* first-encounter
+ * sequence) — from the registration-built index. Returns undefined for a typeId
+ * with no emitting model (behavioural-only / composite) or a multi-line
+ * composite that declares a family but no single node-token line. The data
+ * lives on each model entry's `spice.deckNodeTokens`.
  */
-export const MULTI_LINE_COMPOSITES: ReadonlySet<string> = new Set<string>([
-  "Transformer",
-  "TappedTransformer",
-]);
+export function getDeckNodeTokensByTypeId(typeId: string): readonly string[] | undefined {
+  return NETLIST_DEVICE_BY_TYPE.get(typeId)?.deckNodeTokens;
+}
 
 /**
  * Deck-line ordering producer- single source of truth for the order ngspice's
@@ -350,35 +263,3 @@ export function deckOrder<T extends { typeId: string }>(
     });
 }
 
-/**
- * Startup audit asserting every analog typeId the deck generator can emit has a
- * `TYPE_ID_TO_DECK_PIN_LABEL_ORDER` row.
- *
- * inppas2.c:94-263- every device class ngspice's pass-2 switch dispatches has a
- * fixed node-token order in its `INP2*` parser. The MNA node-map walk reproduces
- * that order from this table; a missing row would silently fall back to pinLayout
- * order, which is the deck order only by coincidence. Auditing at startup makes a
- * gap a loud error rather than a parity drift discovered three layers down.
- *
- * Only typeIds that carry a SPICE card (an `NGSPICE_LOAD_ORDER` / family entry)
- * are checked; genuinely card-less composite outer typeIds legitimately have no
- * row- their sub-element lines drive node numbering, so the pinLayout order
- * applies to them and is correct.
- */
-export function auditDeckPinOrderCoverage(analogTypeIds: readonly string[]): void {
-  for (const typeId of analogTypeIds) {
-    if (!(typeId in TYPE_ID_TO_NGSPICE_LOAD_ORDER)) continue; // card-less composite
-    if (MULTI_LINE_COMPOSITES.has(typeId)) continue; // sub-element cards supply node order
-    if (!(typeId in TYPE_ID_TO_DECK_PIN_LABEL_ORDER)) {
-      // Warn, never throw: a missing row is a developer-facing coverage gap, not a
-      // reason to break every compile (and take the MCP/simulator down with it). The
-      // node-walk falls back to pinLayout order; if that differs from deck order it
-      // surfaces as a harness parity divergence on that device's own gate- the right
-      // place to catch it, not a hard crash three layers up.
-      console.warn(
-        `[ngspice-load-order] TYPE_ID_TO_DECK_PIN_LABEL_ORDER missing "${typeId}"; ` +
-          `node numbering falls back to pinLayout order (inppas2.c:94-263).`,
-      );
-    }
-  }
-}

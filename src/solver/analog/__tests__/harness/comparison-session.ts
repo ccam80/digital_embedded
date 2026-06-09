@@ -40,6 +40,7 @@ import type {
 import type { AcParams } from "../../ac-analysis.js";
 import { buildDirectNodeMapping, reindexNgspiceSession, reindexNgspiceAcSession } from "./node-mapping.js";
 import { generateSpiceNetlist, ELEMENT_SPECS, canonicalizeSpiceLabel } from "./netlist-generator.js";
+import { SPICE_PREFIX_BY_FAMILY } from "../../ngspice-load-order.js";
 import { matchSlotPattern } from "./glob.js";
 import { installUcrtLibmShim, uninstallUcrtLibmShim } from "./ucrt-libm-shim.js";
 import type {
@@ -4298,7 +4299,13 @@ export class ComparisonSession {
     const matchedNgNames = new Set<string>();
     const elementDiffs: TopologyElementDiff[] = [];
 
-    const prefixCandidates = ["v", "l", "e", "f", "h", "r", "c", "d", "q", "m", "j", "i", "g", "s", "w", "t"];
+    // The complete set of SPICE element prefixes the deck emitter can prepend,
+    // sourced from the canonical SPICE_PREFIX_BY_FAMILY map (ngspice-load-order.ts)
+    // so a new device class can never silently drift out of the matcher the way
+    // "B" (ASRC) and "Z" (MESFET) once did.
+    const prefixCandidates = [
+      ...new Set(Object.values(SPICE_PREFIX_BY_FAMILY).map((p) => p.toLowerCase())),
+    ];
     const candidatesFor = (label: string): string[] => {
       const lower = label.toLowerCase();
       const underscored = lower.replace(/:/g, "_");

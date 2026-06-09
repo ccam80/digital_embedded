@@ -32,19 +32,7 @@ Clusters sorted by remaining (open) test payoff.
   - **[DONE] (0/1t)** `src/components/semiconductors/diode.ts:942`
     - Same as full_iteration_paired_blocking: use harness_get_attempt on DIAC1_D_rev across the failing DCOP iters to confirm the breakdown pnjlim
 
-## Cluster 2 [HUB] — 4/4 item(s) open · 14/14 tests still failing
-- themes: digital-level-contract×1, opamp-convergence×1, state-pool×1, integration-tran×1
-- dirs: src/components/active (4)
-  - **[OPEN] (8/8t)** `driver-ctrl-contract`
-    - The driver must stamp the NORMALIZED logic level onto ctrl_out, not the rail-level vTarget. With latch=0 inactive the logic level is 1 (-> o
-  - **[OPEN] (4/4t)** `comparator-latch-polarity`
-    - Invert the latch transition conditions at lines 165-166: latch should go to 1 (sinking) when vPlus < vTl and release to 0 when vPlus >= vTh,
-  - **[OPEN] (1/1t)** `src/components/active/comparator-driver.ts:181`
-    - The DC weight collapse pre-saturates OUTPUT_WEIGHT so the transient integration test starts at the target. Either the DC branch should not p
-  - **[OPEN] (1/1t)** `src/components/active/timer-555.ts:56`
-    - The discharge BJT must saturate and pull DIS toward GND when the base is driven to vDrop. Investigate the bjtDis NpnBJT spice-model area/IS 
-
-## Cluster 3 [HUB] — 3/3 item(s) open · 12/12 tests still failing
+## Cluster 2 [HUB] — 3/3 item(s) open · 12/12 tests still failing
 - themes: opamp-convergence×1, integration-tran×1
 - dirs: src/components/active (3)
   - **[OPEN] (7/7t)** `real-opamp-raillim`
@@ -54,7 +42,7 @@ Clusters sorted by remaining (open) test payoff.
   - **[OPEN] (2/2t)** `src/components/active/real-opamp.ts:170`
     - Either the param default vos at real-opamp.ts:170 (1e-3) is non-zero while the test fixture assumes 0, or the gain-stage vos term at line 55
 
-## Cluster 4 [HUB] — 7/10 item(s) open · 10/20 tests still failing
+## Cluster 3 [HUB] — 7/10 item(s) open · 10/20 tests still failing
 - themes: integration-tran×8, opamp-convergence×5, deck-emission×4, digital-threshold×2, state-pool×1
 - dirs: src/solver/analog (8), src/components/passives (1)
   - **[OPEN] (4/4t)** `src/components/passives/crystal.ts:195`
@@ -78,7 +66,7 @@ Clusters sorted by remaining (open) test payoff.
   - **[DONE] (0/2t)** `src/solver/analog/analog-engine.ts:317`
     - Run the initial transient operating-point solve at init()/compile() time (capturing the source value present then) so a later hot setSignal 
 
-## Cluster 5 [HUB] — 2/2 item(s) open · 8/8 tests still failing
+## Cluster 4 [HUB] — 2/2 item(s) open · 8/8 tests still failing
 - themes: numeric-ulp×1, integration-tran×1, state-pool×1
 - dirs: src/solver/analog (2)
   - **[OPEN] (6/6t)** `src/solver/analog/ckt-terr.ts:53`
@@ -86,7 +74,7 @@ Clusters sorted by remaining (open) test payoff.
   - **[OPEN] (2/2t)** `src/solver/analog/ckt-terr.ts:190`
     - Delete the line 190 early return; let denom=Math.max(abstol, factor*ddiff) clamp to abstol when ddiff===0, matching cktterr.c:69, then retur
 
-## Cluster 6 [HUB] — 2/2 item(s) open · 7/7 tests still failing
+## Cluster 5 [HUB] — 2/2 item(s) open · 7/7 tests still failing
 - themes: digital-level-contract×1, digital-threshold×1, opamp-convergence×1
 - dirs: src/components/switching (1), src/solver/digital (1)
   - **[OPEN] (6/6t)** `src/components/switching/behavioral-fet-driver.ts:135`
@@ -94,7 +82,7 @@ Clusters sorted by remaining (open) test payoff.
   - **[OPEN] (1/1t)** `src/solver/digital/compiler.ts:647`
     - Add an FGPFET (and FGNFET) branch in the Step 8d seeding loop (compiler.ts:645-665) that writes initialStateSlots[stBase+1] = blown property
 
-## Cluster 7 [HUB] — 2/2 item(s) open · 7/9 tests still failing
+## Cluster 6 [HUB] — 2/2 item(s) open · 7/9 tests still failing
 - themes: (none matched)
 - dirs: src/components/active (1), src/solver (1)
   - **[OPEN] (4/4t)** `src/solver/coordinator.ts:716`
@@ -102,7 +90,7 @@ Clusters sorted by remaining (open) test payoff.
   - **[PARTIAL] (3/5t)** `schmitt-rout-key`
     - Change the rOut sub-element param map from {R: rOut} to {resistance: rOut} in SCHMITT_NON_INVERTING_NETLIST (and SCHMITT_INVERTING_NETLIST l
 
-## Cluster 8 [HUB] — 3/3 item(s) open · 7/7 tests still failing
+## Cluster 7 [HUB] — 3/3 item(s) open · 7/7 tests still failing
 - themes: opamp-convergence×1, numeric-ulp×1, state-pool×1, integration-tran×1, temperature×1
 - dirs: src/components/passives (3)
   - **[OPEN] (4/4t)** `src/components/passives/capacitor.ts:641`
@@ -112,19 +100,13 @@ Clusters sorted by remaining (open) test payoff.
   - **[OPEN] (1/1t)** `src/components/passives/capacitor.ts:491`
     - In capacitor.ts setParam, after setting _nominalC recompute this.C = _nominalC * _SCALE (or have the engine re-run computeTemperature on any
 
-## Cluster 9 [singleton] — 1/1 item(s) open · 6/6 tests still failing
-- themes: integration-tran×1
-- dirs: src/components/digital-pins (1)
-  - **[OPEN] (6/6t)** `src/components/digital-pins/digital-output-pin-loaded.ts:99`
-    - Either re-settle to DCOP after setComponentProperty (zero out cOut companion) before reading, or have the test compare against the transient
-
-## Cluster 10 [singleton] — 1/1 item(s) open · 5/5 tests still failing
+## Cluster 8 [singleton] — 1/1 item(s) open · 5/5 tests still failing
 - themes: opamp-convergence×1
 - dirs: src/solver/analog (1)
   - **[OPEN] (5/5t)** `src/solver/analog/ckt-load.ts:127`
     - The load path is family-bucket driven (runByDeviceFamily over elementsByFamily); the hand-built fixtures must populate elementsByFamily from
 
-## Cluster 11 [HUB] — 4/4 item(s) open · 5/5 tests still failing
+## Cluster 9 [HUB] — 4/4 item(s) open · 5/5 tests still failing
 - themes: integration-tran×4, numeric-ulp×1, digital-threshold×1, opamp-convergence×1
 - dirs: src/components/passives (2), src/solver/analog (2)
   - **[OPEN] (2/2t)** `src/components/passives/inductor.ts:891`
@@ -136,13 +118,13 @@ Clusters sorted by remaining (open) test payoff.
   - **[OPEN] (1/1t)** `src/solver/analog/timestep.ts:616`
     - Test-precondition gap, not a source bug: shouldReject and cktTerr match ngspice. To exercise the rollback path the fixture needs sharper flu
 
-## Cluster 12 [singleton] — 1/1 item(s) open · 4/4 tests still failing
+## Cluster 10 [singleton] — 1/1 item(s) open · 4/4 tests still failing
 - themes: opamp-convergence×1, state-pool×1, integration-tran×1
 - dirs: src/components/sensors (1)
   - **[OPEN] (4/4t)** `src/components/sensors/spark-gap.ts:226`
     - Make the CONDUCTING slot written to s0 in load() reach state1 each accepted step (boot DCOP seeds s1 so init tests pass; the transient per-s
 
-## Cluster 13 [HUB] — 2/2 item(s) open · 4/4 tests still failing
+## Cluster 11 [HUB] — 2/2 item(s) open · 4/4 tests still failing
 - themes: integration-tran×2, state-pool×1
 - dirs: src/components/passives (2)
   - **[OPEN] (3/3t)** `src/components/passives/memristor.ts:259`
@@ -150,7 +132,7 @@ Clusters sorted by remaining (open) test payoff.
   - **[OPEN] (1/1t)** `src/components/passives/memristor.ts:226`
     - In DC mode the memristor must read the last-accepted W from s1 (like the inductor), not s0. Reading s0 only holds the seed on the FIRST load
 
-## Cluster 14 [HUB] — 2/2 item(s) open · 4/4 tests still failing
+## Cluster 12 [HUB] — 2/2 item(s) open · 4/4 tests still failing
 - themes: temperature×2, digital-threshold×1, opamp-convergence×1, deck-emission×1, numeric-ulp×1
 - dirs: src/components/semiconductors (2)
   - **[OPEN] (2/2t)** `src/components/semiconductors/mosfet.ts:1375`
@@ -158,13 +140,13 @@ Clusters sorted by remaining (open) test payoff.
   - **[OPEN] (2/2t)** `src/components/semiconductors/mosfet.ts:420`
     - Drill the temp pass tTransconductance (KP/ratio4) tVto and tPhi lines 420 423-430 against mos1temp.c at instanceTemp=350K; the absDelta 3.98
 
-## Cluster 15 [singleton] — 1/1 item(s) open · 3/3 tests still failing
+## Cluster 13 [singleton] — 1/1 item(s) open · 3/3 tests still failing
 - themes: (none matched)
 - dirs: src/test-utils (1)
   - **[OPEN] (3/3t)** `src/test-utils/non-engine-coordinator.ts:126`
     - Change non-engine-coordinator.ts line 126 from let nextSnapshotId = 1 to let nextSnapshotId = 0 to match DigitalEngine 0-based snapshot IDs.
 
-## Cluster 16 [HUB] — 2/2 item(s) open · 2/3 tests still failing
+## Cluster 14 [HUB] — 2/2 item(s) open · 2/3 tests still failing
 - themes: digital-threshold×1, numeric-ulp×1, integration-tran×1
 - dirs: src/components/passives (2)
   - **[PARTIAL] (1/2t)** `src/components/passives/polarized-cap.ts:207`
@@ -172,55 +154,43 @@ Clusters sorted by remaining (open) test payoff.
   - **[OPEN] (1/1t)** `src/components/passives/polarized-cap.ts:641`
     - Read the ESR-limited current off cap:rEsr (the resistor in the series path), not the cap:cBody companion current, and read it at the first t
 
-## Cluster 17 [singleton] — 1/1 item(s) open · 2/2 tests still failing
+## Cluster 15 [singleton] — 1/1 item(s) open · 2/2 tests still failing
 - themes: temperature×1
 - dirs: src/components/semiconductors (1)
   - **[OPEN] (2/2t)** `src/components/semiconductors/zener.ts:230`
     - Add a tIS (DIOtSatCur) derivation to _computeZenerTp mirroring diotemp.c:175-185 (scale IS by exp((T/TNOM-1)*EG/vt)*(T/TNOM)^(XTI/N)) and us
 
-## Cluster 18 [singleton] — 1/1 item(s) open · 2/2 tests still failing
+## Cluster 16 [singleton] — 1/1 item(s) open · 2/2 tests still failing
 - themes: deck-emission×1
 - dirs: src/components/switching (1)
   - **[OPEN] (2/2t)** `src/components/switching/trans-gate.ts:337`
     - Mark TransGateDefinition pairedSpiceEquivalent:false (like fuse/opamp/ota) and switch these tests from ComparisonSession.create (T3 paired) 
 
-## Cluster 19 [singleton] — 1/1 item(s) open · 2/2 tests still failing
-- themes: (none matched)
-- dirs: src/components/digital-pins (1)
-  - **[OPEN] (2/2t)** `src/components/digital-pins/digital-input-pin-loaded.ts:13`
-    - Reconcile rIn default: either the source default should be 100k or the test must assert the 1MOhm sag (approx 4.9505); the loaded vs unloade
-
-## Cluster 20 [singleton] — 1/1 item(s) open · 2/2 tests still failing
-- themes: (none matched)
-- dirs: src/components/gates (1)
-  - **[OPEN] (2/2t)** `src/components/gates/and.ts:196`
-    - Have buildAndGateNetlist read the per-pin loaded flag and per-pin ResolvedPinElectrical (the _pinLoading / _pinElectrical maps set on props 
-
-## Cluster 21 [singleton] — 1/1 item(s) open · 2/2 tests still failing
+## Cluster 17 [singleton] — 1/1 item(s) open · 2/2 tests still failing
 - themes: digital-level-contract×1, digital-threshold×1
 - dirs: src/components/active (1)
   - **[OPEN] (2/2t)** `adc-thresholder-midpoint`
     - clk_result carries logic levels 0.0/0.5/1.0 from DigitalInputThresholder. The driver must classify clk high only when vClock > 0.5 (above in
 
-## Cluster 22 [singleton] — 1/1 item(s) open · 2/2 tests still failing
+## Cluster 18 [singleton] — 1/1 item(s) open · 2/2 tests still failing
 - themes: digital-threshold×1, integration-tran×1
 - dirs: src/solver/analog (1)
   - **[OPEN] (2/2t)** `src/solver/analog/ni-integrate.ts:64`
     - Drill the first-transient-step ag fed to the inductor load: at MODEINITTRAN the engine ag[0] driving geq (ni-integrate.ts:64) is half of ngs
 
-## Cluster 23 [singleton] — 1/1 item(s) open · 2/2 tests still failing
+## Cluster 19 [singleton] — 1/1 item(s) open · 2/2 tests still failing
 - themes: deck-emission×1
 - dirs: src/solver/analog/behavioral-drivers (1)
   - **[OPEN] (2/2t)** `src/solver/analog/behavioral-drivers/bridge-output-driver.ts:154`
     - The bridge boundary drivers inject a parasitic 1/rHiZ (and 1/rOut) conductance that the ngspice deck has no counterpart for. Either suppress
 
-## Cluster 24 [singleton] — 1/1 item(s) open · 2/2 tests still failing
+## Cluster 20 [singleton] — 1/1 item(s) open · 2/2 tests still failing
 - themes: (none matched)
 - dirs: src/components/io (1)
   - **[OPEN] (2/2t)** `src/components/io/clock.ts:306`
     - Make _vdd (and _halfPeriod) mutable and implement setParam: key vdd updates _vdd, key Frequency recomputes _halfPeriod = 1/(2*value). The in
 
-## Cluster 25 [HUB] — 2/2 item(s) open · 2/2 tests still failing
+## Cluster 21 [HUB] — 2/2 item(s) open · 2/2 tests still failing
 - themes: integration-tran×1
 - dirs: src/components/semiconductors/__tests__ (2)
   - **[OPEN] (1/1t)** `src/components/semiconductors/__tests__/schottky.test.ts:138`
@@ -228,7 +198,7 @@ Clusters sorted by remaining (open) test payoff.
   - **[OPEN] (1/1t)** `src/components/semiconductors/__tests__/schottky.test.ts:156`
     - Test-design bug: read a non-source-clamped node (cathode D1:K or the internal prime) to observe the CJO-dependent transient. The diode cap p
 
-## Cluster 26 [HUB] — 2/2 item(s) open · 2/2 tests still failing
+## Cluster 22 [HUB] — 2/2 item(s) open · 2/2 tests still failing
 - themes: digital-threshold×2
 - dirs: src/solver (1), src/components/active (1)
   - **[OPEN] (1/1t)** `src/solver/coordinator.ts:915`
@@ -236,7 +206,19 @@ Clusters sorted by remaining (open) test payoff.
   - **[OPEN] (1/1t)** `src/components/active/dac-driver.ts:196`
     - Stamp a Thevenin output (target voltage behind rOut) in DACDriver.load instead of an ideal VSRC branch, and wire the rOut param into the dri
 
-## Cluster 27 [HUB] — 1/3 item(s) open · 1/5 tests still failing
+## Cluster 23 [HUB] — 1/4 item(s) open · 1/14 tests still failing
+- themes: digital-level-contract×1, opamp-convergence×1, state-pool×1, integration-tran×1
+- dirs: src/components/active (4)
+  - **[OPEN] (1/1t)** `src/components/active/timer-555.ts:56`
+    - The discharge BJT must saturate and pull DIS toward GND when the base is driven to vDrop. Investigate the bjtDis NpnBJT spice-model area/IS 
+  - **[DONE] (0/8t)** `driver-ctrl-contract`
+    - The driver must stamp the NORMALIZED logic level onto ctrl_out, not the rail-level vTarget. With latch=0 inactive the logic level is 1 (-> o
+  - **[DONE] (0/4t)** `comparator-latch-polarity`
+    - Invert the latch transition conditions at lines 165-166: latch should go to 1 (sinking) when vPlus < vTl and release to 0 when vPlus >= vTh,
+  - **[DONE] (0/1t)** `src/components/active/comparator-driver.ts:181`
+    - The DC weight collapse pre-saturates OUTPUT_WEIGHT so the transient integration test starts at the target. Either the DC branch should not p
+
+## Cluster 24 [HUB] — 1/3 item(s) open · 1/5 tests still failing
 - themes: digital-threshold×1
 - dirs: src/components/sources (3)
   - **[OPEN] (1/1t)** `src/components/sources/ac-voltage-source.ts:498`
@@ -246,125 +228,143 @@ Clusters sorted by remaining (open) test payoff.
   - **[DONE] (0/2t)** `src/components/sources/ac-voltage-source.ts:513`
     - Retarget the statistical audit at the seeded TRNOISE generator via evaluateNgspiceWaveform with a TRNOISE coefficient vector (randnumb recon
 
-## Cluster 28 [singleton] — 1/1 item(s) open · 1/1 tests still failing
+## Cluster 25 [singleton] — 1/1 item(s) open · 1/1 tests still failing
 - themes: opamp-convergence×1
 - dirs: src/solver/analog/__tests__ (1)
   - **[OPEN] (1/1t)** `src/solver/analog/__tests__/newton-raphson.test.ts:130`
     - Change the expectation at newton-raphson.test.ts:130 to toBe(3) to match the INITJCT/INITFIX/INITFLOAT ladder both engines run. No source ch
 
-## Cluster 29 [singleton] — 1/1 item(s) open · 1/1 tests still failing
+## Cluster 26 [singleton] — 1/1 item(s) open · 1/1 tests still failing
 - themes: opamp-convergence×1
 - dirs: src/components/active (1)
   - **[OPEN] (1/1t)** `src/components/active/ota.ts:226`
     - This is a test-contract error not a source bug: gmMax only bounds the linearization slope and cancels at the fixed point. Either assert on c
 
-## Cluster 30 [singleton] — 1/1 item(s) open · 1/1 tests still failing
+## Cluster 27 [singleton] — 1/1 item(s) open · 1/1 tests still failing
 - themes: (none matched)
 - dirs: src/components/passives (1)
   - **[OPEN] (1/1t)** `src/components/passives/analog-fuse.ts:323`
     - Seed _intact from props.blown: add a blown param to AnalogFuseElement constructor (initializing _intact = !blown) and pass props.getOrDefaul
 
-## Cluster 31 [singleton] — 1/1 item(s) open · 1/1 tests still failing
+## Cluster 28 [singleton] — 1/1 item(s) open · 1/1 tests still failing
 - themes: deck-emission×1, node-mapping×1
 - dirs: src/components/switching (1)
   - **[OPEN] (1/1t)** `src/components/switching/current-controlled-switch.ts:311`
     - This is an architectural divergence to escalate, not a numerical bug: the normallyClosed inversion in current-controlled-switch.ts:311 has n
 
-## Cluster 32 [singleton] — 1/1 item(s) open · 1/1 tests still failing
+## Cluster 29 [singleton] — 1/1 item(s) open · 1/1 tests still failing
 - themes: temperature×1, state-pool×1
 - dirs: src/components/sensors (1)
   - **[OPEN] (1/1t)** `src/components/sensors/ntc-thermistor.ts:298`
     - In getPinCurrents branch on _selfHeating like load() does: when !_selfHeating use this._tAmbient for tOld (and computeRFromT) so a hot-loade
 
-## Cluster 33 [singleton] — 1/1 item(s) open · 1/1 tests still failing
+## Cluster 30 [singleton] — 1/1 item(s) open · 1/1 tests still failing
 - themes: opamp-convergence×1, state-pool×1
 - dirs: src/components/semiconductors (1)
   - **[OPEN] (1/1t)** `src/components/semiconductors/triode-analog-element.ts:311`
     - This is correct SPICE-parity caching - the slot is meant to lag by one iteration. The test expectation at line 98 (cached VPK == final node 
 
-## Cluster 34 [singleton] — 1/1 item(s) open · 1/1 tests still failing
-- themes: digital-threshold×1, integration-tran×1
-- dirs: src/solver/analog/behavioral-drivers (1)
-  - **[OPEN] (1/1t)** `src/solver/analog/behavioral-drivers/mux-driver.ts:95`
-    - Re-settle to DCOP after the threshold hotload before reading, or restructure the thresholder/driver chain so a within-step NR fully propagat
-
-## Cluster 35 [singleton] — 1/1 item(s) open · 1/1 tests still failing
+## Cluster 31 [singleton] — 1/1 item(s) open · 1/1 tests still failing
 - themes: node-mapping×1, schema-partial×1, state-pool×1, integration-tran×1
 - dirs: src/solver/analog/behavioral-drivers (1)
   - **[OPEN] (1/1t)** `src/solver/analog/behavioral-drivers/d-flipflop-driver.ts:85`
     - Replace the multiplicative edge detector and instance-field _firstSample with the documented NaN-sentinel scheme in SLOT_LAST_CLOCK: detect 
 
-## Cluster 36 [singleton] — 1/1 item(s) open · 1/1 tests still failing
-- themes: (none matched)
-- dirs: src/components/memory (1)
-  - **[OPEN] (1/1t)** `src/components/memory/counter.ts:279`
-    - Two parts: (1) the analog loading override path requires the behavioral netlist; either the test must set model:behavioral or the override c
-
-## Cluster 37 [singleton] — 1/1 item(s) open · 1/1 tests still failing
+## Cluster 32 [singleton] — 1/1 item(s) open · 1/1 tests still failing
 - themes: (none matched)
 - dirs: src/components/active (1)
   - **[OPEN] (1/1t)** `src/components/active/ccvs.ts:180`
     - Add a transresistance branch to setParam (line 180-184) that, when the expression is the default I(sense) linear shortcut, reparses value * 
 
-## Cluster 38 [singleton] — 1/1 item(s) open · 1/1 tests still failing
+## Cluster 33 [singleton] — 1/1 item(s) open · 1/1 tests still failing
 - themes: (none matched)
 - dirs: src/components/memory (1)
   - **[OPEN] (1/1t)** `src/components/memory/program-counter.ts:240`
     - Fixture/test bug: build the PC at bitWidth>=2 so Q=2 is representable. Source line 240 is correct ngspice-style modular increment.
 
-## Cluster 39 [singleton] — 1/1 item(s) open · 1/1 tests still failing
+## Cluster 34 [singleton] — 1/1 item(s) open · 1/1 tests still failing
 - themes: digital-threshold×1, deck-emission×1, numeric-ulp×1
 - dirs: src/solver/analog (1)
   - **[OPEN] (1/1t)** `src/solver/analog/ngspice-load-order.ts:0`
     - Align the per-leaf load() walk order for the PolarizedCap composite so rEsr/rLeak/cBody stamp the nCap diagonal in the same sequence ngspice
 
-## Cluster 40 [singleton] — 1/1 item(s) open · 1/1 tests still failing
+## Cluster 35 [singleton] — 1/1 item(s) open · 1/1 tests still failing
 - themes: (none matched)
 - dirs: src/components/active (1)
   - **[OPEN] (1/1t)** `src/components/active/opamp.ts:298`
     - In setParam, when key===rOut update this._rOut (or make load/G read this._p.rOut directly so the live value drives the conductance). The cac
 
-## Cluster 41 [singleton] — 1/1 item(s) open · 1/1 tests still failing
+## Cluster 36 [singleton] — 1/1 item(s) open · 1/1 tests still failing
 - themes: (none matched)
 - dirs: src/components/active (1)
   - **[OPEN] (1/1t)** `src/components/active/vccs.ts:162`
     - Implement setParam so key transconductance (and gain/m) rebuilds the linear expression / effectiveGm = transconductance*m used in stampOutpu
 
-## Cluster 42 [singleton] — 1/1 item(s) open · 1/1 tests still failing
+## Cluster 37 [singleton] — 1/1 item(s) open · 1/1 tests still failing
 - themes: state-pool×1
 - dirs: src/components/flipflops (1)
   - **[OPEN] (1/1t)** `src/components/flipflops/monoflop.ts:163`
     - Seed prevClock from the actual initial clock level so a pre-existing high does not register as a rising edge (e.g. initialize prevClock=cloc
 
-## Cluster 43 [singleton] — 1/1 item(s) open · 1/1 tests still failing
+## Cluster 38 [singleton] — 1/1 item(s) open · 1/1 tests still failing
 - themes: deck-emission×1, state-pool×1
 - dirs: src/components/graphics (1)
   - **[OPEN] (1/1t)** `src/components/graphics/graphic-card.ts:348`
     - Mask the packed output to the data bus width: read dataBits via layout.getProperty(index, dataBits) and AND the result with ((1<<dataBits)-1
 
-## Cluster 44 [singleton] — 0/1 item(s) open · 0/8 tests still failing
+## Cluster 39 [singleton] — 0/1 item(s) open · 0/8 tests still failing
 - themes: digital-level-contract×1, digital-threshold×1
 - dirs: src/solver/analog/behavioral-drivers (1)
   - **[DONE] (0/8t)** `src/solver/analog/behavioral-drivers/digital-input-thresholder.ts:73`
     - Replace the three-way dead-band classifier with a single midpoint comparison v > 0.5 ? 1.0 : 0.0 (normalized {0,1} contract) and drop the vI
 
-## Cluster 45 [singleton] — 0/1 item(s) open · 0/2 tests still failing
+## Cluster 40 [singleton] — 0/1 item(s) open · 0/6 tests still failing
+- themes: integration-tran×1
+- dirs: src/components/digital-pins (1)
+  - **[DONE] (0/6t)** `src/components/digital-pins/digital-output-pin-loaded.ts:99`
+    - Either re-settle to DCOP after setComponentProperty (zero out cOut companion) before reading, or have the test compare against the transient
+
+## Cluster 41 [singleton] — 0/1 item(s) open · 0/2 tests still failing
+- themes: (none matched)
+- dirs: src/components/digital-pins (1)
+  - **[DONE] (0/2t)** `src/components/digital-pins/digital-input-pin-loaded.ts:13`
+    - Reconcile rIn default: either the source default should be 100k or the test must assert the 1MOhm sag (approx 4.9505); the loaded vs unloade
+
+## Cluster 42 [singleton] — 0/1 item(s) open · 0/2 tests still failing
+- themes: (none matched)
+- dirs: src/components/gates (1)
+  - **[DONE] (0/2t)** `src/components/gates/and.ts:196`
+    - Have buildAndGateNetlist read the per-pin loaded flag and per-pin ResolvedPinElectrical (the _pinLoading / _pinElectrical maps set on props 
+
+## Cluster 43 [singleton] — 0/1 item(s) open · 0/2 tests still failing
 - themes: digital-threshold×1, opamp-convergence×1, deck-emission×1, numeric-ulp×1
 - dirs: src/components/passives (1)
   - **[DONE] (0/2t)** `src/components/passives/transmission-line-element.ts:268`
     - This is a zero-tolerance Object.is comparison failing on a 1-ULP delta where ours is more accurate than ngspice. To reach bit-exact match th
 
-## Cluster 46 [singleton] — 0/1 item(s) open · 0/2 tests still failing
+## Cluster 44 [singleton] — 0/1 item(s) open · 0/2 tests still failing
 - themes: (none matched)
 - dirs: src/editor (1)
   - **[DONE] (0/2t)** `src/editor/wire-current-resolver.ts:32`
     - Add an element identity field (elementIndex or label) to ComponentCurrentPath and populate it at the push sites in resolve() (lines 298 and 
 
-## Cluster 47 [singleton] — 0/1 item(s) open · 0/1 tests still failing
+## Cluster 45 [singleton] — 0/1 item(s) open · 0/1 tests still failing
 - themes: integration-tran×1
 - dirs: src/solver/digital (1)
   - **[DONE] (0/1t)** `src/solver/digital/bus-resolution.ts:75`
     - Mask each driver value and non-highZ mask to the net declared bit width before the conflict XOR at bus-resolution.ts:75 (carry the net width
+
+## Cluster 46 [singleton] — 0/1 item(s) open · 0/1 tests still failing
+- themes: digital-threshold×1, integration-tran×1
+- dirs: src/solver/analog/behavioral-drivers (1)
+  - **[DONE] (0/1t)** `src/solver/analog/behavioral-drivers/mux-driver.ts:95`
+    - Re-settle to DCOP after the threshold hotload before reading, or restructure the thresholder/driver chain so a within-step NR fully propagat
+
+## Cluster 47 [singleton] — 0/1 item(s) open · 0/1 tests still failing
+- themes: (none matched)
+- dirs: src/components/memory (1)
+  - **[DONE] (0/1t)** `src/components/memory/counter.ts:279`
+    - Two parts: (1) the analog loading override path requires the behavioral netlist; either the test must set model:behavioral or the override c
 
 ## Cluster 48 [singleton] — 0/1 item(s) open · 0/1 tests still failing
 - themes: (none matched)

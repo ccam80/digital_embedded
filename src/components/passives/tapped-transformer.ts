@@ -368,6 +368,7 @@ export const TappedTransformerDefinition: StandaloneComponentDefinition = {
       netlist: buildTappedTransformerNetlist,
       paramDefs: TAPPED_TRANSFORMER_PARAM_DEFS,
       params: TAPPED_TRANSFORMER_DEFAULTS,
+      spice: { device: "IND" },
     },
   },
   defaultModel: "behavioral",

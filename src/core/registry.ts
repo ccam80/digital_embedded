@@ -12,6 +12,7 @@ import { PropertyBag, PropertyType } from "./properties.js";
 import type { PropertyDefinition, PropertyValue } from "./properties.js";
 import type { AnalogElement } from "../solver/analog/element.js";
 import type { LoadContext } from "../solver/analog/load-context.js";
+import type { DeviceFamily } from "../solver/analog/ngspice-load-order.js";
 import type { MnaSubcircuitNetlist } from "./mna-subcircuit-netlist.js";
 import type { PinElectricalSpec } from "./pin-electrical.js";
 import type { Diagnostic } from "../compile/types.js";
@@ -158,6 +159,25 @@ export interface ModelEmissionSpec {
    * cleanup; see ngspice-netlist-generator-architecture.md ss3.7a).
    */
   modelCardPrefix?: readonly string[];
+  /**
+   * ngspice DEVices[] family this model's primitive belongs to. The compiler's
+   * node-allocation bucket order and the harness deck emitter read it; load
+   * order derives as `NGSPICE_LOAD_ORDER[device]`. Absent ⇒ this model emits no
+   * primitive device (a behavioural-only leaf or a pure composite): it does not
+   * participate in netlist generation and the harness deck emitter throws if
+   * asked to emit it. Single source of truth — replaces the per-typeId
+   * load-order / device-family tables.
+   */
+  device?: DeviceFamily;
+  /**
+   * Pin labels that appear as node tokens on this model's emitted device line,
+   * in deck order (ngspice's INP2* first-encounter sequence). The compiler
+   * numbers this leaf's nodes in this order so it matches ngspice. Absent on a
+   * `device`-bearing model means the device emits no single line whose tokens
+   * mint nodes (a multi-line composite such as a Transformer, whose sub-element
+   * lines supply their own order).
+   */
+  deckNodeTokens?: readonly string[];
 }
 
 // ---------------------------------------------------------------------------
@@ -740,10 +760,9 @@ export class ComponentRegistry {
 
   /**
    * Return the names (typeIds) of every analog component type- one with a
-   * non-empty `modelRegistry`. These are the device classes whose deck lines
-   * ngspice's pass-2 switch dispatches (inppas2.c:94-263), so they are the set
-   * `auditDeckPinOrderCoverage` checks for a deck-pin-order row. Includes both
-   * user-facing and internal-only definitions, in registration order.
+   * non-empty `modelRegistry`. Consumed by the editor's wire-consistency check
+   * (analog pins route differently from digital). Includes both user-facing and
+   * internal-only definitions, in registration order.
    */
   analogTypeIds(): string[] {
     const out: string[] = [];

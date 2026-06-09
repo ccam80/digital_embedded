@@ -401,6 +401,7 @@ export const CCVSDefinition: StandaloneComponentDefinition = {
       },
       paramDefs: CCVS_PARAM_DEFS,
       params: CCVS_DEFAULTS,
+      spice: { device: "CCVS", deckNodeTokens: ["out+", "out-"] },
     },
   },
   defaultModel: "behavioral",

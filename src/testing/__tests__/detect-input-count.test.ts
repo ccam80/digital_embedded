@@ -55,7 +55,7 @@ describe('detectInputCount', () => {
         { id: 'g1', type: 'And' },
         { id: 'g2', type: 'Not' },
       ],
-      connections: [['g1:out', 'g2:in']],
+      connections: [['g1:out', 'g2:In_1']],
     });
 
     const result = detectInputCount(circuit, registry, 'A B Y\n0 0 0');

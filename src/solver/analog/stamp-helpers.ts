@@ -108,3 +108,79 @@ export function stampNortonValue(
     ctx.rhs[negNode] -= I;
   }
 }
+
+/**
+ * Matrix handles for a linearized (controlled-source) Norton port: the four
+ * self-conductance handles at (posNode, negNode) plus, for each control input
+ * k, the pair of cross handles [(posNode, in_k), (negNode, in_k)] that carry
+ * the Jacobian term ∂result/∂V(in_k). Allocate once in setup() over the full
+ * set of nodes the result can depend on; load() stamps only the currently
+ * active derivatives, leaving the rest structural-zero.
+ */
+export interface LinearizedNortonHandles {
+  readonly self: readonly [number, number, number, number];
+  readonly crossPos: readonly number[];
+  readonly crossNeg: readonly number[];
+}
+
+export function allocLinearizedNorton(
+  solver: SparseSolver,
+  posNode: number,
+  negNode: number,
+  inputNodes: readonly number[],
+): LinearizedNortonHandles {
+  const self = allocNortonStamp(solver, posNode, negNode);
+  const crossPos: number[] = [];
+  const crossNeg: number[] = [];
+  for (const inNode of inputNodes) {
+    crossPos.push(solver.allocElement(posNode, inNode));
+    crossNeg.push(solver.allocElement(negNode, inNode));
+  }
+  return { self, crossPos, crossNeg };
+}
+
+/**
+ * Stamp a Norton port whose target voltage is a (piecewise-)differentiable
+ * function f of its control-input voltages: it enforces V(pos)−V(neg) → f.
+ * Stamps the self conductance G=1/rOut, the Jacobian cross-conductances
+ * −G·dₖ at (pos,in_k) / +G·dₖ at (neg,in_k), and the Newton companion current
+ * I = G·(resultOld − Σ dₖ·inputOld_k). With the derivative terms present the
+ * coupled behavioral chain is a true Newton device that converges to its exact
+ * fixed point in one iteration; a constant-source Norton read from rhsOld
+ * instead lags one iteration per chain stage and the solver's reltol-based
+ * termination accepts it ~reltol short of self-consistency.
+ *
+ * `derivs[k]` = ∂f/∂V(in_k); `inputsOld[k]` = the V(in_k)−V(gnd) value used to
+ * evaluate f and its derivatives this iteration. dₖ===0 entries add no coupling.
+ */
+export function stampLinearizedNorton(
+  ctx: LoadContext,
+  handles: LinearizedNortonHandles,
+  posNode: number,
+  negNode: number,
+  rOut: number,
+  resultOld: number,
+  derivs: readonly number[],
+  inputsOld: readonly number[],
+): void {
+  const G = 1 / rOut;
+  const solver = ctx.solver;
+  solver.stampElement(handles.self[0],  G);
+  solver.stampElement(handles.self[1],  G);
+  solver.stampElement(handles.self[2], -G);
+  solver.stampElement(handles.self[3], -G);
+  let constResult = resultOld;
+  for (let k = 0; k < derivs.length; k++) {
+    const d = derivs[k]!;
+    if (d !== 0) {
+      solver.stampElement(handles.crossPos[k]!, -G * d);
+      solver.stampElement(handles.crossNeg[k]!,  G * d);
+      constResult -= d * inputsOld[k]!;
+    }
+  }
+  const I = G * constResult;
+  if (I !== 0) {
+    ctx.rhs[posNode] += I;
+    ctx.rhs[negNode] -= I;
+  }
+}

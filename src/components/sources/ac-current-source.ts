@@ -971,6 +971,7 @@ export const AcCurrentSourceDefinition: StandaloneComponentDefinition = {
       factory: makeAcCurrentSource,
       paramDefs: AC_CURRENT_SOURCE_PARAM_DEFS,
       params: AC_CURRENT_SOURCE_DEFAULTS,
+      spice: { device: "ISRC", deckNodeTokens: ["pos", "neg"] },
     },
   },
   defaultModel: "behavioral",

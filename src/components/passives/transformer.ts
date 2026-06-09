@@ -330,6 +330,7 @@ export const TransformerDefinition: StandaloneComponentDefinition = {
       netlist: buildTransformerNetlist,
       paramDefs: TRANSFORMER_PARAM_DEFS,
       params: TRANSFORMER_DEFAULTS,
+      spice: { device: "IND" },
     },
   },
   defaultModel: "behavioral",

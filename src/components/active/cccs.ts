@@ -473,6 +473,7 @@ export const CCCSDefinition: StandaloneComponentDefinition = {
       },
       paramDefs: CCCS_PARAM_DEFS,
       params: CCCS_DEFAULTS,
+      spice: { device: "CCCS", deckNodeTokens: ["out+", "out-"] },
     },
   },
   defaultModel: "behavioral",

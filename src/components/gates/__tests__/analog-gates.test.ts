@@ -50,7 +50,7 @@ function build1InputGate(gateType: string, vIn: number) {
         { id: "gnd",   type: "Ground" },
       ],
       connections: [
-        ["vsIn:pos",  "gate:in"],
+        ["vsIn:pos",  "gate:In_1"],
         ["gate:out",  "rLoad:pos"],
         ["rLoad:neg", "gnd:out"],
         ["vsIn:neg",  "gnd:out"],

@@ -54,7 +54,7 @@ function build1InputGate(gateType: string, vIn: number) {
         { id: "gnd",   type: "Ground" },
       ],
       connections: [
-        ["vsIn:pos",  "gate:in"],
+        ["vsIn:pos",  "gate:In_1"],
         ["gate:out",  "rLoad:pos"],
         ["rLoad:neg", "gnd:out"],
         ["vsIn:neg",  "gnd:out"],
@@ -264,8 +264,9 @@ describe("AND gate pin loading (T1, bridge)", () => {
   it("loaded_pin_sees_voltage_sag", () => {
     const fix = buildFixture({ build: buildGateWithLoadedSel("loaded") });
     expect(fix.coordinator.dcOperatingPoint()?.converged).toBe(true);
-    // 5V * 100k / (10k + 100k) = 4.5454545454...V (closed-form rIn = 100 kΩ).
-    expect(getNodeV(fix, "gate:In_1")).toBeCloseTo(4.5454545454545454, 9);
+    // 5V * 1MΩ / (10kΩ + 1MΩ) = 4.95049504950...V — closed-form divider with the
+    // DigitalInputPinLoaded default input impedance rIn = 1 MΩ.
+    expect(getNodeV(fix, "gate:In_1")).toBeCloseTo(4.9504950495049505, 9);
   });
 
   it("ideal_pin_sees_full_source_voltage", () => {

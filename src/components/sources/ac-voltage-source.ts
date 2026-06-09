@@ -1623,6 +1623,7 @@ export const AcVoltageSourceDefinition: StandaloneComponentDefinition = {
       factory: makeAcVoltageSourceElement,
       paramDefs: AC_VOLTAGE_SOURCE_PARAM_DEFS,
       params: AC_VOLTAGE_SOURCE_DEFAULTS,
+      spice: { device: "VSRC", deckNodeTokens: ["pos", "neg"] },
     },
   },
   defaultModel: "behavioral",

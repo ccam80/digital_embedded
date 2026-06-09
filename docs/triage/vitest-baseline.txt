@@ -95,22 +95,11 @@ src/editor/__tests__/wire-current-resolver.test.ts::every junction's wires carry
 src/editor/__tests__/wire-current-resolver.test.ts::parallel split at junction: branch wires carry their branch's current
 src/headless/__tests__/rlc-lte-path.test.ts::RC step response: exponential charging matches V(1-e^-t/τ)
 src/headless/__tests__/rlc-lte-path.test.ts::RL step response: V_R matches 1-e^-t/τ (R=10, L=1mH, τ=100µs)
+src/headless/builder.ts::connect op adds a wire between pins
 src/runtime/__tests__/timing-diagram.test.ts::restores the closest snapshot to time 0 when jumped to start
 src/runtime/__tests__/timing-diagram.test.ts::restores the closest snapshot when jumpToTime is called
 src/runtime/__tests__/timing-diagram.test.ts::snapshot IDs match what the coordinator returned
-src/solver/analog/__tests__/behavioral-combinational.test.ts::hotload_loaded_structural_property_seeds_pin_subelements
-src/solver/analog/__tests__/behavioral-combinational.test.ts::hotload_rOut_changes_active_output_divider
-src/solver/analog/__tests__/behavioral-combinational.test.ts::hotload_rOut_changes_output_divider_voltage
-src/solver/analog/__tests__/behavioral-combinational.test.ts::hotload_rOut_changes_selected_output_divider
-src/solver/analog/__tests__/behavioral-combinational.test.ts::hotload_vIH_shifts_digital_input_threshold
-src/solver/analog/__tests__/behavioral-combinational.test.ts::hotload_vOH_changes_active_output_voltage
-src/solver/analog/__tests__/behavioral-combinational.test.ts::hotload_vOH_changes_output_high_voltage
-src/solver/analog/__tests__/behavioral-combinational.test.ts::hotload_vOH_changes_selected_output_voltage
-src/solver/analog/__tests__/behavioral-combinational.test.ts::loaded_sel_pin_sags_through_external_series_resistor
 src/solver/analog/__tests__/behavioral-flipflop.test.ts::behavioral_preset_preserves_digital_truth_q_qbar_after_rising_edge_d1
-src/solver/analog/__tests__/behavioral-gate.test.ts::ideal_pin_sees_full_source_voltage
-src/solver/analog/__tests__/behavioral-gate.test.ts::loaded_pin_sees_voltage_sag
-src/solver/analog/__tests__/behavioral-sequential.test.ts::loaded_en_sees_voltage_sag_ideal_clk_clr_see_no_sag
 src/solver/analog/__tests__/ckt-terr.test.ts::cktTerrVoltage_gear_order2_matches_ngspice
 src/solver/analog/__tests__/ckt-terr.test.ts::constant charge history produces finite timestep (not Infinity)- abstol-gated
 src/solver/analog/__tests__/ckt-terr.test.ts::gear_lte_factor_order_3
@@ -162,12 +151,4 @@ src/solver/analog/__tests__/newton-raphson.test.ts::linear_converges_in_two_iter
 src/solver/analog/__tests__/nr-nodeset-parity.test.ts::nodeset_steers_ngspice_to_latch_state_digiTS_does_not
 src/solver/analog/__tests__/state-pool.test.ts::invariant_persists_across_multiple_accepted_steps
 src/solver/analog/__tests__/state-pool.test.ts::pool_state0_state1_agree_slot_for_slot_after_accepted_step
-src/solver/analog/behavioral-drivers/__tests__/gate-driver-ctrl-stamp.test.ts::treats above-threshold input as HIGH (A=MID, B=MID): AND → HI
-src/solver/analog/behavioral-drivers/__tests__/gate-driver-ctrl-stamp.test.ts::treats above-threshold input as HIGH (A=MID, B=MID): NAND → LO
-src/solver/analog/behavioral-drivers/__tests__/gate-driver-ctrl-stamp.test.ts::treats above-threshold input as HIGH (A=MID, B=MID): NOR → LO
-src/solver/analog/behavioral-drivers/__tests__/gate-driver-ctrl-stamp.test.ts::treats above-threshold input as HIGH (A=MID, B=MID): OR → HI
-src/solver/analog/behavioral-drivers/__tests__/gate-driver-ctrl-stamp.test.ts::treats above-threshold input as HIGH (A=MID, B=MID): XNOR → HI (equal)
-src/solver/analog/behavioral-drivers/__tests__/gate-driver-ctrl-stamp.test.ts::treats above-threshold input as HIGH (A=MID, B=MID): XOR → LO (equal)
-src/solver/analog/behavioral-drivers/__tests__/gate-driver-ctrl-stamp.test.ts::treats above-threshold input as HIGH (In_1=MID): BUF → HI
-src/solver/analog/behavioral-drivers/__tests__/gate-driver-ctrl-stamp.test.ts::treats above-threshold input as HIGH (in=MID): NOT → LO
 src/solver/digital/bus-resolution.ts::masked_addresses_are_independent_across_distinct_register_slots

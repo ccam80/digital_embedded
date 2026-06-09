@@ -312,7 +312,10 @@ describe("Multiplexer behavioural model — parameter hot-load (T1)", () => {
     );
     expect(muxEl).toBeDefined();
     fix.coordinator.setComponentProperty(muxEl!, "vOH", 6.0);
-    fix.coordinator.step();
+    // Re-settle to the new DC steady state. A single transient step leaves the
+    // output RC ~0.1% short of the new rail; the closed-form below is the DC
+    // operating point, so read it there.
+    fix.coordinator.dcOperatingPoint();
     const after = getNodeV(fix, ["mux:out", "rLoad:pos"]);
     const expectedAfter = (6.0 * LOAD_R) / (100 + LOAD_R);
     expect(after).not.toBeCloseTo(before, 3);
@@ -329,7 +332,8 @@ describe("Multiplexer behavioural model — parameter hot-load (T1)", () => {
     );
     expect(muxEl).toBeDefined();
     fix.coordinator.setComponentProperty(muxEl!, "rOut", 1000);
-    fix.coordinator.step();
+    // Re-settle to the new DC steady state (see hotload_vOH).
+    fix.coordinator.dcOperatingPoint();
     const after = getNodeV(fix, ["mux:out", "rLoad:pos"]);
     const expectedAfter = (5.0 * LOAD_R) / (1000 + LOAD_R);
     expect(after).not.toBeCloseTo(before, 3);
@@ -375,7 +379,8 @@ describe("Multiplexer behavioural model — parameter hot-load (T1)", () => {
     expect(muxEl).toBeDefined();
     fix.coordinator.setComponentProperty(muxEl!, "vIH", 3.0);
     fix.coordinator.setComponentProperty(muxEl!, "vIL", 2.7);
-    fix.coordinator.step();
+    // Re-settle to the new DC steady state (see hotload_vOH).
+    fix.coordinator.dcOperatingPoint();
     const after = getNodeV(fix, ["mux:out", "rLoad:pos"]);
     // Documented contract: sel = 2.5V is now below vIL=2.7 → sel=0 → mux
     // routes in_0 (GND) → vOut = vOL = 0V. The change must be observable.
@@ -390,8 +395,8 @@ describe("Multiplexer behavioural model — parameter hot-load (T1)", () => {
     // topologies must produce observably different DCOP node voltages
     // when an external series-resistor exercises the input-pin's rIn.
     //
-    // Loaded variant: rIn ≈ 100kΩ; with 10kΩ series resistor on sel,
-    //   vSelNode = 5V * 100k / 110k ≈ 4.5454V (sag below 5V).
+    // Loaded variant: rIn = 1e6; with 10kΩ series resistor on sel,
+    //   vSelNode = 5V * 1e6 / 1.01e6 ≈ 4.9505V (slight sag below 5V).
     // Unloaded variant: rIn → ∞; vSelNode ≈ 5V (no sag).
     function buildWithSelSeries(loaded: number) {
       return (registry: ComponentRegistry): Circuit => {
@@ -427,8 +432,8 @@ describe("Multiplexer behavioural model — parameter hot-load (T1)", () => {
     // Loaded variant sags toward (5 * 100k / 110k) ≈ 4.5454V; unloaded
     // variant stays close to the source 5V.
     expect(vSelLoaded).toBeLessThan(vSelUnloaded);
-    expect(vSelUnloaded).toBeGreaterThan(4.9);
-    expect(vSelLoaded).toBeLessThan(4.7);
+    expect(vSelUnloaded).toBeGreaterThan(4.99);
+    expect(vSelLoaded).toBeCloseTo(4.950495049504951, 6);
   });
 });
 
@@ -441,7 +446,8 @@ describe("Demultiplexer behavioural model — parameter hot-load (T1)", () => {
     );
     expect(demuxEl).toBeDefined();
     fix.coordinator.setComponentProperty(demuxEl!, "vOH", 6.0);
-    fix.coordinator.step();
+    // Re-settle to the new DC steady state (see hotload_vOH).
+    fix.coordinator.dcOperatingPoint();
     const after = getNodeV(fix, ["demux:out_1", "r1:pos", "r1:pos/demux:out_1"]);
     const expectedAfter = (6.0 * LOAD_R) / (100 + LOAD_R);
     expect(after).not.toBeCloseTo(before, 3);
@@ -456,7 +462,8 @@ describe("Demultiplexer behavioural model — parameter hot-load (T1)", () => {
     );
     expect(demuxEl).toBeDefined();
     fix.coordinator.setComponentProperty(demuxEl!, "rOut", 1000);
-    fix.coordinator.step();
+    // Re-settle to the new DC steady state (see hotload_vOH).
+    fix.coordinator.dcOperatingPoint();
     const after = getNodeV(fix, ["demux:out_1", "r1:pos", "r1:pos/demux:out_1"]);
     const expectedAfter = (5.0 * LOAD_R) / (1000 + LOAD_R);
     expect(after).not.toBeCloseTo(before, 3);
@@ -473,7 +480,8 @@ describe("Decoder behavioural model — parameter hot-load (T1)", () => {
     );
     expect(decoderEl).toBeDefined();
     fix.coordinator.setComponentProperty(decoderEl!, "vOH", 6.0);
-    fix.coordinator.step();
+    // Re-settle to the new DC steady state (see hotload_vOH).
+    fix.coordinator.dcOperatingPoint();
     const after = getNodeV(fix, ["decoder:out_1", "r1:pos"]);
     const expectedAfter = (6.0 * LOAD_R) / (100 + LOAD_R);
     expect(after).not.toBeCloseTo(before, 3);
@@ -488,7 +496,8 @@ describe("Decoder behavioural model — parameter hot-load (T1)", () => {
     );
     expect(decoderEl).toBeDefined();
     fix.coordinator.setComponentProperty(decoderEl!, "rOut", 1000);
-    fix.coordinator.step();
+    // Re-settle to the new DC steady state (see hotload_vOH).
+    fix.coordinator.dcOperatingPoint();
     const after = getNodeV(fix, ["decoder:out_1", "r1:pos"]);
     const expectedAfter = (5.0 * LOAD_R) / (1000 + LOAD_R);
     expect(after).not.toBeCloseTo(before, 3);
@@ -595,8 +604,8 @@ describe("Multiplexer behavioural model — pin-loading propagation (T1)", () =>
   it("loaded_sel_pin_sags_through_external_series_resistor", () => {
     // Uses the same loaded vs. unloaded contrast as the Cat 4 build-time
     // structural seed it() above, but asserts the closed-form sag value
-    // for the loaded variant when rIn defaults to 100kΩ.
-    //   vSel = 5 * 100k / (10k + 100k) = 4.5454545454545454V
+    // for the loaded variant when rIn defaults to 1e6.
+    //   vSel = 5 * 1e6 / (10k + 1e6) = 4.950495049504951V
     const buildAt = (registry: ComponentRegistry): Circuit => {
       const facade = new DefaultSimulatorFacade(registry);
       const c = facade.build({
@@ -633,7 +642,7 @@ describe("Multiplexer behavioural model — pin-loading propagation (T1)", () =>
     const fix = buildFixture({ build: buildAt });
     const vSel = getNodeV(fix, ["mux:sel", "rsrcSel:neg"]);
     const vIn0 = getNodeV(fix, ["mux:in_0", "rsrcIn0:neg"]);
-    expect(vSel).toBeCloseTo(4.5454545454545454, 6);
+    expect(vSel).toBeCloseTo(4.950495049504951, 6);
     expect(vIn0).toBeCloseTo(5.0, 6);
   });
 });

@@ -60,7 +60,7 @@ describe('Port MCP surface- compile', () => {
         { id: 'pOut', type: 'Port', props: { label: 'Z', bitWidth: 1, face: 'right' } },
       ],
       connections: [
-        ['pIn:port',  'gate:in'],
+        ['pIn:port',  'gate:In_1'],
         ['gate:out',  'pOut:port'],
       ],
     });

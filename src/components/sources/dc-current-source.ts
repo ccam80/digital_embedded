@@ -261,6 +261,7 @@ export const DcCurrentSourceDefinition: StandaloneComponentDefinition = {
       factory: makeDcCurrentSource,
       paramDefs: DC_CURRENT_SOURCE_PARAM_DEFS,
       params: {},
+      spice: { device: "ISRC", deckNodeTokens: ["pos", "neg"] },
     },
   },
   defaultModel: "behavioral",

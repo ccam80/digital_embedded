@@ -503,6 +503,7 @@ export const CurrentControlledSwitchDefinition: StandaloneComponentDefinition = 
         props: PropertyBag,
         _getTime: () => number,
       ): AnalogElement => new CurrentControlledSwitchAnalogElement(pinNodes, props),
+      spice: { device: "CSW", deckNodeTokens: ["out+", "out-"] },
     },
   },
   defaultModel: "default",

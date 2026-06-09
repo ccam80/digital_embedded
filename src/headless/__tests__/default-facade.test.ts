@@ -462,9 +462,9 @@ describe('DefaultSimulatorFacade', () => {
         { id: 'Y',  type: 'Out', props: { label: 'Y', bitWidth: 1 } },
       ],
       connections: [
-        ['X:out',  'n1:in'],
-        ['n1:out', 'n2:in'],
-        ['n2:out', 'n3:in'],
+        ['X:out',  'n1:In_1'],
+        ['n1:out', 'n2:In_1'],
+        ['n2:out', 'n3:In_1'],
         ['n3:out', 'Y:in'],
       ],
     });

@@ -292,6 +292,12 @@ abstract class BSourceAnalogElement extends AnalogElement {
       }
       return column;
     }
+    // Composite path: a controller whose label matches one of this element's
+    // own pins binds to that pin's resolved node — the parent subcircuit wires
+    // it by connectivity (compiler.ts:568-576), so the flat-circuit net-label
+    // map never carries the (prefixed, colon-bearing) internal net name.
+    const pinNode = this.pinNodes.get(v.label);
+    if (pinNode !== undefined) return pinNode;
     // IF_NODE: the controlling net's node id (asrcset.c:104-105).
     const column = ctx.findNode(v.label);
     if (column === 0) {
@@ -662,6 +668,7 @@ export const BVDefinition: StandaloneComponentDefinition = {
       },
       paramDefs: BV_PARAM_DEFS,
       params: BV_DEFAULTS,
+      spice: { device: "ASRC", deckNodeTokens: ["out+", "out-"] },
     },
   },
   defaultModel: "behavioral",
@@ -698,6 +705,7 @@ export const BIDefinition: StandaloneComponentDefinition = {
       },
       paramDefs: BI_PARAM_DEFS,
       params: BI_DEFAULTS,
+      spice: { device: "ASRC", deckNodeTokens: ["out+", "out-"] },
     },
   },
   defaultModel: "behavioral",

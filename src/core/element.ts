@@ -65,10 +65,13 @@ export interface CircuitElement {
   readonly typeId: string;
 
   /**
-   * Instance-unique identifier within a circuit. Generated at creation time,
-   * preserved through serialization for stable references (undo, cross-circuit links).
+   * Instance-unique identifier within a circuit. Component factories default it
+   * to a UUID at creation; the spec-driven builder reassigns it to the readable
+   * spec id so headless circuits address and anchor (per-net loading overrides,
+   * stableNetId) by that id rather than an opaque UUID. Preserved through
+   * serialization for stable references (undo, cross-circuit links).
    */
-  readonly instanceId: string;
+  instanceId: string;
 
   // --- Visual placement ---
 
@@ -164,7 +167,7 @@ export interface CircuitElement {
  */
 export abstract class AbstractCircuitElement implements CircuitElement {
   readonly typeId: string;
-  readonly instanceId: string;
+  instanceId: string;
 
   position: Point;
   rotation: Rotation;

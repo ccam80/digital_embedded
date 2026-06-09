@@ -402,6 +402,10 @@ export class CircuitBuilder {
 
     for (const comp of spec.components) {
       const element = this.addComponent(circuit, comp.type, comp.props);
+      // The spec id is this element's identity: adopt it as the instanceId so
+      // headless circuits address and anchor (per-net loading overrides via
+      // stableNetId) by the readable id rather than the factory's UUID.
+      element.instanceId = comp.id;
       idMap.set(comp.id, element);
       // Use spec id as default label so netlist shows readable names instead of UUIDs
       const bag = element.getProperties();

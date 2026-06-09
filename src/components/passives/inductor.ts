@@ -1028,6 +1028,7 @@ export const InductorDefinition: StandaloneComponentDefinition = {
       factory: createInductorElement,
       paramDefs: INDUCTOR_PARAM_DEFS,
       params: INDUCTOR_DEFAULTS,
+      spice: { device: "IND", deckNodeTokens: ["pos", "neg"] },
     },
   },
   defaultModel: "behavioral",

@@ -361,6 +361,7 @@ export const VCCSDefinition: StandaloneComponentDefinition = {
       },
       paramDefs: VCCS_PARAM_DEFS,
       params: VCCS_DEFAULTS,
+      spice: { device: "VCCS", deckNodeTokens: ["out+", "out-", "ctrl+", "ctrl-"] },
     },
   },
   defaultModel: "behavioral",

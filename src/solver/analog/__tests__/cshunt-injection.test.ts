@@ -43,7 +43,7 @@ function negOf(el: { label: string }): number {
 }
 
 function gate(cshunt?: number): Fixture {
-  return buildFixture({ dtsPath: GATE_DTS, params: cshunt === undefined ? undefined : { cshunt } });
+  return buildFixture({ dtsPath: GATE_DTS, ...(cshunt === undefined ? {} : { params: { cshunt } }) });
 }
 
 describe(".option cshunt injection (headless)", () => {

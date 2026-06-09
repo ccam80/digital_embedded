@@ -524,10 +524,12 @@ describe("Register — bridge / digital (T1)", () => {
 // stub-registry coverage in src/solver/analog/__tests__/digital-pin-loading
 // .test.ts and src/headless/__tests__/digital-pin-loading-mcp.test.ts).
 //
-// Closed-form: vsEN=5 V drives ctr:en through rEN=10 kΩ; the loaded pin sees
-//   v_en = 5 · 100 kΩ / (10 kΩ + 100 kΩ) ≈ 4.5454 V (rIn=100 kΩ default).
-// Ideal pins (C, clr) see the full 5 V because the override stamps no
-// loading conductance.
+// Closed-form: vsEN=5 V drives ctr:en through rEN=10 kΩ; the loaded boundary
+//   node sees v_en = 5 · 1e7 / (10 kΩ + 1e7) ≈ 4.99500 V (cmos-3v3 bridge input
+//   impedance rIn=1e7). This voltage is on the analog net (rEN:neg) — the
+//   counter's "ctr:en" signal reports the thresholded digital level, not the
+//   boundary voltage. Ideal pins (C, clr) see the full 5 V: the override stamps
+//   no loading conductance and the sources are stiff (no series resistor).
 // ---------------------------------------------------------------------------
 
 describe("Counter — pin-loading override (T1)", () => {
@@ -570,12 +572,14 @@ describe("Counter — pin-loading override (T1)", () => {
     coordinator.dcOperatingPoint();
     const signals = facade.readAllSignals(coordinator);
 
-    const vEN = signals["ctr:en"] as number;
-    expect(vEN).toBeGreaterThan(4.4);
-    expect(vEN).toBeLessThan(4.6);
+    // en is the loaded boundary: read the analog net (rEN:neg), not the digital
+    // pin signal. 5·1e7/(10kΩ+1e7) = 4.995004995…V.
+    const vEN = signals["rEN:neg"] as number;
+    expect(vEN).toBeCloseTo(4.995004995004995, 6);
 
-    expect(signals["ctr:C"] as number).toBeCloseTo(5.0, 3);
-    expect(signals["ctr:clr"] as number).toBeCloseTo(5.0, 3);
+    // C and clr are ideal + stiff-driven → full 5 V, no sag.
+    expect(signals["vsCLK:pos"] as number).toBeCloseTo(5.0, 6);
+    expect(signals["vsCLR:pos"] as number).toBeCloseTo(5.0, 6);
 
     coordinator.dispose();
   });

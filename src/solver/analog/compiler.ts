@@ -41,7 +41,7 @@ import type { SolverPartition, PartitionedComponent, DigitalCompilerFn, Componen
 import type { ModelEntry } from "../../core/registry.js";
 import { StatePool } from "./state-pool.js";
 import { AnalogElement } from "./element.js";
-import { getNgspiceLoadOrderByTypeId, getDeviceFamilyByTypeId, TYPE_ID_TO_DECK_PIN_LABEL_ORDER, deckOrder, auditDeckPinOrderCoverage } from "./ngspice-load-order.js";
+import { getNgspiceLoadOrderByTypeId, getDeviceFamilyByTypeId, getDeckNodeTokensByTypeId, DECK_EMITTING_FAMILIES, deckOrder } from "./ngspice-load-order.js";
 import type { DeviceFamily } from "./ngspice-load-order.js";
 import {
   buildTopologyInfo,
@@ -238,160 +238,180 @@ function computeSubcktParams(
 }
 
 /**
- * Walk a composite's netlist in INPpas2 first-encounter order and allocate
- * MNA node IDs for each composite-internal net at the deck position where
- * ngspice would first encounter the net name on the flattened deck.
+ * One sub-element of a composite at a single nesting level, carrying everything
+ * BOTH node numbering and element construction need so the structure is derived
+ * exactly once: the resolved model entry, the fully-built sub-element
+ * PropertyBag (givenness-correct), the resolved pin layout, the raw
+ * connectivity, the nested-netlist resolution, and the deck node-token order.
  *
- * Called from `buildAnalogNodeMapFromPartition` *inside* its
- * `componentsInDeckOrder` loop, immediately after the composite's external
- * pins have been allocated. This interleaves composite-internal IDs with
- * external IDs in the same order ngspice does, so a composite sitting in the
- * CAP bucket (e.g. PolarizedCap) gets its `nCap` allocated before the next
- * outer-bucket element's external pins — matching ngspice's flattened-deck
- * INPpas2 walk (`inppas2.c:76` + `inpsymt.c:43-72`).
- *
- * `allocateInternal(parentLabel, suffix)` is idempotent on the
- * `${parentLabel}#${suffix}` key — callers can safely re-walk without double-
- * allocating. Nested composites (sub-elements that are themselves
- * `kind: "netlist"`) recurse via the same allocator so their internal nets
- * also land in flattened-deck position.
- *
- * Pin walk order: each sub-element's pins are visited in its deck node-token
- * order (`TYPE_ID_TO_DECK_PIN_LABEL_ORDER[sub.typeId]`), exactly as the
- * outer-device node-map walk does. ngspice flattens the subcircuit before
- * `INPpas2`, so a sub-element's node tokens mint internal-net numbers in the
- * same `INP2*` token order as a top-level device (`inppas2.c:76` over the
- * flattened deck; per-device token order from each `INP2*` parser, e.g.
- * `inp2m.c:80-104` for the M card's `D G S` tokens). A sub-element with no
- * deck-pin row (a card-less nested composite) falls back to `connectivity`
- * (pinLayout) order; the nested-composite recursion below then drives that
- * sub-element's own internal numbering through this same allocator.
+ * `nodeTokenNetIndices` are the connectivity net-indices that introduce a node
+ * for a primitive (inline) leaf, in the pin order matching ngspice's INP2*
+ * first-encounter sequence over the flattened deck (inppas2.c:76) — the single
+ * source for that order is `TYPE_ID_TO_DECK_PIN_LABEL_ORDER`. A composite
+ * sub-element (`kind:"netlist"`) introduces no node of its own; its ports are
+ * listed in connectivity order and its internals are numbered by recursing into
+ * `innerNetlist`.
  */
-function walkCompositeForNodeAllocation(
+interface CompositeSubRecord {
+  subEl: import("../../core/mna-subcircuit-netlist.js").SubcircuitElement;
+  subName: string;
+  childLabel: string;
+  typeId: string;
+  leafDef: import("../../core/registry.js").ComponentDefinition | undefined;
+  leafModelKey: string | undefined;
+  leafEntry: ModelEntry | null;
+  subProps: PropertyBag;
+  connectivity: readonly number[];
+  subPinLayout: ReturnType<typeof resolvePinLayout>;
+  isNetlist: boolean;
+  innerNetlist: MnaSubcircuitNetlist | undefined;
+  innerSubcktParams: Map<string, number> | undefined;
+  nodeTokenNetIndices: number[];
+}
+
+/**
+ * Enumerate one composite level's sub-elements in definition (deck) order,
+ * resolving each sub-element's model + props + pin layout + nested netlist +
+ * deck node-token order ONCE. Both the node-numbering walk
+ * (`buildAnalogNodeMapFromPartition`) and the element-construction walk
+ * (`expandCompositeInstance`) consume these records, so there is a single
+ * structural derivation of which leaves a composite has and how their node
+ * tokens are ordered — the deck emitter, the node numbering, and the element
+ * build can no longer drift apart (the divergence that left a B-source leaf
+ * mis-numbered when its typeId was absent from the deck-token table).
+ *
+ * Node-token order is authoritative: a device-modelled leaf (DeviceFamily in
+ * DECK_EMITTING_FAMILIES) with no `TYPE_ID_TO_DECK_PIN_LABEL_ORDER` entry is a
+ * hard error — never a silent fallback that could mis-order its nodes against
+ * ngspice. Behavioural-only leaves (no ngspice counterpart) and composites use
+ * connectivity order.
+ */
+function enumerateCompositeLevel(
   netlist: MnaSubcircuitNetlist,
   parentLabel: string,
-  outerPortNodes: ReadonlyMap<string, number>,
   registry: ComponentRegistry,
   runtimeModelMap: Record<string, Record<string, ModelEntry>> | undefined,
   subcktParams: Map<string, number>,
-  allocateInternal: (parentLabel: string, suffix: string) => number,
-  internalIds: Map<string, number>,
-): void {
-  const portCount = netlist.ports.length;
-
+): CompositeSubRecord[] {
+  const elementsByName = new Map<string, import("../../core/mna-subcircuit-netlist.js").SubcircuitElement>();
   for (let elIdx = 0; elIdx < netlist.elements.length; elIdx++) {
-    const sub = netlist.elements[elIdx]!;
-    const connectivity = netlist.netlist[elIdx]!;
+    const subEl = netlist.elements[elIdx]!;
+    elementsByName.set(subEl.subElementName ?? `el${elIdx}`, subEl);
+  }
 
-    // Resolve the sub-element's definition + props + pinLayout up front so the
-    // internal-net mint loop below can visit pins in this sub-element's deck
-    // node-token order, not raw pinLayout order. ngspice flattens the subckt
-    // before INPpas2, so each sub-element's node tokens mint internal numbers
-    // in its `INP2*` parser's token order (inppas2.c:76 over the flattened
-    // deck). A sub-element with no registry def is walked in connectivity order
-    // (it carries no SPICE card to dictate a different token order).
-    const subDef = registry.get(sub.typeId);
-    const modelKey = sub.modelRef ?? (sub.params?.model as string | undefined);
-    const subEntry =
-      subDef && modelKey !== undefined
-        ? resolveModelEntry(subDef, modelKey, runtimeModelMap)
+  const records: CompositeSubRecord[] = [];
+  for (let elIdx = 0; elIdx < netlist.elements.length; elIdx++) {
+    const subEl = netlist.elements[elIdx]!;
+    const connectivity = netlist.netlist[elIdx]!;
+    const subName = subEl.subElementName ?? `el${elIdx}`;
+    const childLabel = `${parentLabel}:${subName}`;
+
+    const leafDef = registry.get(subEl.typeId);
+    const leafModelKey = subEl.modelRef ?? (subEl.params?.model as string | undefined);
+    const leafEntry =
+      leafDef && leafModelKey !== undefined
+        ? resolveModelEntry(leafDef, leafModelKey, runtimeModelMap)
         : null;
 
-    // Build subProps once for both pinLayout resolution and the nested-netlist
-    // resolution. Mirrors the expandCompositeInstance subProps construction
-    // (model-entry defaults + literal numbers + string refs into subcktParams;
-    // sibling-refs aren't walk-relevant so skip them).
+    // Sub-element PropertyBag: model-entry defaults written as VALUES (not given)
+    // so givenness-gated leaf branches stay inactive, then per-sub-element param
+    // overrides — literal numbers, subckt-param refs, sibling {ref} (resolved to
+    // the flattened sibling label for ctx.findBranch/findDevice), and verbatim
+    // {literal} (e.g. a B-source `expression`). Identical contract to the
+    // standalone instantiation path (modelEntryDefaults).
     const subProps = new PropertyBag();
-    if (subEntry) {
-      // Registry defaults + entry params as values (not given) — same contract as
-      // expandCompositeInstance / the standalone path. See modelEntryDefaults.
-      subProps.replaceModelParams(modelEntryDefaults(subEntry), { preserveGivenness: true });
+    if (leafEntry) {
+      subProps.replaceModelParams(modelEntryDefaults(leafEntry), { preserveGivenness: true });
     }
-    if (sub.params) {
-      for (const [paramKey, v] of Object.entries(sub.params)) {
+    if (subEl.params) {
+      for (const [paramKey, v] of Object.entries(subEl.params)) {
         if (typeof v === "number") {
           subProps.setModelParam(paramKey, v);
         } else if (typeof v === "string") {
           const resolved = subcktParams.get(v);
           if (resolved !== undefined) subProps.setModelParam(paramKey, resolved);
+        } else if (v !== null && typeof v === "object") {
+          const tag = (v as { kind?: string }).kind;
+          if (tag === "ref") {
+            const ref = v as { kind: "ref"; name: string };
+            if (!elementsByName.has(ref.name)) {
+              throw new Error(`SubcircuitElementParam ref: unknown element "${ref.name}"`);
+            }
+            subProps.set(paramKey, `${parentLabel}:${ref.name}`);
+          } else if (tag === "literal") {
+            subProps.set(paramKey, (v as { kind: "literal"; value: string }).value);
+          } else {
+            throw new Error(
+              "Unsupported SubcircuitElementParam discriminator. " +
+                "Allowed shapes: number, string, { kind: 'ref', name }, { kind: 'literal', value }.",
+            );
+          }
         }
       }
     }
 
-    const subPinLayout = subDef ? resolvePinLayout(subDef, subProps) : [];
+    const subPinLayout = leafDef ? resolvePinLayout(leafDef, subProps) : [];
 
-    // Deck node-token visit order: map each deck-token label to its pinLayout
-    // index (which is the `connectivity` index, since connectivity is stored in
-    // pinLayout order), preserving the INP2* token sequence. For a sub-element
-    // with no deck-pin row (a card-less nested composite) fall back to
-    // pinLayout/connectivity order.
-    const subDeck = TYPE_ID_TO_DECK_PIN_LABEL_ORDER[sub.typeId];
-    const internalVisitOrder: number[] =
-      subDeck !== undefined
-        ? subDeck
-            .map((lbl) => subPinLayout.findIndex((p) => p.label === lbl))
-            .filter((i) => i >= 0)
-        : connectivity.map((_, i) => i);
-
-    for (const pi of internalVisitOrder) {
-      const netIdx = connectivity[pi];
-      if (netIdx === undefined || netIdx < portCount) continue;
-      const slot = netIdx - portCount;
-      const suffix = netlist.internalNetLabels?.[slot] ?? `int${slot}`;
-      const key = `${parentLabel}#${suffix}`;
-      if (!internalIds.has(key)) {
-        allocateInternal(parentLabel, suffix);
-      }
+    const isNetlist = leafEntry?.kind === "netlist";
+    let innerNetlist: MnaSubcircuitNetlist | undefined;
+    let innerSubcktParams: Map<string, number> | undefined;
+    if (isNetlist && leafEntry) {
+      innerNetlist = resolveNetlistInstance(leafEntry, subProps);
+      innerSubcktParams = computeSubcktParams(innerNetlist, subProps);
     }
 
-    // Nested-composite recursion: if a sub-element is itself `kind: "netlist"`,
-    // its internal nets are also flattened-deck-visible and must land at this
-    // sub-element's deck position, not after the outer composite finishes.
-    if (!subDef) continue;
-    if (!subEntry || subEntry.kind !== "netlist") continue;
-
-    const innerNetlist = resolveNetlistInstance(subEntry, subProps);
-    const innerSubcktParams = computeSubcktParams(innerNetlist, subProps);
-    const subName = sub.subElementName ?? `el${elIdx}`;
-    const childLabel = `${parentLabel}:${subName}`;
-
-    const innerOuterPortNodes = new Map<string, number>();
-    for (let pi = 0; pi < subPinLayout.length && pi < connectivity.length; pi++) {
-      const netIdx = connectivity[pi];
-      if (netIdx === undefined) continue;
-      const pinLabel = subPinLayout[pi]!.label;
-      let nodeId: number;
-      if (netIdx < portCount) {
-        const portLabel = netlist.ports[netIdx]!;
-        const id = outerPortNodes.get(portLabel);
-        if (id !== undefined) {
-          nodeId = id;
-        } else if (portLabel === "gnd" || portLabel === "GND") {
-          nodeId = 0;
-        } else {
-          continue;
+    // Node-token order. A device-modelled leaf (DeviceFamily in
+    // DECK_EMITTING_FAMILIES) numbers its nodes in the pin order given by
+    // TYPE_ID_TO_DECK_PIN_LABEL_ORDER (matching ngspice's INP2* first-encounter
+    // sequence); such a leaf with no entry is a hard error. A behavioural-only
+    // leaf (no ngspice counterpart, never harness-compared) and a composite
+    // sub-element use connectivity order — the composite recurses into
+    // innerNetlist for its own internals.
+    let nodeTokenNetIndices: number[];
+    const deck = getDeckNodeTokensByTypeId(subEl.typeId);
+    if (deck !== undefined) {
+      nodeTokenNetIndices = deck
+        .map((lbl) => subPinLayout.findIndex((p) => p.label === lbl))
+        .filter((pi) => pi >= 0)
+        .map((pi) => connectivity[pi])
+        .filter((n): n is number => n !== undefined);
+      // B-source: ngspice's INP2B parser registers the expression's V() controller
+      // nodes immediately after n+ / n- while parsing the B-card (inpptree.c), so
+      // those nets mint at the B-card, not where they later appear as a token on
+      // another card. The controller pins are every pin not in the card's
+      // node-token list, in pinLayout order — which pinLayoutFactory builds in
+      // expression first-encounter order, matching ngspice's registration order.
+      if (leafEntry?.spice?.device === "ASRC") {
+        const tokenLabels = new Set(deck);
+        for (let pi = 0; pi < subPinLayout.length && pi < connectivity.length; pi++) {
+          if (tokenLabels.has(subPinLayout[pi]!.label)) continue;
+          const netIdx = connectivity[pi];
+          if (netIdx !== undefined) nodeTokenNetIndices.push(netIdx);
         }
-      } else {
-        const slot = netIdx - portCount;
-        const suffix = netlist.internalNetLabels?.[slot] ?? `int${slot}`;
-        const id = internalIds.get(`${parentLabel}#${suffix}`);
-        if (id === undefined) continue;
-        nodeId = id;
       }
-      innerOuterPortNodes.set(pinLabel, nodeId);
+    } else {
+      if (
+        leafEntry?.kind === "inline" &&
+        DECK_EMITTING_FAMILIES.has(getDeviceFamilyByTypeId(subEl.typeId))
+      ) {
+        throw new Error(
+          `compiler: device-modelled leaf "${subName}" (typeId "${subEl.typeId}", ` +
+            `family "${getDeviceFamilyByTypeId(subEl.typeId)}") has no ` +
+            `TYPE_ID_TO_DECK_PIN_LABEL_ORDER entry. A leaf whose DeviceFamily is ` +
+            `matched against ngspice must declare its node-token order so node ` +
+            `numbering matches ngspice's INPpas2 first-encounter walk.`,
+        );
+      }
+      nodeTokenNetIndices = connectivity.filter((n): n is number => n !== undefined);
     }
 
-    walkCompositeForNodeAllocation(
-      innerNetlist,
-      childLabel,
-      innerOuterPortNodes,
-      registry,
-      runtimeModelMap,
-      innerSubcktParams,
-      allocateInternal,
-      internalIds,
-    );
+    records.push({
+      subEl, subName, childLabel, typeId: subEl.typeId,
+      leafDef, leafModelKey, leafEntry, subProps, connectivity, subPinLayout,
+      isNetlist, innerNetlist, innerSubcktParams, nodeTokenNetIndices,
+    });
   }
+  return records;
 }
 
 /**
@@ -415,11 +435,13 @@ function expandCompositeInstance(
   parentLabel: string,
   parentTypeId: string,
   registry: ComponentRegistry,
+  runtimeModelMap: Record<string, Record<string, ModelEntry>> | undefined,
   getTime: () => number,
   allocateNode: NodeAllocator,
   compositeInternalIds: ReadonlyMap<string, number>,
   hookFactory?: import("../../core/registry.js").AnalogWrapperHookFactory,
   outerProps?: PropertyBag,
+  nodeIdToLoadingOverride?: ReadonlyMap<number, "loaded" | "ideal">,
 ): { wrapper: SubcircuitWrapperElement; allLeaves: AnalogElement[] } {
   // Pre-allocated path: `walkCompositeForNodeAllocation` (called from the
   // node-map builder during Pass A's deck walk) populates `compositeInternalIds`
@@ -454,14 +476,6 @@ function expandCompositeInstance(
     }
   }
 
-  // Build elementsByName index for cross-element ref resolution.
-  const elementsByName = new Map<string, import("../../core/mna-subcircuit-netlist.js").SubcircuitElement>();
-  for (let elIdx = 0; elIdx < netlist.elements.length; elIdx++) {
-    const subEl = netlist.elements[elIdx]!;
-    const subName = subEl.subElementName ?? `el${elIdx}`;
-    elementsByName.set(subName, subEl);
-  }
-
   // Resolve a netlist net index to a concrete MNA node ID.
   // Reserved port labels `gnd` / `GND` auto-bind to MNA node 0 (global ground)
   // when the parent component's pinLayout doesn't expose a matching pin. This
@@ -491,17 +505,11 @@ function expandCompositeInstance(
   const subElementLabelInfo: Array<{ el: AnalogElement; subElementName: string }> = [];
   const bindings = new Map<string, Array<{ el: AnalogElement; key: string }>>();
 
-  for (let elIdx = 0; elIdx < netlist.elements.length; elIdx++) {
-    const subEl = netlist.elements[elIdx]!;
-    const connectivity = netlist.netlist[elIdx]!;
-    const subName = subEl.subElementName ?? `el${elIdx}`;
-    const childLabel = `${parentLabel}:${subName}`;
+  for (const rec of enumerateCompositeLevel(netlist, parentLabel, registry, runtimeModelMap, subcktParams)) {
+    const { subEl, subName, childLabel, leafDef, leafModelKey, leafEntry, subProps, connectivity, subPinLayout } = rec;
 
-    const leafDef = registry.get(subEl.typeId);
-    // CLAUDE.md "Component Model Architecture": defaultModel is for
-    // placement-time UI only and MUST NOT be a compile-time lookup key.
-    const leafModelKey =
-      subEl.modelRef ?? (subEl.params?.model as string | undefined);
+    // defaultModel is placement-time UI only and is not a compile-time lookup
+    // key (CLAUDE.md "Component Model Architecture").
     if (leafModelKey === undefined) {
       throw new Error(
         `Composite sub-element "${subName}" (typeId="${subEl.typeId}") has no ` +
@@ -509,7 +517,6 @@ function expandCompositeInstance(
           `only and is not a valid compile-time lookup key.`,
       );
     }
-    const leafEntry = leafDef ? resolveModelEntry(leafDef, leafModelKey) : null;
     if (!leafEntry) {
       const available = leafDef?.modelRegistry
         ? Object.keys(leafDef.modelRegistry).join(", ") || "(none)"
@@ -521,59 +528,15 @@ function expandCompositeInstance(
       );
     }
 
-    // Build the sub-element's PropertyBag: leaf-entry defaults + sub-element
-    // param overrides (literal numbers, subcircuit-param refs, sibling refs).
-    const subProps = new PropertyBag();
-    // Leaf model-entry defaults under the SAME contract as the standalone
-    // instantiation path (runPassA_partition): registry paramDef defaults + the
-    // model entry's params, written as VALUES (not given). A hand-rolled
-    // setModelParam loop would mark them given and falsely activate ngspice
-    // *Given-gated leaf branches the emitted deck never has (e.g. a defaulted
-    // RCO=0.01 sets BJTintCollResistGiven -> the Kull quasi-saturation node split
-    // at bjt.ts:1549 / bjtsetup.c:163-166, an MNA equation ngspice does not).
-    // Only the explicit subEl.params overrides below are marked given.
-    subProps.replaceModelParams(modelEntryDefaults(leafEntry), { preserveGivenness: true });
-    if (subEl.params) {
-      for (const [paramKey, v] of Object.entries(subEl.params)) {
-        if (typeof v === "number") {
-          subProps.setModelParam(paramKey, v);
-        } else if (typeof v === "string") {
-          const resolved = subcktParams.get(v);
-          if (resolved !== undefined) subProps.setModelParam(paramKey, resolved);
-        } else if (v !== null && typeof v === "object") {
-          const tag = (v as { kind?: string }).kind;
-          if (tag === "ref") {
-            const ref = v as { kind: "ref"; name: string };
-            const sibling = elementsByName.get(ref.name);
-            if (!sibling) {
-              throw new Error(`SubcircuitElementParam ref: unknown element "${ref.name}"`);
-            }
-            // Resolve to the flattened sibling label. The consumer's setup()
-            // hands this string to ctx.findBranch / ctx.findDevice (ngspice
-            // CKTfndBranch / CKTfndDev) for runtime resolution.
-            subProps.set(paramKey, `${parentLabel}:${ref.name}`);
-          } else {
-            throw new Error(
-              "Unsupported SubcircuitElementParam discriminator. " +
-                "Allowed shapes: number, string, { kind: 'ref', name }.",
-            );
-          }
-        }
-      }
-    }
-
-    // Build pin-label-keyed Map for the sub-element. All node IDs are
-    // already resolved (port pins via outer pinNodes; internal-net pins via
-    // pre-allocated IDs) - no `-1` placeholder ever appears here.
+    // Bind every pin to its resolved node ID (port pins via outer pinNodes;
+    // internal-net pins via the pre-allocated IDs) — no `-1` placeholder ever
+    // appears. Pins bind in pinLayout order; node-token order governs only
+    // allocation, which the numbering walk already did.
     const subPinNodes = new Map<string, number>();
-    if (leafDef) {
-      const subPinLayout = resolvePinLayout(leafDef, subProps);
-      for (let pi = 0; pi < subPinLayout.length && pi < connectivity.length; pi++) {
-        const netIdx = connectivity[pi];
-        if (netIdx === undefined) continue;
-        const pinLabel = subPinLayout[pi]!.label;
-        subPinNodes.set(pinLabel, resolveNetToNode(netIdx));
-      }
+    for (let pi = 0; pi < subPinLayout.length && pi < connectivity.length; pi++) {
+      const netIdx = connectivity[pi];
+      if (netIdx === undefined) continue;
+      subPinNodes.set(subPinLayout[pi]!.label, resolveNetToNode(netIdx));
     }
 
     // Build the child element. Inline factories produce a primitive directly;
@@ -587,8 +550,34 @@ function expandCompositeInstance(
       subElements.push(childEl);
       allLeaves.push(childEl);
     } else if (leafEntry.kind === "netlist") {
-      const innerNetlist = resolveNetlistInstance(leafEntry, subProps);
-      const innerSubcktParams = computeSubcktParams(innerNetlist, subProps);
+      // Per-net loading override: a digital input pin whose bound input node
+      // carries an explicit loaded/ideal override selects its variant from the
+      // override, taking precedence over the composite's baked `loaded` default.
+      // The Loaded and Unloaded variants share ports, internal-net labels, and
+      // node numbering — they differ only by the rIn/cIn input-load elements,
+      // which reference the port nets — so this swap never perturbs the
+      // pre-allocated composite-internal IDs.
+      let innerNetlist = rec.innerNetlist!;
+      let innerSubcktParams = rec.innerSubcktParams!;
+      if (
+        nodeIdToLoadingOverride !== undefined &&
+        (subEl.typeId === "DigitalInputPinLoaded" || subEl.typeId === "DigitalInputPinUnloaded")
+      ) {
+        const inputNode = subPinNodes.get("node");
+        const override = inputNode !== undefined ? nodeIdToLoadingOverride.get(inputNode) : undefined;
+        const targetTypeId =
+          override === "ideal" ? "DigitalInputPinUnloaded"
+          : override === "loaded" ? "DigitalInputPinLoaded"
+          : undefined;
+        if (targetTypeId !== undefined && targetTypeId !== subEl.typeId) {
+          const targetDef = registry.get(targetTypeId);
+          const targetEntry = targetDef ? resolveModelEntry(targetDef, "default", runtimeModelMap) : null;
+          if (targetEntry?.kind === "netlist") {
+            innerNetlist = resolveNetlistInstance(targetEntry, subProps);
+            innerSubcktParams = computeSubcktParams(innerNetlist, subProps);
+          }
+        }
+      }
       const inner = expandCompositeInstance(
         innerNetlist,
         innerSubcktParams,
@@ -596,11 +585,13 @@ function expandCompositeInstance(
         childLabel,
         subEl.typeId,
         registry,
+        runtimeModelMap,
         getTime,
         allocateNode,
         compositeInternalIds,
         leafDef?.analogWrapperHook,
         subProps,
+        nodeIdToLoadingOverride,
       );
       childEl = inner.wrapper;
       // Inner expansion already set inner.wrapper.label = childLabel via
@@ -922,6 +913,66 @@ function buildAnalogNodeMapFromPartition(
     preAllocatedNodes.push({ name: key, number: id, type: "voltage" });
     return id;
   };
+  // Mint composite-internal node IDs for one composite. The harness deck emitter
+  // inlines a composite's body at its position in DEFINITION (depth-first) order
+  // — exactly as ngspice splices a `.subckt` body (subckt.c `doit`) — and ngspice
+  // numbers nodes by first-encounter walking that flattened deck top-to-bottom
+  // (inppas2.c:76). So mint internal nets by flattening the composite to its
+  // primitive leaves in definition order and minting each leaf's node-token nets
+  // where they first appear. A net must be minted at the deep leaf whose card
+  // first names it (e.g. a thresholder's `out-`), NOT at the parent-composite
+  // port that re-exposes it — minting at the port would order it ahead of the
+  // sub-composite's own earlier leaves. External pins resolve to already-numbered
+  // outer node ids and are skipped here.
+  const mintCompositeInternals = (
+    netlist: MnaSubcircuitNetlist,
+    parentLabel: string,
+    subcktParams: Map<string, number>,
+    outerPortNodes: ReadonlyMap<string, number>,
+  ): void => {
+    const walk = (
+      nl: MnaSubcircuitNetlist,
+      label: string,
+      params: Map<string, number>,
+      portMap: ReadonlyMap<string, number | string>,
+    ): void => {
+      const portCount = nl.ports.length;
+      // Resolve a net index to its canonical identity: an already-numbered outer
+      // node id (number) or an internal-net key `${level-label}#${suffix}`
+      // (string, not yet minted).
+      const resolve = (netIdx: number): number | string => {
+        if (netIdx < portCount) {
+          const outer = portMap.get(nl.ports[netIdx]!);
+          return outer ?? 0; // gnd / unconnected port → global ground
+        }
+        const suffix = nl.internalNetLabels?.[netIdx - portCount] ?? `int${netIdx - portCount}`;
+        return `${label}#${suffix}`;
+      };
+      for (const rec of enumerateCompositeLevel(nl, label, registry, runtimeModelMap, params)) {
+        if (rec.isNetlist && rec.innerNetlist && rec.innerSubcktParams) {
+          // Composite sub-element: recurse at its deck position (depth-first), so
+          // its internal leaves mint before whatever follows it at this level.
+          const innerPortMap = new Map<string, number | string>();
+          for (let pi = 0; pi < rec.subPinLayout.length && pi < rec.connectivity.length; pi++) {
+            const netIdx = rec.connectivity[pi];
+            if (netIdx === undefined) continue;
+            innerPortMap.set(rec.subPinLayout[pi]!.label, resolve(netIdx));
+          }
+          walk(rec.innerNetlist, rec.childLabel, rec.innerSubcktParams, innerPortMap);
+        } else {
+          // Primitive leaf: mint each internal-net key its node tokens name, in
+          // deck-token order, on first encounter.
+          for (const netIdx of rec.nodeTokenNetIndices) {
+            const net = resolve(netIdx);
+            if (typeof net !== "string" || compositeInternalIds.has(net)) continue;
+            const hash = net.lastIndexOf("#");
+            allocateCompositeInternal(net.slice(0, hash), net.slice(hash + 1));
+          }
+        }
+      }
+    };
+    walk(netlist, parentLabel, subcktParams, outerPortNodes);
+  };
   for (const { pc } of componentsInDeckOrder) {
     // Visit pins in SPICE deck-emission order. ngspice numbers nodes during
     // PARSE, in the order each new node name appears on each element line.
@@ -929,7 +980,7 @@ function buildAnalogNodeMapFromPartition(
     // pinLayout is [neg, pos]; M card is [D, G, S, B] but pinLayout for NMOS
     // is [G, S, D]). The TYPE_ID_TO_DECK_PIN_LABEL_ORDER table mirrors what
     // netlist-generator emits.
-    const deckLabels = TYPE_ID_TO_DECK_PIN_LABEL_ORDER[pc.element.typeId];
+    const deckLabels = getDeckNodeTokensByTypeId(pc.element.typeId);
     const visitPin = (rp: ResolvedGroupPin): void => {
       const key = `${rp.worldPosition.x},${rp.worldPosition.y}`;
       const gid = positionToGroupId.get(key);
@@ -975,16 +1026,7 @@ function buildAnalogNodeMapFromPartition(
         const id = groupToNodeId.get(gid);
         if (id !== undefined) outerPortNodes.set(rp.pinLabel, id);
       }
-      walkCompositeForNodeAllocation(
-        netlist,
-        parentLabel,
-        outerPortNodes,
-        registry,
-        runtimeModelMap,
-        subcktParams,
-        allocateCompositeInternal,
-        compositeInternalIds,
-      );
+      mintCompositeInternals(netlist, parentLabel, subcktParams, outerPortNodes);
     }
   }
   // Any groups not visited by any component pin (floating wire-only nets)
@@ -1081,13 +1123,6 @@ export function compileAnalogPartition(
   perNetLoadingOverrides?: ReadonlyMap<number, "loaded" | "ideal">,
 ): ConcreteCompiledAnalogCircuit {
   const diagnostics: Diagnostic[] = [];
-
-  // Assert the deck-pin-order table is total over every analog device class the
-  // generator can emit (inppas2.c:94-263). A missing row would silently fall
-  // back to pinLayout order in the node-map walk- the deck order only by
-  // coincidence- so a gap is a loud error here, not a parity drift discovered
-  // three layers down.
-  auditDeckPinOrderCoverage(registry.analogTypeIds());
 
   // Extract typed inline runtime models for use in route resolution.
   const runtimeModelMap: Record<string, Record<string, ModelEntry>> | undefined =
@@ -1362,11 +1397,13 @@ export function compileAnalogPartition(
         resolvedLabel,
         pc.element.typeId,
         registry,
+        runtimeModelMap,
         getTime,
         allocateCompositeNode,
         compositeInternalIds,
         hookFactory,
         props,
+        nodeIdToLoadingOverride,
       );
       core = expanded.wrapper;
       core.label = resolvedLabel;

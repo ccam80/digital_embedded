@@ -1,10 +1,10 @@
 {
   "summary": {
-    "passed": 15679,
-    "failed": 173,
+    "passed": 15815,
+    "failed": 154,
     "skipped": 0,
-    "totalFiles": 443,
-    "durationSeconds": 61.4
+    "totalFiles": 451,
+    "durationSeconds": 68.8
   },
   "failures": [
     {
@@ -380,13 +380,13 @@
         {
           "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session.ts",
           "test": "dcop_paired_rail_saturation",
-          "line": 1400,
+          "line": 1401,
           "column": 13
         },
         {
           "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session.ts",
           "test": "dcop_paired_rail_saturation",
-          "line": 1400,
+          "line": 1401,
           "column": 13
         }
       ]
@@ -584,30 +584,6 @@
       ]
     },
     {
-      "message": "expected { type: 'digital', value: +0 } to match object { type: 'digital', value: 2 }",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\components\\memory\\__tests__\\program-counter.test.ts",
-          "test": "jump_then_increment_continues_from_loaded_value",
-          "line": 245,
-          "column": 50
-        }
-      ]
-    },
-    {
-      "message": "Bus conflict on net 1: conflicting drivers",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\solver\\digital\\bus-resolution.ts",
-          "test": "masked_addresses_are_independent_across_distinct_register_slots",
-          "line": 229,
-          "column": 12
-        }
-      ]
-    },
-    {
       "message": "expected 3.8163916471489756e-17 to not be close to 3.729655473350135e-17, received difference is 8.673617379884035e-19, but expected 0.005",
       "count": 4,
       "locations": [
@@ -752,13 +728,13 @@
         {
           "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session.ts",
           "test": "transient_step_end_paired_rc_charge",
-          "line": 3990,
+          "line": 3991,
           "column": 13
         },
         {
           "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session.ts",
           "test": "transient_step_end_paired_reverse_bias",
-          "line": 3990,
+          "line": 3991,
           "column": 13
         }
       ]
@@ -910,6 +886,30 @@
           "test": "full_iteration_paired_matched_load",
           "line": 83,
           "column": 31
+        }
+      ]
+    },
+    {
+      "message": "expected { type: 'digital', value: +0 } to match object { type: 'digital', value: 2 }",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\components\\memory\\__tests__\\program-counter.test.ts",
+          "test": "jump_then_increment_continues_from_loaded_value",
+          "line": 245,
+          "column": 50
+        }
+      ]
+    },
+    {
+      "message": "Bus conflict on net 1: conflicting drivers",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\solver\\digital\\bus-resolution.ts",
+          "test": "masked_addresses_are_independent_across_distinct_register_slots",
+          "line": 229,
+          "column": 12
         }
       ]
     },
@@ -1352,13 +1352,13 @@
         {
           "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session.ts",
           "test": "transient_step_end_paired_pass_through",
-          "line": 3990,
+          "line": 3991,
           "column": 13
         },
         {
           "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session.ts",
           "test": "transient_step_end_paired_isolation",
-          "line": 3990,
+          "line": 3991,
           "column": 13
         }
       ]
@@ -1378,126 +1378,6 @@
           "test": "full_iteration_paired_isolation",
           "line": 83,
           "column": 31
-        }
-      ]
-    },
-    {
-      "message": "expected 5.934652993168346 to be close to 5.9405940594059405, received difference is 0.005941066237594939, but expected 0.00005",
-      "count": 3,
-      "locations": [
-        {
-          "file": "src\\solver\\analog\\__tests__\\behavioral-combinational.test.ts",
-          "test": "hotload_vOH_changes_output_high_voltage",
-          "line": 319,
-          "column": 19
-        },
-        {
-          "file": "src\\solver\\analog\\__tests__\\behavioral-combinational.test.ts",
-          "test": "hotload_vOH_changes_selected_output_voltage",
-          "line": 448,
-          "column": 19
-        },
-        {
-          "file": "src\\solver\\analog\\__tests__\\behavioral-combinational.test.ts",
-          "test": "hotload_vOH_changes_active_output_voltage",
-          "line": 480,
-          "column": 19
-        }
-      ]
-    },
-    {
-      "message": "expected 4.554695090899679 to be close to 4.545454545454546, received difference is 0.009240545445132753, but expected 0.00005",
-      "count": 3,
-      "locations": [
-        {
-          "file": "src\\solver\\analog\\__tests__\\behavioral-combinational.test.ts",
-          "test": "hotload_rOut_changes_output_divider_voltage",
-          "line": 336,
-          "column": 19
-        },
-        {
-          "file": "src\\solver\\analog\\__tests__\\behavioral-combinational.test.ts",
-          "test": "hotload_rOut_changes_selected_output_divider",
-          "line": 463,
-          "column": 19
-        },
-        {
-          "file": "src\\solver\\analog\\__tests__\\behavioral-combinational.test.ts",
-          "test": "hotload_rOut_changes_active_output_divider",
-          "line": 495,
-          "column": 19
-        }
-      ]
-    },
-    {
-      "message": "expected 0.19232222916994643 to be close to +0, received difference is 0.19232222916994643, but expected 0.00005",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\solver\\analog\\__tests__\\behavioral-combinational.test.ts",
-          "test": "hotload_vIH_shifts_digital_input_threshold",
-          "line": 383,
-          "column": 19
-        }
-      ]
-    },
-    {
-      "message": "expected 4.950495049504951 to be less than 4.7",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\solver\\analog\\__tests__\\behavioral-combinational.test.ts",
-          "test": "hotload_loaded_structural_property_seeds_pin_subelements",
-          "line": 431,
-          "column": 24
-        }
-      ]
-    },
-    {
-      "message": "expected 4.950495049504951 to be close to 4.545454545454545, received difference is 0.40504050405040637, but expected 5e-7",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\solver\\analog\\__tests__\\behavioral-combinational.test.ts",
-          "test": "loaded_sel_pin_sags_through_external_series_resistor",
-          "line": 636,
-          "column": 18
-        }
-      ]
-    },
-    {
-      "message": "expected 4.9504950495049505 to be close to 4.545454545454545, received difference is 0.4050405040504055, but expected 5e-10",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\solver\\analog\\__tests__\\behavioral-gate.test.ts",
-          "test": "loaded_pin_sees_voltage_sag",
-          "line": 268,
-          "column": 40
-        }
-      ]
-    },
-    {
-      "message": "expected 4.9504950495049505 to be close to 5, received difference is 0.04950495049504955, but expected 5e-10",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\solver\\analog\\__tests__\\behavioral-gate.test.ts",
-          "test": "ideal_pin_sees_full_source_voltage",
-          "line": 274,
-          "column": 40
-        }
-      ]
-    },
-    {
-      "message": "expected 0 to be greater than 4.4",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\solver\\analog\\__tests__\\behavioral-sequential.test.ts",
-          "test": "loaded_en_sees_voltage_sag_ideal_clk_clr_see_no_sag",
-          "line": 574,
-          "column": 17
         }
       ]
     },
@@ -1682,61 +1562,13 @@
       ]
     },
     {
-      "message": "expected 0.5 to be close to 1, received difference is 0.5, but expected 0.00005",
-      "count": 4,
+      "message": "Pin 'in' not found on component 'Not'. Valid pins: In_1, out (connection: \"A:out\" → \"g:in\")",
+      "count": 1,
       "locations": [
         {
-          "file": "src\\solver\\analog\\behavioral-drivers\\__tests__\\gate-driver-ctrl-stamp.test.ts",
-          "test": "treats above-threshold input as HIGH (A=MID, B=MID): AND → HI",
-          "line": 100,
-          "column": 17
-        },
-        {
-          "file": "src\\solver\\analog\\behavioral-drivers\\__tests__\\gate-driver-ctrl-stamp.test.ts",
-          "test": "treats above-threshold input as HIGH (A=MID, B=MID): OR → HI",
-          "line": 100,
-          "column": 17
-        },
-        {
-          "file": "src\\solver\\analog\\behavioral-drivers\\__tests__\\gate-driver-ctrl-stamp.test.ts",
-          "test": "treats above-threshold input as HIGH (A=MID, B=MID): XNOR → HI (equal)",
-          "line": 100,
-          "column": 17
-        },
-        {
-          "file": "src\\solver\\analog\\behavioral-drivers\\__tests__\\gate-driver-ctrl-stamp.test.ts",
-          "test": "treats above-threshold input as HIGH (In_1=MID): BUF → HI",
-          "line": 100,
-          "column": 17
-        }
-      ]
-    },
-    {
-      "message": "expected 0.5 to be close to +0, received difference is 0.5, but expected 0.00005",
-      "count": 4,
-      "locations": [
-        {
-          "file": "src\\solver\\analog\\behavioral-drivers\\__tests__\\gate-driver-ctrl-stamp.test.ts",
-          "test": "treats above-threshold input as HIGH (A=MID, B=MID): NAND → LO",
-          "line": 100,
-          "column": 17
-        },
-        {
-          "file": "src\\solver\\analog\\behavioral-drivers\\__tests__\\gate-driver-ctrl-stamp.test.ts",
-          "test": "treats above-threshold input as HIGH (A=MID, B=MID): NOR → LO",
-          "line": 100,
-          "column": 17
-        },
-        {
-          "file": "src\\solver\\analog\\behavioral-drivers\\__tests__\\gate-driver-ctrl-stamp.test.ts",
-          "test": "treats above-threshold input as HIGH (A=MID, B=MID): XOR → LO (equal)",
-          "line": 100,
-          "column": 17
-        },
-        {
-          "file": "src\\solver\\analog\\behavioral-drivers\\__tests__\\gate-driver-ctrl-stamp.test.ts",
-          "test": "treats above-threshold input as HIGH (in=MID): NOT → LO",
-          "line": 100,
+          "file": "src\\headless\\builder.ts",
+          "test": "connect op adds a wire between pins",
+          "line": 452,
           "column": 17
         }
       ]

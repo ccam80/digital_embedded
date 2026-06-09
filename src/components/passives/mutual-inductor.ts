@@ -306,6 +306,7 @@ export const MutualInductorDefinition: ComponentDefinition = {
         props: PropertyBag,
         _getTime: () => number,
       ): AnalogElement => new MutualInductorElement(pinNodes, props),
+      spice: { device: "MUT", deckNodeTokens: [] },
     },
   },
   defaultModel: "default",

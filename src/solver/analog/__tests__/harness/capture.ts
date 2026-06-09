@@ -25,7 +25,7 @@ import type {
 import type { LimitingEvent } from "../../newton-raphson.js";
 import { normalizeDeviceType, DEVICE_MAPPINGS, projectPinCurrents } from "./device-mappings.js";
 import { canonicalizeSpiceLabel } from "./netlist-generator.js";
-import type { DeviceFamily } from "../../ngspice-load-order.js";
+import { SPICE_PREFIX_BY_FAMILY } from "../../ngspice-load-order.js";
 
 // ---------------------------------------------------------------------------
 // Topology capture (once per compile)
@@ -55,14 +55,11 @@ const TYPE_TO_PREFIX: Record<string, string> = {
  *
  * Source of truth: `netlist-generator.ts::ELEMENT_SPECS`. Keep in sync.
  */
-const FAMILY_TO_SPICE_PREFIX: Partial<Record<DeviceFamily, string>> = {
-  RES: "R", CAP: "C", IND: "L", MUT: "K",
-  DIO: "D", BJT: "Q", MOS: "M", JFET: "J",
-  VSRC: "V", ISRC: "I",
-  VCVS: "E", VCCS: "G", CCVS: "H", CCCS: "F",
-  SW: "S", CSW: "W",
-  TRA: "T", URC: "U",
-};
+// SPICE prefix per device family is the canonical SPICE_PREFIX_BY_FAMILY map
+// (src/solver/analog/ngspice-load-order.ts)- imported above. The former local
+// copy here was incomplete (missing ASRC/MES/JFET2), which mislabeled B-source
+// leaves; sourcing the canonical map keeps the harness label in step with the
+// emitted deck and can never drift from the family ordinals again.
 
 /**
  * Build a map from element index â†’ human-readable component label.
@@ -151,7 +148,7 @@ export function buildElementLabelMap(
     const wrapperHarnessLabel = wrapperHarnessLabelByRawParent.get(rawParent) ?? rawParent;
     const flattened = `${wrapperHarnessLabel}_${subPath}`;
 
-    const prefix = FAMILY_TO_SPICE_PREFIX[el.deviceFamily];
+    const prefix = SPICE_PREFIX_BY_FAMILY[el.deviceFamily];
     if (prefix !== undefined) {
       map.set(i, canonicalizeSpiceLabel(flattened, prefix));
     } else {
@@ -262,11 +259,21 @@ export function captureTopology(
     matrixColLabels.set(branchRow, `${label}:branch`);
   }
 
+  // Composite wrapper / digital-bridge elements (deviceFamily BEHAVIORAL) emit no
+  // SPICE card, so they have no ngspice counterpart and can never pair in the
+  // topology diff. Excluding them keeps the device list comparable to ngspice's-
+  // otherwise each wrapper surfaces as a phantom "ours-only" element that
+  // misleads investigations. Node tags (perNode above) still include their pins,
+  // so connectivity attribution is unaffected.
+  const deviceElements = compiled.elements
+    .map((el, i) => ({ el, i }))
+    .filter(({ el }) => el.deviceFamily !== "BEHAVIORAL");
+
   return {
     matrixSize,
     nodeCount: compiled.nodeCount,
-    elementCount: compiled.elements.length,
-    elements: compiled.elements.map((el, i) => {
+    elementCount: deviceElements.length,
+    elements: deviceElements.map(({ el, i }) => {
       const ce = compiled.elementToCircuitElement?.get(i);
       const typeId = ce?.typeId ?? "";
       return {

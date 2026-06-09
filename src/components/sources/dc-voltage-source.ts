@@ -311,6 +311,7 @@ export const DcVoltageSourceDefinition: StandaloneComponentDefinition = {
       factory: makeDcVoltageSource,
       paramDefs: DC_VOLTAGE_SOURCE_PARAM_DEFS,
       params: DC_VOLTAGE_SOURCE_DEFAULTS,
+      spice: { device: "VSRC", deckNodeTokens: ["pos", "neg"] },
     },
   },
   defaultModel: "behavioral",

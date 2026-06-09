@@ -1627,6 +1627,7 @@ export const DiodeDefinition: StandaloneComponentDefinition = {
       factory: createDiodeElement,
       paramDefs: DIODE_PARAM_DEFS,
       params: DIODE_PARAM_DEFAULTS,
+      spice: { device: "DIO", deckNodeTokens: ["A", "K"] },
     },
   },
   defaultModel: "spice",

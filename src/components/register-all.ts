@@ -6,6 +6,7 @@
  */
 
 import { ComponentRegistry } from "@/core/registry";
+import { buildNetlistDeviceIndex } from "../solver/analog/ngspice-load-order.js";
 import { auditNgspiceLoadOrderTables } from "../solver/analog/ngspice-load-order-audit.js";
 
 // Gates
@@ -228,20 +229,7 @@ import { FetSWDefinition } from "./switching/fet-sw.js";
 import { BehavioralFETDriverDefinition } from "./switching/behavioral-fet-driver.js";
 
 // Gate behavioral drivers (internalOnly)
-import { BehavioralAndDriverDefinition } from "../solver/analog/behavioral-drivers/and-driver.js";
-import { BehavioralOrDriverDefinition } from "../solver/analog/behavioral-drivers/or-driver.js";
-import { BehavioralNandDriverDefinition } from "../solver/analog/behavioral-drivers/nand-driver.js";
-import { BehavioralNorDriverDefinition } from "../solver/analog/behavioral-drivers/nor-driver.js";
-import { BehavioralXorDriverDefinition } from "../solver/analog/behavioral-drivers/xor-driver.js";
-import { BehavioralXnorDriverDefinition } from "../solver/analog/behavioral-drivers/xnor-driver.js";
-import { BehavioralNotDriverDefinition } from "../solver/analog/behavioral-drivers/not-driver.js";
-import { BehavioralBufDriverDefinition } from "../solver/analog/behavioral-drivers/buf-driver.js";
-import { DigitalInputThresholderDefinition } from "../solver/analog/behavioral-drivers/digital-input-thresholder.js";
-
-// Wiring behavioral drivers (internalOnly)
-import { BehavioralMuxDriverDefinition } from "../solver/analog/behavioral-drivers/mux-driver.js";
-import { BehavioralDemuxDriverDefinition } from "../solver/analog/behavioral-drivers/demux-driver.js";
-import { BehavioralDecoderDriverDefinition } from "../solver/analog/behavioral-drivers/decoder-driver.js";
+import { BehavioralLogicDefinition } from "../solver/analog/behavioral-drivers/behavioral-logic.js";
 
 // Sequential behavioral drivers (internalOnly)
 import { BehavioralCounterDriverDefinition } from "../solver/analog/behavioral-drivers/counter-driver.js";
@@ -531,20 +519,7 @@ export function createDefaultRegistry(
   registry.register(BehavioralFETDriverDefinition);
 
   // Gate behavioral drivers (internalOnly)
-  registry.register(BehavioralAndDriverDefinition);
-  registry.register(BehavioralOrDriverDefinition);
-  registry.register(BehavioralNandDriverDefinition);
-  registry.register(BehavioralNorDriverDefinition);
-  registry.register(BehavioralXorDriverDefinition);
-  registry.register(BehavioralXnorDriverDefinition);
-  registry.register(BehavioralNotDriverDefinition);
-  registry.register(BehavioralBufDriverDefinition);
-  registry.register(DigitalInputThresholderDefinition);
-
-  // Wiring behavioral drivers (internalOnly)
-  registry.register(BehavioralMuxDriverDefinition);
-  registry.register(BehavioralDemuxDriverDefinition);
-  registry.register(BehavioralDecoderDriverDefinition);
+  registry.register(BehavioralLogicDefinition);
 
   // Sequential behavioral drivers (internalOnly)
   registry.register(BehavioralCounterDriverDefinition);
@@ -588,6 +563,9 @@ export function createDefaultRegistry(
   // and also referenced by the Relay composite as a sub-element.
   registry.register(CurrentControlledSwitchDefinition);
 
+  // Build the typeId → netlist-device index from each model's `spice` block,
+  // then validate it. Must run after all register() calls and before any compile.
+  buildNetlistDeviceIndex(registry);
   auditNgspiceLoadOrderTables(registry);
 
   return registry;

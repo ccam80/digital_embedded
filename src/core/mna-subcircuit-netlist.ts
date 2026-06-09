@@ -1,5 +1,5 @@
 /**
- * Sub-element parameter value. CLOSED 3-arm union — no other shapes permitted.
+ * Sub-element parameter value. CLOSED 4-arm union — no other shapes permitted.
  *
  * - `number`: literal scalar (resistance, capacitance, gain, flag-as-0/1).
  * - `string`: lookup key into the enclosing subcircuit's `params` map; the
@@ -12,6 +12,10 @@
  *   resolve a branch index or peer AnalogElement at runtime. Used by CSW
  *   (W-element ctrlBranch), CCCS/CCVS (F/H-element sense source), and MUT
  *   (K-element L1/L2 coupling).
+ * - `{ kind: "literal"; value }`: a literal string written verbatim into the
+ *   regular property partition (NOT a subcircuit-param lookup). Used to hand a
+ *   behavioural B-source its `expression` text; a bare `string` would otherwise
+ *   be read as a subcircuit-param reference and dropped.
  *
  * **Flags / booleans MUST be encoded as `0`/`1` numbers**, matching ngspice's
  * `IFvalue.iValue` convention (booleans are ints in the device-param ABI).
@@ -22,7 +26,8 @@
 export type SubcircuitElementParam =
   | number
   | string
-  | { kind: "ref"; name: string };
+  | { kind: "ref"; name: string }
+  | { kind: "literal"; value: string };
 
 export interface SubcircuitElement {
   /** Component type (NMOS, PMOS, Resistor, Diode, etc.) */

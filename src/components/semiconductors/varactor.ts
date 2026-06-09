@@ -196,6 +196,7 @@ export const VaractorDefinition: StandaloneComponentDefinition = {
       factory: createDiodeElement,
       paramDefs: VARACTOR_PARAM_DEFS,
       params: VARACTOR_PARAM_DEFAULTS,
+      spice: { device: "DIO", deckNodeTokens: ["A", "K"] },
     },
   },
   defaultModel: "spice",

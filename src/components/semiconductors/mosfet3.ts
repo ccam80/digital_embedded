@@ -408,7 +408,7 @@ function _createMosfet3ElementWithPolarity(
     private _dtempGiven = given.DTEMP;
     private _temp = params.TEMP;
     private _dtemp = params.DTEMP;
-    private _lastCtx: TempContext = { cktTemp: REFTEMP, cktNomTemp: params.TNOM, _indVerbosity: 2 };
+    private _lastCtx: TempContext = { cktTemp: REFTEMP, cktNomTemp: params.TNOM, reltol: 1e-3, epsmin: 1e-28, _indVerbosity: 2 };
 
     constructor(pinNodes: ReadonlyMap<string, number>) {
       super(pinNodes);
@@ -1924,6 +1924,7 @@ export const Mosfet3NDefinition: StandaloneComponentDefinition = {
       factory: createMosfet3Element,
       paramDefs: MOSFET3_N_PARAM_DEFS,
       params: MOSFET3_N_DEFAULTS,
+      spice: { device: "MOS", deckNodeTokens: ["D", "G", "S"] },
     },
   },
   defaultModel: "spice-l3",
@@ -1954,6 +1955,7 @@ export const Mosfet3PDefinition: StandaloneComponentDefinition = {
       factory: createPmosfet3Element,
       paramDefs: MOSFET3_P_PARAM_DEFS,
       params: MOSFET3_P_DEFAULTS,
+      spice: { device: "MOS", deckNodeTokens: ["D", "G", "S"] },
     },
   },
   defaultModel: "spice-l3",

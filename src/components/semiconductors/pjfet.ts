@@ -1044,6 +1044,7 @@ export const PJfetDefinition: StandaloneComponentDefinition = {
       factory: createPJfetElement,
       paramDefs: PJFET_PARAM_DEFS,
       params: PJFET_PARAM_DEFAULTS,
+      spice: { device: "JFET", deckNodeTokens: ["D", "G", "S"] },
     },
   },
   defaultModel: "spice",

@@ -413,6 +413,7 @@ export const VCVSDefinition: StandaloneComponentDefinition = {
       },
       paramDefs: VCVS_PARAM_DEFS,
       params: VCVS_DEFAULTS,
+      spice: { device: "VCVS", deckNodeTokens: ["out+", "out-", "ctrl+", "ctrl-"] },
     },
     "comparator": {
       kind: "inline",
@@ -422,6 +423,7 @@ export const VCVSDefinition: StandaloneComponentDefinition = {
       },
       paramDefs: COMPARATOR_PARAM_DEFS,
       params: { ...COMPARATOR_PARAM_DEFAULTS, gain: VCVS_COMP_GAIN },
+      spice: { device: "VCVS", deckNodeTokens: ["out+", "out-", "ctrl+", "ctrl-"] },
     },
   },
   defaultModel: "behavioral",

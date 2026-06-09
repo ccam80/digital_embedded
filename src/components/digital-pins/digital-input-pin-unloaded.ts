@@ -11,12 +11,27 @@ const DIGITAL_INPUT_PIN_UNLOADED_PIN_LAYOUT: PinDeclaration[] = [
 export const DIGITAL_INPUT_PIN_UNLOADED_NETLIST: MnaSubcircuitNetlist = {
   ports: ["node", "gnd", "result"],
   params: { vIH: 2.0, vIL: 0.8 },
+  // Same ngspice-faithful threshold classifier as the loaded pin
+  // (digital-input-pin-loaded.ts), but WITHOUT the rIn/cIn input load- an
+  // unloaded pin presents a high-Z input (only the B-source controller reads
+  // V(node), and controllers draw no current). vIH/vIL are carried as controller
+  // node voltages (DC sources) so they hot-load via setComponentProperty.
   elements: [
-    { typeId: "DigitalInputThresholder", modelRef: "default", subElementName: "thresh", params: { vIH: "vIH", vIL: "vIL" } },
+    { typeId: "DcVoltageSource", modelRef: "behavioral", subElementName: "vihSrc", params: { voltage: "vIH" } },
+    { typeId: "DcVoltageSource", modelRef: "behavioral", subElementName: "vilSrc", params: { voltage: "vIL" } },
+    {
+      typeId: "BehavioralLogic", modelRef: "default", subElementName: "thresh",
+      params: { expression: { kind: "literal", value: "gt0(V(in)-V(vih))?1:(lt0(V(in)-V(vil))?0:0.5)" } },
+    },
+    { typeId: "Resistor", modelRef: "behavioral", subElementName: "threshR", params: { resistance: 1 } },
   ],
-  internalNetCount: 0,
+  internalNetCount: 2,
+  internalNetLabels: ["vih", "vil"],
   netlist: [
-    [0, 1, 2],
+    [1, 3],          // vihSrc: neg=gnd(1),   pos=vih(3)
+    [1, 4],          // vilSrc: neg=gnd(1),   pos=vil(4)
+    [0, 3, 4, 1, 2], // thresh: in=node(0), vih(3), vil(4), out+=gnd(1), out-=result(2)
+    [2, 1],          // threshR: pos=result(2), neg=gnd(1) — Norton conductance G=1
   ],
 };
 

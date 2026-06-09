@@ -218,6 +218,7 @@ export const SchottkyDiodeDefinition: StandaloneComponentDefinition = {
       factory: createSchottkyElement,
       paramDefs: SCHOTTKY_PARAM_DEFS,
       params: SCHOTTKY_PARAM_DEFAULTS,
+      spice: { device: "DIO", deckNodeTokens: ["A", "K"] },
     },
   },
   defaultModel: "spice",

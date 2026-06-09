@@ -40,7 +40,7 @@ function buildNotInverterCircuit(
       { id: "gnd",   type: "Ground",   props: { label: "gnd" } },
     ],
     connections: [
-      ["A:out",     "U1:in"],
+      ["A:out",     "U1:In_1"],
       ["U1:out",    "Y:in"],
       ["U1:out",    "Rload:pos"],
       ["Rload:neg", "gnd:out"],

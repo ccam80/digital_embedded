@@ -16,6 +16,18 @@
 
 import type { MnaSubcircuitNetlist, SubcircuitElement } from "../../core/mna-subcircuit-netlist.js";
 import type { PropertyBag } from "../../core/properties.js";
+import { buildBSourceTree } from "./expression.js";
+
+/**
+ * Product decode-literal weight for output index `i` over K selector
+ * controllers: ∏_b ((i>>b)&1 ? V(s_b) : 1-V(s_b)). On the {0,0.5,1} lattice this
+ * is the one-hot minterm select (1 only when every selector bit matches `i`).
+ */
+function decodeWeightExpr(i: number, K: number): string {
+  const lits = Array.from({ length: K }, (_, b) =>
+    ((i >>> b) & 1) === 1 ? `V(s${b})` : `(1-V(s${b}))`);
+  return lits.join("*");
+}
 
 // ---------------------------------------------------------------------------
 // buildDecoderNetlist
@@ -68,22 +80,26 @@ export function buildDecoderNetlist(params: PropertyBag): MnaSubcircuitNetlist {
   const elements: SubcircuitElement[] = [];
   const netlist: number[][] = [];
 
-  // Driver leaf reads result-nets for selector inputs.
-  // Pin order MUST match buildDecoderDriverPinLayout
-  // (sel_0..sel_{K-1}, gnd, ctrl_0..ctrl_{N-1}).
-  const drvNets: number[] = [];
-  for (let b = 0; b < K; b++) drvNets.push(resultSelBase + b);
-  drvNets.push(gndPortIdx);
-  for (let i = 0; i < N; i++) drvNets.push(ctrlNetBase + i);
-  elements.push({
-    typeId: "BehavioralDecoderDriver",
-    modelRef: "default",
-    subElementName: "drv",
-    params: {
-      selectorBits: K,
-    },
-  });
-  netlist.push(drvNets);
+  // One BehavioralLogic I-mode B-source per decoded output: out_i = ∏_b lit_b_i
+  // (the product decode literal), each paired with a 1Ω drvR Norton
+  // (I + 1Ω -> V(ctrl_i) = expr). Controllers bound in the expression's V()
+  // first-encounter order (parsed), out+ -> gnd, out- -> ctrl_i.
+  for (let i = 0; i < N; i++) {
+    const expr = decodeWeightExpr(i, K);
+    const nodeVars = buildBSourceTree(expr).vars.filter((v) => v.kind === "node").map((v) => v.label);
+    const pins = nodeVars.map((label) => resultSelBase + Number(label.slice(1)));
+    pins.push(gndPortIdx, ctrlNetBase + i);
+    elements.push({
+      typeId: "BehavioralLogic", modelRef: "default", subElementName: `drv_${i}`,
+      params: { expression: { kind: "literal", value: expr } },
+    });
+    netlist.push(pins);
+    elements.push({
+      typeId: "Resistor", modelRef: "behavioral", subElementName: `drvR_${i}`,
+      params: { resistance: 1 },
+    });
+    netlist.push([ctrlNetBase + i, gndPortIdx]);
+  }
 
   // Selector input pins — 3-port DIPL, string-bound.
   for (let b = 0; b < K; b++) {
@@ -185,22 +201,26 @@ export function buildDemuxNetlist(params: PropertyBag): MnaSubcircuitNetlist {
   const elements: SubcircuitElement[] = [];
   const netlist: number[][] = [];
 
-  // Driver leaf reads result-nets for sel and data inputs.
-  // Pin order MUST match buildDemuxDriverPinLayout
-  // (sel_0..sel_{K-1}, in, gnd, ctrl_0..ctrl_{N-1}).
-  const drvNets: number[] = [];
-  for (let b = 0; b < K; b++) drvNets.push(resultSelBase + b);
-  drvNets.push(resultInNet, gndPortIdx);
-  for (let i = 0; i < N; i++) drvNets.push(ctrlNetBase + i);
-  elements.push({
-    typeId: "BehavioralDemuxDriver",
-    modelRef: "default",
-    subElementName: "drv",
-    params: {
-      selectorBits: K,
-    },
-  });
-  netlist.push(drvNets);
+  // One BehavioralLogic I-mode B-source per output: out_i = (∏_b lit_b_i)·V(in),
+  // each paired with a 1Ω drvR Norton. Controllers (selector literals + data)
+  // bound in the expression's V() first-encounter order, out+ -> gnd,
+  // out- -> ctrl_i.
+  for (let i = 0; i < N; i++) {
+    const expr = `(${decodeWeightExpr(i, K)})*V(in)`;
+    const nodeVars = buildBSourceTree(expr).vars.filter((v) => v.kind === "node").map((v) => v.label);
+    const pins = nodeVars.map((label) => (label === "in" ? resultInNet : resultSelBase + Number(label.slice(1))));
+    pins.push(gndPortIdx, ctrlNetBase + i);
+    elements.push({
+      typeId: "BehavioralLogic", modelRef: "default", subElementName: `drv_${i}`,
+      params: { expression: { kind: "literal", value: expr } },
+    });
+    netlist.push(pins);
+    elements.push({
+      typeId: "Resistor", modelRef: "behavioral", subElementName: `drvR_${i}`,
+      params: { resistance: 1 },
+    });
+    netlist.push([ctrlNetBase + i, gndPortIdx]);
+  }
 
   // Selector input pins — 3-port DIPL, string-bound.
   for (let b = 0; b < K; b++) {

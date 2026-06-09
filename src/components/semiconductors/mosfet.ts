@@ -2194,42 +2194,42 @@ export const NmosfetDefinition: StandaloneComponentDefinition = {
       factory: createMosfetElement,
       paramDefs: MOSFET_NMOS_PARAM_DEFS,
       params: MOSFET_NMOS_DEFAULTS,
-
+      spice: { device: "MOS", deckNodeTokens: ["D", "G", "S"] },
     },
     "2N7000": {
       kind: "inline",
       factory: createMosfetElement,
       paramDefs: MOSFET_NMOS_PARAM_DEFS,
       params: NMOS_2N7000,
-
+      spice: { device: "MOS", deckNodeTokens: ["D", "G", "S"] },
     },
     "BS170": {
       kind: "inline",
       factory: createMosfetElement,
       paramDefs: MOSFET_NMOS_PARAM_DEFS,
       params: NMOS_BS170,
-
+      spice: { device: "MOS", deckNodeTokens: ["D", "G", "S"] },
     },
     "IRF530N": {
       kind: "inline",
       factory: createMosfetElement,
       paramDefs: MOSFET_NMOS_PARAM_DEFS,
       params: NMOS_IRF530N,
-
+      spice: { device: "MOS", deckNodeTokens: ["D", "G", "S"] },
     },
     "IRF540N": {
       kind: "inline",
       factory: createMosfetElement,
       paramDefs: MOSFET_NMOS_PARAM_DEFS,
       params: NMOS_IRF540N,
-
+      spice: { device: "MOS", deckNodeTokens: ["D", "G", "S"] },
     },
     "IRFZ44N": {
       kind: "inline",
       factory: createMosfetElement,
       paramDefs: MOSFET_NMOS_PARAM_DEFS,
       params: NMOS_IRFZ44N,
-
+      spice: { device: "MOS", deckNodeTokens: ["D", "G", "S"] },
     },
   },
   defaultModel: "spice-l1",
@@ -2260,42 +2260,42 @@ export const PmosfetDefinition: StandaloneComponentDefinition = {
       factory: createPmosfetElement,
       paramDefs: MOSFET_PMOS_PARAM_DEFS,
       params: MOSFET_PMOS_DEFAULTS,
-
+      spice: { device: "MOS", deckNodeTokens: ["D", "G", "S"] },
     },
     "BS250": {
       kind: "inline",
       factory: createPmosfetElement,
       paramDefs: MOSFET_PMOS_PARAM_DEFS,
       params: PMOS_BS250,
-
+      spice: { device: "MOS", deckNodeTokens: ["D", "G", "S"] },
     },
     "IRF9520": {
       kind: "inline",
       factory: createPmosfetElement,
       paramDefs: MOSFET_PMOS_PARAM_DEFS,
       params: PMOS_IRF9520,
-
+      spice: { device: "MOS", deckNodeTokens: ["D", "G", "S"] },
     },
     "IRFP9240": {
       kind: "inline",
       factory: createPmosfetElement,
       paramDefs: MOSFET_PMOS_PARAM_DEFS,
       params: PMOS_IRFP9240,
-
+      spice: { device: "MOS", deckNodeTokens: ["D", "G", "S"] },
     },
     "IRF5210": {
       kind: "inline",
       factory: createPmosfetElement,
       paramDefs: MOSFET_PMOS_PARAM_DEFS,
       params: PMOS_IRF5210,
-
+      spice: { device: "MOS", deckNodeTokens: ["D", "G", "S"] },
     },
     "IRF4905": {
       kind: "inline",
       factory: createPmosfetElement,
       paramDefs: MOSFET_PMOS_PARAM_DEFS,
       params: PMOS_IRF4905,
-
+      spice: { device: "MOS", deckNodeTokens: ["D", "G", "S"] },
     },
   },
   defaultModel: "spice-l1",

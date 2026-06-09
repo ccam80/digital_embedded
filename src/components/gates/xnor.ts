@@ -19,7 +19,7 @@ import {
   type StandaloneComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
-import type { MnaSubcircuitNetlist, SubcircuitElement } from "../../core/mna-subcircuit-netlist.js";
+import type { MnaSubcircuitNetlist } from "../../core/mna-subcircuit-netlist.js";
 import { defineModelParams } from "../../core/model-params.js";
 import {
   compWidth,
@@ -30,6 +30,8 @@ import {
   drawGateLabel,
   drawGateExtensionLines,
   drawXorBody,
+  xorFold,
+  buildBehavioralGateNetlist,
 } from "./gate-shared.js";
 
 export { STANDARD_GATE_ATTRIBUTE_MAPPINGS as XNOR_ATTRIBUTE_MAPPINGS } from "./gate-shared.js";
@@ -208,70 +210,7 @@ export const { paramDefs: XNOR_BEHAVIORAL_PARAM_DEFS, defaults: XNOR_BEHAVIORAL_
 // ---------------------------------------------------------------------------
 
 export function buildXnorGateNetlist(params: PropertyBag): MnaSubcircuitNetlist {
-  const N        = params.getModelParam<number>("inputCount");
-  const loaded   = params.getModelParam<number>("loaded") >= 0.5;
-  const inputPinType  = loaded ? "DigitalInputPinLoaded"  : "DigitalInputPinUnloaded";
-  const outputPinType = loaded ? "DigitalOutputPinLoaded" : "DigitalOutputPinUnloaded";
-
-  const ports: string[] = [];
-  for (let i = 0; i < N; i++) ports.push(`In_${i + 1}`);
-  ports.push("out", "gnd");
-  const outIdx = N;
-  const gndIdx = N + 1;
-  const ctrlOutNet = N + 2;
-  const resultNets: number[] = [];
-  for (let i = 0; i < N; i++) resultNets.push(N + 3 + i);
-
-  const elements: SubcircuitElement[] = [];
-  const netlist: number[][] = [];
-
-  const driverPins: number[] = [];
-  for (let i = 0; i < N; i++) driverPins.push(resultNets[i]!);
-  driverPins.push(ctrlOutNet, gndIdx);
-  elements.push({
-    typeId: "BehavioralXnorDriver",
-    modelRef: "default",
-    subElementName: "drv",
-    params: { inputCount: N },
-  });
-  netlist.push(driverPins);
-
-  for (let i = 0; i < N; i++) {
-    elements.push({
-      typeId: inputPinType,
-      modelRef: "default",
-      subElementName: `inPin_${i + 1}`,
-      params: { vIH: "vIH", vIL: "vIL", rIn: "rIn", cIn: "cIn" },
-    });
-    netlist.push([i, gndIdx, resultNets[i]!]);
-  }
-
-  elements.push({
-    typeId: outputPinType,
-    modelRef: "default",
-    subElementName: "outPin",
-    params: {
-      rOut: params.getModelParam<number>("rOut"),
-      cOut: params.getModelParam<number>("cOut"),
-      vOH:  params.getModelParam<number>("vOH"),
-      vOL:  params.getModelParam<number>("vOL"),
-    },
-  });
-  netlist.push([outIdx, gndIdx, ctrlOutNet]);
-
-  return {
-    ports,
-    params: {
-      vIH: params.getModelParam<number>("vIH"),
-      vIL: params.getModelParam<number>("vIL"),
-      rIn: params.getModelParam<number>("rIn"),
-      cIn: params.getModelParam<number>("cIn"),
-    },
-    elements,
-    internalNetCount: 1 + N,
-    internalNetLabels: ["ctrl_out", ...Array.from({ length: N }, (_, i) => `result_${i + 1}`)],
-    netlist,
-  };
+  return buildBehavioralGateNetlist(params, (vars) => `1-${xorFold(vars)}`);
 }
 
 // ---------------------------------------------------------------------------
