@@ -96,6 +96,14 @@ export default defineConfig({
   },
   plugins: [serveLibDev(), copyStaticAssets()],
   server: {
+    // The ngspice reference tree (`ref/`) sits in the working dir and carries a
+    // Visual Studio `.vs/` index whose `.vsidx` files are intermittently locked.
+    // Vite's recursive FSWatcher emits an unhandled EBUSY `error` watching them
+    // and the dev-server process exits, taking every in-flight e2e test with it.
+    // None of `ref/` is an app input, so exclude it (and any `.vs/`) from watch.
+    watch: {
+      ignored: ['**/ref/**', '**/.vs/**'],
+    },
     headers: {
       'Cross-Origin-Opener-Policy': 'same-origin',
       'Cross-Origin-Embedder-Policy': 'require-corp',
