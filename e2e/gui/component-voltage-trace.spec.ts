@@ -86,6 +86,56 @@ async function bodyCenter(page: Page, label: string): Promise<{ x: number; y: nu
   return pt;
 }
 
+/**
+ * Divider whose middle node (R1.neg == R2.pos at 380,200) is a *direct
+ * pin-to-pin junction with no wire*. The compiler merges coincident pins into
+ * one MNA node, but the old trace-menu resolver only matched pin positions
+ * against wire endpoints, so R1.neg resolved to nothing and the across-R1 trace
+ * could not be plotted. This is the same failure tunnel-joined pins hit on
+ * buckbjt, reduced to a circuit with controllable coordinates.
+ */
+const DIVIDER_NOWIRE_MID_XML = `<?xml version="1.0" encoding="utf-8"?>
+<circuit>
+  <version>2</version>
+  <attributes><entry><string>romContent</string><romList><roms/></romList></entry></attributes>
+  <visualElements>
+    <visualElement>
+      <elementName>AcVoltageSource</elementName>
+      <elementAttributes>
+        <entry><string>Label</string><string>Vs</string></entry>
+        <entry><string>Amplitude</string><int>5</int></entry>
+        <entry><string>Frequency</string><int>100</int></entry>
+      </elementAttributes>
+      <pos x="140" y="260"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Resistor</elementName>
+      <elementAttributes>
+        <entry><string>Label</string><string>R1</string></entry>
+        <entry><string>resistance</string><int>1000</int></entry>
+      </elementAttributes>
+      <pos x="300" y="200"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Resistor</elementName>
+      <elementAttributes>
+        <entry><string>Label</string><string>R2</string></entry>
+        <entry><string>resistance</string><int>1000</int></entry>
+      </elementAttributes>
+      <pos x="380" y="200"/>
+    </visualElement>
+    <visualElement><elementName>Ground</elementName><elementAttributes/><pos x="220" y="300"/></visualElement>
+    <visualElement><elementName>Ground</elementName><elementAttributes/><pos x="540" y="300"/></visualElement>
+  </visualElements>
+  <wires>
+    <wire><p1 x="140" y="260"/><p2 x="140" y="200"/></wire>
+    <wire><p1 x="140" y="200"/><p2 x="300" y="200"/></wire>
+    <wire><p1 x="460" y="200"/><p2 x="540" y="200"/></wire>
+    <wire><p1 x="540" y="200"/><p2 x="540" y="300"/></wire>
+    <wire><p1 x="220" y="260"/><p2 x="220" y="300"/></wire>
+  </wires>
+</circuit>`;
+
 test.describe('component differential voltage trace', () => {
   test('Trace Voltage on a resistor plots the across-component drop, not a flat node', async ({ page }) => {
     await page.goto('/');
@@ -128,6 +178,46 @@ test.describe('component differential voltage trace', () => {
 
     // The across-R1 voltage swings — it is a real differential, not the flat
     // ~0 (or pinned-to-source-node) trace the bug produced.
+    expect(r1Trace!.max - r1Trace!.min).toBeGreaterThan(0.1);
+  });
+
+  test('Trace Voltage across a component whose far pin is a wireless pin-to-pin junction', async ({ page }) => {
+    await page.goto('/');
+    await page.locator('#sim-canvas').waitFor({ state: 'visible' });
+    await page.waitForTimeout(400);
+
+    await loadXml(page, DIVIDER_NOWIRE_MID_XML);
+
+    await page.locator('[data-menu="sim"]').click();
+    await page.locator('#btn-menu-timing').click();
+    await expect(page.locator('#viewer-panel')).toBeVisible();
+
+    await page.evaluate(() => { for (let i = 0; i < 10; i++) window.postMessage({ type: 'sim-step' }, '*'); });
+    await page.waitForTimeout(300);
+
+    // Right-click R1 → "Trace Voltage: R1". R1.neg is the (380,200) junction
+    // shared pin-to-pin with R2.pos and carried by NO wire. The differential
+    // item only exists, and only reads non-zero, once the menu resolves that
+    // pin from the compiler's authoritative node table.
+    const r1 = await bodyCenter(page, 'R1');
+    await page.mouse.click(r1.x, r1.y, { button: 'right' });
+    await page.locator('.ctx-menu').waitFor({ state: 'visible' });
+    await page.locator('.ctx-menu-label', { hasText: /^Trace Voltage: R1$/ }).click();
+
+    await page.evaluate(() => { for (let i = 0; i < 800; i++) window.postMessage({ type: 'sim-step' }, '*'); });
+    await page.waitForTimeout(600);
+
+    const stats = await page.evaluate(() => {
+      const bridge = (window as unknown as { __test: {
+        getTraceStats(): Array<{ label: string; min: number; max: number; mean: number }> | null;
+      } }).__test;
+      return bridge.getTraceStats();
+    });
+
+    expect(stats).not.toBeNull();
+    const r1Trace = stats!.find(s => s.label.includes('R1'));
+    expect(r1Trace, `trace stats: ${JSON.stringify(stats)}`).toBeDefined();
+    // Half of the 5 V AC amplitude drops across R1 (equal divider) — a clear swing.
     expect(r1Trace!.max - r1Trace!.min).toBeGreaterThan(0.1);
   });
 });

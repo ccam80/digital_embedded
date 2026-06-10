@@ -20,7 +20,6 @@ import { separator } from '../editor/context-menu.js';
 import type { CircuitElement } from '../core/element.js';
 import type { SignalAddress } from '../compile/types.js';
 import type { SimulationCoordinator, CurrentResolverContext } from '../solver/coordinator-types.js';
-import { pinWorldPosition } from '../core/pin.js';
 
 // ---------------------------------------------------------------------------
 // Public types
@@ -91,27 +90,29 @@ export function resolveSignalName(
 }
 
 /**
- * Map each of an element's pin labels to its MNA node id by matching pin world
- * positions against the analog wire→node table. Same matcher used when building
- * the component trace menu; reused on restore to re-resolve differential probes
- * after node renumbering.
+ * Map each of an element's pin labels to its MNA node id from the compiler's
+ * authoritative per-pin resolution (`elementResolvedPins`)- the same source
+ * `getPinVoltages()` reads for pin colouring and the current-trace path uses
+ * for node anchoring. Reused on restore to re-resolve differential probes after
+ * node renumbering.
+ *
+ * Resolving by pin world position against the wire→node table silently fails
+ * for any pin whose net is joined through a Tunnel or a coincident-pin overlap:
+ * no wire endpoint sits on the pin, so the match found nothing and the trace
+ * read a flat 0 V on tunnel-heavy circuits.
  */
 export function resolveElementPinNodes(
   element: CircuitElement,
   resolverCtx: CurrentResolverContext,
 ): Map<string, number> {
   const map = new Map<string, number>();
-  for (const pin of element.getPins()) {
-    const wp = pinWorldPosition(element, pin);
-    for (const [wire, nid] of resolverCtx.wireToNodeId) {
-      if (
-        (Math.abs(wire.start.x - wp.x) < 0.5 && Math.abs(wire.start.y - wp.y) < 0.5) ||
-        (Math.abs(wire.end.x - wp.x) < 0.5 && Math.abs(wire.end.y - wp.y) < 0.5)
-      ) {
-        map.set(pin.label, nid);
-        break;
-      }
-    }
+  let elementIndex = -1;
+  for (const [idx, ce] of resolverCtx.elementToCircuitElement) {
+    if (ce === element) { elementIndex = idx; break; }
+  }
+  if (elementIndex < 0) return map;
+  for (const rp of resolverCtx.elementResolvedPins?.get(elementIndex) ?? []) {
+    map.set(rp.label, rp.nodeId);
   }
   return map;
 }
@@ -495,21 +496,15 @@ export function initViewerController(ctx: AppContext, renderPipeline: RenderPipe
 
       if (items.length > 0) items.push(separator());
 
-      // Resolve pin node IDs by world position (not by indexing pinNodeIds,
-      // which may differ in order from pins, e.g. FET pinNodeIds = [D,G,S]
-      // but pins = [G,S,D]).
+      // Resolve each pin's MNA node from the compiler's authoritative per-pin
+      // resolution- the same source getPinVoltages() uses for pin colouring and
+      // the current-trace path uses for node anchoring. A world-position match
+      // against wireToNodeId silently failed for any pin whose net is joined by
+      // a Tunnel or a coincident-pin overlap (no wire endpoint sits on the pin),
+      // so voltage traces read a flat 0 V on tunnel-heavy circuits.
       const pinNodeMap: { pinLabel: string; nodeId: number }[] = [];
-      for (const pin of pins) {
-        const wp = pinWorldPosition(element, pin);
-        for (const [wire, nid] of resolverCtx.wireToNodeId) {
-          if (
-            (Math.abs(wire.start.x - wp.x) < 0.5 && Math.abs(wire.start.y - wp.y) < 0.5) ||
-            (Math.abs(wire.end.x - wp.x) < 0.5 && Math.abs(wire.end.y - wp.y) < 0.5)
-          ) {
-            pinNodeMap.push({ pinLabel: pin.label, nodeId: nid });
-            break;
-          }
-        }
+      for (const rp of resolverCtx.elementResolvedPins?.get(elementIndex) ?? []) {
+        pinNodeMap.push({ pinLabel: rp.label, nodeId: rp.nodeId });
       }
 
       const existingPanels = getPanelList();
