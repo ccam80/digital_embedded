@@ -58,7 +58,7 @@ async function buildAndNotChainCircuit(builder: UICircuitBuilder): Promise<void>
 
   await builder.drawWire('A', 'out', 'G1', 'In_1');
   await builder.drawWire('B', 'out', 'G1', 'In_2');
-  await builder.drawWire('G1', 'out', 'G2', 'in');
+  await builder.drawWire('G1', 'out', 'G2', 'In_1');
   await builder.drawWire('G2', 'out', 'Y', 'in');
 }
 
@@ -588,7 +588,7 @@ test.describe('Subcircuit workflow- full lifecycle', () => {
     // Now build a second pair of components and try to use the same name
     await builder.placeLabeled('And', 22, 10, 'H1');
     await builder.placeLabeled('Not', 26, 11, 'H2');
-    await builder.drawWire('H1', 'out', 'H2', 'in');
+    await builder.drawWire('H1', 'out', 'H2', 'In_1');
     await builder.page.waitForTimeout(100);
 
     // Select H1 + H2
@@ -638,7 +638,7 @@ test.describe('Subcircuit workflow- full lifecycle', () => {
     // Place two more components and select them
     await builder.placeLabeled('Or', 22, 10, 'H1');
     await builder.placeLabeled('Not', 26, 11, 'H2');
-    await builder.drawWire('H1', 'out', 'H2', 'in');
+    await builder.drawWire('H1', 'out', 'H2', 'In_1');
 
     await selectTwoByLabel(builder, 'H1', 'H2');
     await rightClickElement(builder, 'H1');
