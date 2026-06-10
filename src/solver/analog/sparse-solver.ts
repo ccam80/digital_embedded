@@ -222,13 +222,30 @@ export class SparseSolver {
    *  Matrix->Size). After CKTsetup-equivalent calls have run, this is the
    *  number of MNA equations including ground row 0. */
   get matrixSize(): number { return this._size; }
+  /**
+   * Distinct external rows with a structural entry in external column `col`.
+   * For a branch column this is the set of nodes the branch row injects current
+   * into (the KCL `allocElement(node, branch)` incidence) — i.e. the nodes whose
+   * voltage the branch actually constrains. Coefficient-only couplings stamped
+   * as `allocElement(branch, node)` (e.g. a controlled source's sense nodes) land
+   * in row `branch`, not column `branch`, so they are excluded. Ground (0) is
+   * never an `allocElement` argument, so it never appears. */
+  getColumnRows(col: number): number[] {
+    const rows = new Set<number>();
+    for (const { extRow, extCol } of this._insertionOrder) {
+      if (extCol === col) rows.add(extRow);
+    }
+    return [...rows];
+  }
   /** ngspice Matrix->AllocatedSize- heap capacity for _diag/_rowHead/_colHead/_intToExtRow/_intToExtCol. */
   private _allocatedSize: number = 0;
   /** ngspice Matrix->ExtSize- largest external index seen. */
   private _extSize: number = 0;
   /** ngspice Matrix->AllocatedExtSize- heap capacity for _extToIntRow/_extToIntCol. */
   private _allocatedExtSize: number = 0;
-  /** Insertion order for _getInsertionOrder()- test-only debug field. */
+  /** External (row, col) of every allocElement call this build, in order.
+   *  Consumed by getColumnRows() for branch-terminal incidence and by
+   *  _getInsertionOrder() in tests. Reset on structural rebuild. */
   private _insertionOrder: Array<{ extRow: number; extCol: number }> = [];
 
   // =========================================================================

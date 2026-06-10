@@ -3,13 +3,32 @@ import type { AnalogElement } from "./element.js";
 import { makeDiagnostic } from "./diagnostics.js";
 
 export interface TopologyEntry {
+  /** All pin nodes of the element. Used for connectivity (weak-node) counting. */
   nodeIds: number[];
+  /**
+   * For a branch element, the nodes its branch row actually constrains — the
+   * KCL current-injection terminals (e.g. a VCVS's out+/out-, not its sense
+   * ctrl pins; a DAC driver's OUT/GND, not its VREF sense pin). Undefined when
+   * the branch's terminal incidence is unavailable (compile-time, pre-setup).
+   * Source/loop detection keys on this, falling back to `nodeIds`.
+   */
+  branchNodeIds?: number[] | undefined;
   isBranch: boolean;
   typeHint: "inductor" | "voltage" | "other";
   label: string;
 }
 
-export function buildTopologyInfo(elements: readonly AnalogElement[]): TopologyEntry[] {
+/**
+ * @param branchTerminals  Map of branchIndex → constrained terminal nodes (the
+ *   KCL incidence of that branch column from the solver). When supplied, a
+ *   branch element's `branchNodeIds` is set from it so the voltage/inductor/
+ *   competing detectors reason about the real driven terminals rather than
+ *   every pin (which falsely implicates sense/control pins).
+ */
+export function buildTopologyInfo(
+  elements: readonly AnalogElement[],
+  branchTerminals?: ReadonlyMap<number, number[]>,
+): TopologyEntry[] {
   const result: TopologyEntry[] = [];
   for (const el of elements) {
     const nodeIds = [...el.pinNodes.values()];
@@ -23,7 +42,14 @@ export function buildTopologyInfo(elements: readonly AnalogElement[]): TopologyE
       typeHint = "other";
     }
     const label = el.label !== "" ? el.label : "<unnamed>";
-    result.push({ nodeIds, isBranch, typeHint, label });
+    const branchNodeIds = isBranch ? branchTerminals?.get(el.branchIndex) : undefined;
+    result.push({
+      nodeIds,
+      ...(branchNodeIds !== undefined ? { branchNodeIds } : {}),
+      isBranch,
+      typeHint,
+      label,
+    });
   }
   return result;
 }
@@ -183,7 +209,7 @@ function detectVoltageSourceLoops(
   // Build adjacency list: node â†’ set of reachable nodes through voltage sources
   const adj = new Map<number, Set<number>>();
   for (const vs of vSources) {
-    const [a, b] = vs.nodeIds;
+    const [a, b] = vs.branchNodeIds ?? vs.nodeIds;
     if (a < 0 || b < 0) continue;
     if (!adj.has(a)) adj.set(a, new Set());
     if (!adj.has(b)) adj.set(b, new Set());
@@ -228,7 +254,7 @@ function detectInductorLoops(
 
   const adj = new Map<number, Set<number>>();
   for (const ind of inductors) {
-    const [a, b] = ind.nodeIds;
+    const [a, b] = ind.branchNodeIds ?? ind.nodeIds;
     if (a < 0 || b < 0) continue;
     if (!adj.has(a)) adj.set(a, new Set());
     if (!adj.has(b)) adj.set(b, new Set());
@@ -259,11 +285,21 @@ function detectInductorLoops(
 }
 
 /**
- * Detect nets driven by two or more voltage-source branch equations.
+ * Detect ideal voltage sources connected in parallel- two or more branch
+ * equations constraining the *same* pair of nodes. Parallel ideal voltage
+ * sources impose redundant/contradictory rows on the identical node set,
+ * making the MNA matrix singular.
  *
- * Returns pairs of component labels that compete on the same node.
- * Each pair represents one conflict: two components that both impose
- * a voltage constraint on the same MNA node.
+ * Two sources that share only *one* node are a valid series stack (e.g. a
+ * digital output pin's `vLowRail` + `eDrive`, or any reference chain), not a
+ * conflict- so grouping is by the full terminal-node SET, not per-node. Loops
+ * of voltage sources are a separate singularity handled by
+ * `detectVoltageSourceLoops`.
+ *
+ * Each terminal set is the branch's KCL current-injection nodes (`branchNodeIds`,
+ * which excludes ground and sense pins); ground is never a driven terminal.
+ *
+ * Returns pairs of component labels that share an identical terminal set.
  */
 function detectCompetingVoltageConstraints(
   elements: readonly TopologyEntry[],
@@ -271,27 +307,28 @@ function detectCompetingVoltageConstraints(
   const vSources = elements.filter((e) => e.isBranch && e.typeHint === "voltage");
   if (vSources.length < 2) return [];
 
-  // Map from node ID â†’ list of component labels that drive that node via a branch equation
-  const nodeDrivers = new Map<number, string[]>();
+  // Group sources by their constrained terminal-node set (sorted, ground-free).
+  // Sources sharing an identical set are in parallel → singular.
+  const byTerminalSet = new Map<string, string[]>();
   for (const vs of vSources) {
-    for (const nodeId of vs.nodeIds) {
-      if (nodeId <= 0) continue;
-      let drivers = nodeDrivers.get(nodeId);
-      if (!drivers) { drivers = []; nodeDrivers.set(nodeId, drivers); }
-      if (!drivers.includes(vs.label)) drivers.push(vs.label);
-    }
+    const nodes = [...new Set((vs.branchNodeIds ?? vs.nodeIds).filter((n) => n > 0))].sort((a, b) => a - b);
+    if (nodes.length === 0) continue; // fully grounded / degenerate- not a drive
+    const key = nodes.join(",");
+    let labels = byTerminalSet.get(key);
+    if (!labels) { labels = []; byTerminalSet.set(key, labels); }
+    if (!labels.includes(vs.label)) labels.push(vs.label);
   }
 
   const conflicts: Array<[string, string]> = [];
   const reportedPairs = new Set<string>();
-  for (const drivers of nodeDrivers.values()) {
-    if (drivers.length < 2) continue;
-    for (let i = 0; i < drivers.length - 1; i++) {
-      for (let j = i + 1; j < drivers.length; j++) {
-        const key = `${drivers[i]!}|${drivers[j]!}`;
+  for (const labels of byTerminalSet.values()) {
+    if (labels.length < 2) continue;
+    for (let i = 0; i < labels.length - 1; i++) {
+      for (let j = i + 1; j < labels.length; j++) {
+        const key = `${labels[i]!}|${labels[j]!}`;
         if (!reportedPairs.has(key)) {
           reportedPairs.add(key);
-          conflicts.push([drivers[i]!, drivers[j]!]);
+          conflicts.push([labels[i]!, labels[j]!]);
         }
       }
     }

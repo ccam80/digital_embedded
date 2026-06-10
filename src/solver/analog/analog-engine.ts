@@ -1936,7 +1936,24 @@ export class MNAEngine implements AnalogEngine {
     // emit through the same DiagnosticCollector that already carries
     // convergence-failed and reactive-state-outside-pool.
     {
-      const topology = buildTopologyInfo(this._elements);
+      // Map each branch row to the nodes it actually constrains: the KCL
+      // current-injection incidence (structural entries in the branch column),
+      // minus any branch-row indices (e.g. an inductor's own di/dt diagonal).
+      // This lets the source/loop detectors reason about real terminals rather
+      // than every pin — a controlled source's sense pins land in the branch
+      // ROW (coefficients), never its column, so they are excluded.
+      const branchRows = new Set(
+        this._nodeTable.filter(e => e.type === "current").map(e => e.number),
+      );
+      const branchTerminals = new Map<number, number[]>();
+      for (const el of this._elements) {
+        if (el.branchIndex === -1) continue;
+        branchTerminals.set(
+          el.branchIndex,
+          this._solver.getColumnRows(el.branchIndex).filter(r => !branchRows.has(r)),
+        );
+      }
+      const topology = buildTopologyInfo(this._elements, branchTerminals);
       runPostSetupDetectors(topology, d => this._diagnostics.emit(d));
     }
 
