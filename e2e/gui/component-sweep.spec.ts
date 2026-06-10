@@ -175,9 +175,15 @@ const WIDTH_MATRIX: WidthTestEntry[] = [
   { type: 'Delay',           propKey: 'bitWidth',     widths: [1, 4, 8, 16] },
   { type: 'BusSplitter',     propKey: 'bitWidth',     widths: [2, 4, 8, 16] },
 
-  // DAC/ADC- bits property (internal key: 'bits', label: 'Resolution (bits)')
+  // DAC- bits property (internal key: 'bits', label: 'Resolution (bits)'). The
+  // DAC is combinational (output = code/2^bits * VREF), so it has a DC operating
+  // point and compiles cleanly here. The ADC is intentionally absent: it is a
+  // fixed-pinout part (always D0..D7; `bits` sets internal resolution, not pin
+  // count) AND a clocked SAR converter with no DC operating point (its outputs
+  // only resolve on a clock edge), so the compile+DC-OP shape of this sweep
+  // cannot validate it. The ADC's `bits` plumbing and conversion are covered at
+  // the headless surface in src/components/active/__tests__/adc.test.ts.
   { type: 'DAC', propKey: 'bits', widths: [4, 8] },
-  { type: 'ADC', propKey: 'bits', widths: [4, 8] },
 ];
 
 // ---------------------------------------------------------------------------
