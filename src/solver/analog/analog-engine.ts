@@ -1866,6 +1866,27 @@ export class MNAEngine implements AnalogEngine {
     cktTemp(ctx, compiled.elementsByFamily);
   }
 
+  /**
+   * Re-run the temperature pass at the current operating temperature.
+   *
+   * cite: ckttemp.c:28-33 — ngspice re-runs CKTtemp (calling DEVtemperature for
+   * every device) before the next analysis after a `.alter`. The fold for
+   * temperature/geometry/TC-derived load quantities lives solely in each
+   * element's computeTemperature (CAPtemp/INDtemp ports), so re-running the pass
+   * re-folds the load-read quantity (this.C / _effectiveL) from the instance
+   * params a setParam hot-load just updated. Idempotent for untouched elements
+   * (pure function of params + cktTemp), so a no-op for everything that did not
+   * change. Mirrors setCircuitTemp's pass minus the temperature mutation.
+   */
+  refreshTemperatureDerivedParams(): void {
+    const ctx = this._ctx;
+    if (!ctx) return;
+    if (!this._isSetup) return;
+    const compiled = this._compiled as ConcreteCompiledAnalogCircuit | null;
+    if (!compiled) return;
+    cktTemp(ctx, compiled.elementsByFamily);
+  }
+
   get circuitTemp(): number {
     return this._ctx?.cktTemp ?? 300.15;
   }

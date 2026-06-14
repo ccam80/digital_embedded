@@ -488,7 +488,12 @@ export class AnalogCapacitorElement extends PoolBackedAnalogElement {
    */
   setParam(key: string, value: number): void {
     if (key === "capacitance") {
+      // capparam.c:32  CAPcapacinst = CAPcapac = value: store the raw value into
+      // both the instance field (_nominalC) and the working field (this.C). The
+      // TC/geometry/SCALE fold overwrites this.C in computeTemperature (CAPtemp),
+      // which the hot-load path re-runs via refreshTemperatureDerivedParams().
       this._nominalC = value;
+      this.C = value;
       this._capGiven = true;
     } else if (key === "IC") {
       this._IC = value;

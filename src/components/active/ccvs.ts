@@ -49,7 +49,6 @@ import { ControlledSourceElement } from "../../solver/analog/controlled-source-b
 import { NGSPICE_LOAD_ORDER, type DeviceFamily } from "../../solver/analog/ngspice-load-order.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
 import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
-import type { LoadContext } from "../../solver/analog/load-context.js";
 import { defineModelParams } from "../../core/model-params.js";
 
 // ---------------------------------------------------------------------------
@@ -177,9 +176,15 @@ export class CCVSAnalogElement extends ControlledSourceElement {
     this._hIbrCtBr = solver.allocElement(ownBranch, contBranch); // :62
   }
 
-  setParam(key: string, value: number | string): void {
+  override setParam(key: string, value: number | string): void {
     if (key === "senseSourceLabel" && typeof value === "string") {
       this._senseSourceLabel = value;
+    } else if (key === "transresistance" && typeof value === "number") {
+      // ccvspar.c:25 — store the bare transresistance; applied live by the base
+      // _effectiveCoeff() at load() time so rm is hot-loadable.
+      this._setCoeff(value);
+    } else {
+      super.setParam(key, value);
     }
   }
 
@@ -235,17 +240,6 @@ export class CCVSAnalogElement extends ControlledSourceElement {
     const iSense = this._contBranch >= 0 ? rhs[this._contBranch] : 0;
     const iOut   = this.branchIndex >= 0  ? rhs[this.branchIndex]  : 0;
     return [iSense, -iSense, iOut, -iOut];
-  }
-
-  /**
-   * Override load() to use cached handles- no allocElement calls.
-   */
-  override load(ctx: LoadContext): void {
-    this._bindContext(ctx.rhsOld);
-    this._stampLinear(ctx.solver);
-    const value = this._compiledExpr(this._ctx);
-    const deriv = this._compiledDeriv(this._ctx);
-    this.stampOutput(ctx.solver, ctx.rhs, value, deriv, this._ctrlValue);
   }
 }
 
@@ -385,12 +379,14 @@ export const CCVSDefinition: StandaloneComponentDefinition = {
       kind: "inline",
       factory: (pinNodes, props, _getTime) => {
         const expression = props.getOrDefault<string>("expression", "I(sense)");
-        const transresistance = props.getModelParam<number>("transresistance");
-        const rawExpr = parseExpression(expression === "I(sense)"
-          ? `${transresistance} * I(sense)`
-          : expression);
-        const deriv = simplify(differentiate(rawExpr, "I(sense)"));
-        const el = new CCVSAnalogElement(pinNodes, rawExpr, deriv, "I(sense)", "current");
+        const isLinear = expression === "I(sense)";
+        // Unscaled base expression; the transresistance is applied live at
+        // load() (ccvsload.c:39), keeping rm hot-loadable via setParam.
+        const baseExpr = parseExpression(isLinear ? "I(sense)" : expression);
+        const deriv = simplify(differentiate(baseExpr, "I(sense)"));
+        const el = new CCVSAnalogElement(pinNodes, baseExpr, deriv, "I(sense)", "current");
+        el.setLinearDefault(isLinear);
+        el.setParam("transresistance", props.getModelParam<number>("transresistance"));
         // Wire the sense-source link via the public setParam path so the
         // build-spec entry point can drive CCVS without reaching past the
         // factory boundary. Empty string = unset; setup() will throw with

@@ -187,10 +187,12 @@ export function cktTerr(
   const coeffTable = method === "trapezoidal" ? TRAP_LTE_FACTORS : GEAR_LTE_FACTORS;
   const factor = coeffTable[Math.max(0, Math.min(coeffTable.length - 1, order - 1))];
 
-  if (ddiff === 0) return Infinity;
+  // ngspice cktterr.c:69 — del = trtol*tol / MAX(abstol, factor*|diff[0]|).
+  // There is no ddiff===0 short-circuit: a zero divided difference (linear /
+  // constant charge) clamps the denominator to abstol via the MAX, yielding a
+  // finite abstol-gated bound rather than Infinity. abstol (default 1e-6) keeps
+  // the denominator strictly positive, so no separate guard is needed.
   const denom = Math.max(params.abstol, factor * ddiff);
-  if (!(denom > 0)) return Infinity;
-  // ngspice cktterr.c:69
   let del = params.trtol * tol / denom;
 
   // ------------------------------------------------------------------

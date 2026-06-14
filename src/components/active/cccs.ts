@@ -54,7 +54,6 @@ import { ControlledSourceElement } from "../../solver/analog/controlled-source-b
 import { NGSPICE_LOAD_ORDER, type DeviceFamily } from "../../solver/analog/ngspice-load-order.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
 import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
-import type { LoadContext } from "../../solver/analog/load-context.js";
 import { defineModelParams } from "../../core/model-params.js";
 
 // ---------------------------------------------------------------------------
@@ -134,19 +133,6 @@ export class CCCSAnalogElement extends ControlledSourceElement {
   // Must be set via setParam("senseSourceLabel", label) before setup() runs.
   private _senseSourceLabel: string = "";
 
-  // cccsdefs.h:33 CCCScoeff — the bare gain coefficient (CCCScoeff pre-fold,
-  // cccspar.c:25). _effectiveCoeff() folds in _mValue when _mGiven.
-  private _gain: number = 1;
-  // cccsdefs.h:35 CCCSmValue — the parallel multiplier (cccspar.c:34).
-  private _mValue: number = 1;
-  // cccsdefs.h:42 CCCSmGiven — multiplier-given flag; gates the
-  // CCCScoeff *= CCCSmValue fold (cccspar.c:26).
-  private _mGiven: boolean = false;
-  // True for the default linear F-element path ("I(sense)"): the stamped
-  // coefficient is the bare scalar _effectiveCoeff(), matching cccsload.c:35-36.
-  // False for the digiTS-only non-default expression extension.
-  private _linearDefault: boolean = true;
-
   // Resolved controlling branch index (filled in setup()).
   private _contBranch: number = -1;
 
@@ -179,41 +165,17 @@ export class CCCSAnalogElement extends ControlledSourceElement {
     this._hNCtBr = solver.allocElement(negNode, contBranch); // :50
   }
 
-  setParam(key: string, value: number | string): void {
+  override setParam(key: string, value: number | string): void {
     if (key === "senseSourceLabel" && typeof value === "string") {
       this._senseSourceLabel = value;
     } else if (key === "currentGain" && typeof value === "number") {
-      // cccspar.c:25 — store the bare gain coefficient.
-      this._gain = value;
-    } else if (key === "M" && typeof value === "number") {
-      // cccspar.c:34-35 — store the parallel multiplier and mark it given.
-      this._mValue = value;
-      this._mGiven = true;
+      // cccspar.c:25 — store the bare gain; the M-fold is applied by the base
+      // _effectiveCoeff() at load() time, keeping currentGain hot-loadable.
+      this._setCoeff(value);
+    } else {
+      // cccspar.c:34-35 — M is handled by the base (sets _mValue / _mGiven).
+      super.setParam(key, value);
     }
-  }
-
-  /**
-   * The stamped gain coefficient. cccspar.c:25-28: CCCScoeff = gain; if
-   * (CCCSmGiven) CCCScoeff *= CCCSmValue. The bare gain is scaled by the
-   * parallel multiplier only when m was given, so a CCCS with no m= stamps
-   * exactly the bare gain — bit-identical to ngspice's CCCSmGiven=FALSE skip.
-   */
-  private _effectiveCoeff(): number {
-    return this._mGiven ? this._gain * this._mValue : this._gain;
-  }
-
-  /**
-   * The scalar factor the digiTS-only non-default expression is multiplied by.
-   * cccspar.c:26 gate: the parallel multiplier folds in only when m was given,
-   * so an un-netlisted m is a true no-op on the extension (not a ×1).
-   */
-  private _exprMultiplier(): number {
-    return this._mGiven ? this._mValue : 1;
-  }
-
-  /** Select the linear F-element path vs the digiTS-only expression extension. */
-  setLinearDefault(isLinear: boolean): void {
-    this._linearDefault = isLinear;
   }
 
   protected override _stampLinear(_solver: SparseSolver): void {
@@ -281,26 +243,6 @@ export class CCCSAnalogElement extends ControlledSourceElement {
     ];
   }
 
-  /**
-   * Override load() to use cached handles instead of allocating in load().
-   * Calls _bindContext, evaluates expression, then calls stampOutput with
-   * the cached handle-based stamps.
-   */
-  override load(ctx: LoadContext): void {
-    this._bindContext(ctx.rhsOld);
-    this._stampLinear(ctx.solver);
-    // The base expression is unscaled. cccspar.c:25-28: the stamped coefficient
-    // is the bare gain folded with the parallel multiplier when m was given.
-    // Reading _effectiveCoeff() here (rather than baking a constant at
-    // construction) keeps currentGain and M hot-loadable via setParam: the next
-    // load() re-reads the live _gain / _mValue, so the stamp tracks the change.
-    // For the default linear path f = I(sense), so value = coeff·Isense,
-    // deriv = coeff, gm = coeff, iNR = 0 — the ±CCCScoeff stamp of cccsload.c:35-36.
-    const factor = this._linearDefault ? this._effectiveCoeff() : this._exprMultiplier();
-    const value = factor * this._compiledExpr(this._ctx);
-    const deriv = factor * this._compiledDeriv(this._ctx);
-    this.stampOutput(ctx.solver, ctx.rhs, value, deriv, this._ctrlValue);
-  }
 }
 
 // ---------------------------------------------------------------------------

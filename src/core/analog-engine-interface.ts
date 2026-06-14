@@ -595,6 +595,17 @@ export interface AnalogEngine extends Engine {
   setCircuitTemp(K: number): void;
 
   /**
+   * Re-run the per-instance temperature pass (ngspice CKTtemp → DEVtemperature)
+   * WITHOUT changing the operating temperature. Re-folds every element's
+   * temperature/geometry-derived load quantity (CAPtemp's CAPcapac, INDtemp's
+   * INDinduct, …) from its current instance params. Called on the runtime
+   * `setParam` hot-load path so a changed capacitance / inductance / geometry /
+   * TC param takes effect on the next solve — mirroring ngspice re-running
+   * CKTtemp after a `.alter`. Idempotent for untouched elements.
+   */
+  refreshTemperatureDerivedParams(): void;
+
+  /**
    * Current circuit operating temperature in Kelvin. Default 300.15 K
    * (REFTEMP); reflects the value last passed to `setCircuitTemp`.
    */

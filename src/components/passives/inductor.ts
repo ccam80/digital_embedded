@@ -690,10 +690,11 @@ export class AnalogInductorElement extends PoolBackedAnalogElement {
       this._TC2 = value;
       this._TC2Given = true;
     } else if (key === "SCALE") {
+      // indparam.c:51-52  IND_SCALE stores INDscale only; the scale fold into
+      // INDinduct happens in INDtemp (computeTemperature), which the hot-load
+      // path re-runs via refreshTemperatureDerivedParams().
       this._SCALE = value;
       this._scaleGiven = true;
-      // No /M here — it is applied at the stamp sites.
-      this._effectiveL = this._nominalL * this._SCALE;
     } else if (key === "M") {
       this._M = value;
       this._mGiven = true;

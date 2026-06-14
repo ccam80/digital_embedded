@@ -159,7 +159,14 @@ export class VCCSAnalogElement extends ControlledSourceElement {
     };
   }
 
-  setParam(_key: string, _value: number): void {
+  override setParam(key: string, value: number | string): void {
+    if (key === "transconductance" && typeof value === "number") {
+      // vccspar.c:25 — store the bare transconductance; the M-fold is applied
+      // by the base _effectiveCoeff() at load() time.
+      this._setCoeff(value);
+    } else {
+      super.setParam(key, value);
+    }
   }
 
   protected override _bindContext(rhsOld: Float64Array): void {
@@ -215,7 +222,10 @@ export class VCCSAnalogElement extends ControlledSourceElement {
    * current at out+ is -I_out, at out- is +I_out.
    */
   getPinCurrents(_rhs: Float64Array): number[] {
-    const iOut = this._compiledExpr(this._ctx);
+    // Base expression is unscaled; apply the live coefficient (gm·m) for the
+    // linear path, or the gated multiplier for the custom-expression extension.
+    const factor = this._linearDefault ? this._effectiveCoeff() : this._exprMultiplier();
+    const iOut = factor * this._compiledExpr(this._ctx);
     return [0, 0, -iOut, iOut];
   }
 }
@@ -348,16 +358,21 @@ export const VCCSDefinition: StandaloneComponentDefinition = {
       kind: "inline",
       factory: (pinNodes, props, _getTime) => {
         const expression = props.getOrDefault<string>("expression", "V(ctrl)");
-        const transconductance = props.getModelParam<number>("transconductance");
-        const m = props.getModelParam<number>("M"); // VCCSmValue, default 1
-        // vccspar.c:27-28 — VCCScoeff *= VCCSmValue (m defaults to 1, so the
-        // product is the bare transconductance when m is not netlisted).
-        const effectiveGm = transconductance * m;
-        const rawExpr = parseExpression(expression === "V(ctrl)"
-          ? `${effectiveGm} * V(ctrl)`
-          : `(${m}) * (${expression})`);
-        const deriv = simplify(differentiate(rawExpr, "V(ctrl)"));
-        return new VCCSAnalogElement(pinNodes, rawExpr, deriv, "V(ctrl)", "voltage");
+        const isLinear = expression === "V(ctrl)";
+        // Unscaled base expression; the transconductance and the parallel
+        // multiplier are applied live at load() (vccspar.c:24-28), keeping gm
+        // and M hot-loadable via setParam.
+        const baseExpr = parseExpression(isLinear ? "V(ctrl)" : expression);
+        const deriv = simplify(differentiate(baseExpr, "V(ctrl)"));
+        const el = new VCCSAnalogElement(pinNodes, baseExpr, deriv, "V(ctrl)", "voltage");
+        el.setLinearDefault(isLinear);
+        el.setParam("transconductance", props.getModelParam<number>("transconductance"));
+        // vccspar.c:30-33 — fold the parallel multiplier only when m was given,
+        // mirroring ngspice's VCCSmGiven gate (props.isModelParamGiven == *Given).
+        if (props.isModelParamGiven("M")) {
+          el.setParam("M", props.getModelParam<number>("M"));
+        }
+        return el;
       },
       paramDefs: VCCS_PARAM_DEFS,
       params: VCCS_DEFAULTS,

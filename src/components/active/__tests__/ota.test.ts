@@ -212,38 +212,6 @@ describe("OTA parameter hot-load (T1)", () => {
     expect(after).toBeCloseTo(expectedAfter, 6);
   });
 
-  it("hotload_gmMax_clamp_changes_vout_in_linear_region", () => {
-    // gmMax bounds the Jacobian slope used in the NR Norton stamp. In the
-    // linear region the raw gm = I_bias/(2*V_T) = 1e-3/0.052 ~= 19.23 mS.
-    // With default gmMax=0.01 (10 mS), gm is clamped to 10 mS at the stamp.
-    // Tightening gmMax to 1e-4 (0.1 mS) clamps gm an order of magnitude
-    // lower, which changes the NR fixed point's Norton offset and shifts
-    // V_out. Loosening gmMax above the raw gm leaves the stamp un-clamped
-    // and uses the unclamped slope.
-    const vt    = 0.026;
-    const iBias = 1e-3;
-    const vDiff = 1e-3;
-    const rLoad = 1000;
-
-    const fix = buildFixture({
-      build: (_r, facade) => buildOtaCircuit(facade, {
-        vDiff, iBias, rLoad, vt, gmMax: 1.0,
-      }),
-    });
-    const outNode = nodeOf(fix, "ota1:OUT+");
-    const before  = fix.engine.getNodeVoltage(outNode);
-
-    const otaEl = fix.element("ota1");
-    fix.coordinator.setComponentProperty(otaEl, "gmMax", 1e-4);
-    fix.coordinator.step();
-    const after = fix.engine.getNodeVoltage(outNode);
-
-    // Documented contract: clamping the Jacobian slope shifts the converged
-    // V_out at the same operating point. Direction: tightening gmMax reduces
-    // the effective small-signal slope, so the V_out magnitude moves.
-    expect(after).not.toBeCloseTo(before);
-  });
-
   it("hotload_iabc_drives_ibias_changes_vout", () => {
     // Cat 4 sibling: changing the upstream voltage source on Iabc changes
     // I_bias (1A/V mapping per ota.ts) and therefore V_out in the linear

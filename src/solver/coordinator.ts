@@ -954,6 +954,12 @@ export class DefaultSimulationCoordinator implements SimulationCoordinator {
           el.setParam(key, value);
         }
         this._analog.configure({});
+        // ngspice re-runs CKTtemp after a `.alter` so temperature/geometry-folded
+        // load quantities (CAPcapac, INDinduct, …) are re-derived from the params
+        // the setParam above just changed. The fold lives only in each element's
+        // computeTemperature, so re-run the pass here to make a capacitance /
+        // inductance / geometry / TC hot-load observable on the next solve.
+        this._analog.refreshTemperatureDerivedParams();
         handled = true;
       }
     }
