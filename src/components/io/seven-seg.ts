@@ -283,7 +283,7 @@ export const SevenSegDefinition: StandaloneComponentDefinition = {
   category: ComponentCategory.IO,
   helpText:
     "SevenSeg- direct-drive 7-segment display.\n" +
-    "Inputs aâ€“g control each segment independently. dp controls the decimal point.\n" +
+    "Inputs a–g control each segment independently. dp controls the decimal point.\n" +
     "commonCathode=true: segment on when input=1. commonCathode=false: segment on when input=0.",
   models: {
     digital: { executeFn: executeSevenSeg, inputSchema: ["a", "b", "c", "d", "e", "f", "g", "dp"], outputSchema: [] },

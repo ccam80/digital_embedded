@@ -98,7 +98,7 @@ export class DelayElement extends AbstractCircuitElement {
   draw(ctx: RenderContext): void {
     ctx.save();
 
-    // Rectangle: (0.05,-0.5) â†’ (1.95,0.5)
+    // Rectangle: (0.05,-0.5) → (1.95,0.5)
     ctx.setColor("COMPONENT_FILL");
     ctx.drawPolygon(
       [

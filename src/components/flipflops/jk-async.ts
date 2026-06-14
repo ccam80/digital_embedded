@@ -430,7 +430,7 @@ export const JKAsyncDefinition: StandaloneComponentDefinition = {
     "JK Flip-Flop with async Set/Clear.\n" +
     "Set (active-high) forces Q=1 asynchronously.\n" +
     "Clr (active-high) forces Q=0 asynchronously.\n" +
-    "On rising clock edge: J=0,K=0 â†’ hold; J=1,K=0 â†’ set; J=0,K=1 â†’ reset; J=1,K=1 â†’ toggle.",
+    "On rising clock edge: J=0,K=0 → hold; J=1,K=0 → set; J=0,K=1 → reset; J=1,K=1 → toggle.",
   modelRegistry: {
     behavioral: {
       kind: "netlist",

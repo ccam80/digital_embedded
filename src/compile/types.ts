@@ -233,23 +233,58 @@ export interface PartitionedComponent {
 }
 
 /**
- * Describes a single cross-domain boundary group- the data needed to
- * build a bridge adapter connecting the two simulation domains.
+ * Describes ONE crossing digital pin at a cross-domain boundary group.
+ *
+ * Per-pin (not per-net): a single physical boundary net that carries N
+ * crossing digital pins emits N BridgePinDescriptors, all sharing the same
+ * `analogGroupId` (the merged analog hub node) but each carrying its own
+ * private digital net, role, and resolved electrical spec.
+ *
+ * `role` is derived from the crossing pin's own `direction`
+ * (OUTPUT -> 'output', anything else -> 'input'); there is no per-net
+ * direction collapse. `isTriState` is uniformly true for output crossings
+ * (every output crossing realizes a DigitalOutputPinTriState whose `en` port
+ * the coordinator drives from highZs).
  */
-export interface BridgeDescriptor {
+export interface BridgePinDescriptor {
+  /** The boundary connectivity group whose analog hub this pin attaches to. */
   boundaryGroup: ConnectivityGroup;
-  direction: "digital-to-analog" | "analog-to-digital";
+  /** Analog hub group ID (== boundaryGroup.groupId). Every pin on the net
+   *  shares this; it resolves to the single shared analog MNA node. */
+  analogGroupId: number;
+  /** Stable identity of the crossing digital pin: "instanceId:pinLabel".
+   *  Used to mint the pin's private digital net and to label the adapter. */
+  pinKey: string;
+  /** The crossing pin's own label (e.g. "out", "In_2"). */
+  pinLabel: string;
+  /** Element index (into the flat circuit elements array) of the crossing
+   *  pin's owning component. */
+  elementIndex: number;
+  /** Pin index within that component. */
+  pinIndex: number;
+  /** Boundary role of THIS pin: 'output' when pin.direction===OUTPUT, else
+   *  'input'. Replaces the per-net bridgeDirection collapse. */
+  role: "output" | "input";
+  /** Output crossings always realize a tri-state output pin so highZs can
+   *  release the node; gates simply never assert Hi-Z (en stays 1). Inputs
+   *  carry false. */
+  isTriState: boolean;
   bitWidth: number;
+  /** Per-pin electrical spec resolved from THIS pin's component cascade. */
   electricalSpec: PinElectricalSpec;
 }
 
 /**
- * Reference to a bridge descriptor, keyed by the boundary group ID.
- * Held in a SolverPartition so each side knows which groups require bridging.
+ * Reference to a per-pin bridge descriptor. Held in a SolverPartition so each
+ * side knows which crossing pins require an adapter. Keyed by the crossing
+ * pin's stable `pinKey` (an analog hub net carries one stub per crossing pin).
  */
 export interface BridgeStub {
-  boundaryGroupId: number;
-  descriptor: BridgeDescriptor;
+  /** Stable "instanceId:pinLabel" of the crossing pin. */
+  pinKey: string;
+  /** Analog hub group ID this pin's adapter `node` port attaches to. */
+  analogGroupId: number;
+  descriptor: BridgePinDescriptor;
 }
 
 /**
@@ -274,17 +309,22 @@ export interface SolverPartition {
  * reads the analog voltage and thresholds it back to a digital value.
  */
 export interface BridgeAdapter {
-  /** The connectivity group that straddles the domain boundary. */
-  boundaryGroupId: number;
-  /** Net ID in the compiled digital domain for this boundary. */
+  /** Stable "instanceId:pinLabel" of the crossing pin. */
+  pinKey: string;
+  /** Analog hub group ID (shared by all pins on the net). */
+  analogGroupId: number;
+  /** Private digital net ID minted for THIS pin in the compiled digital
+   *  domain. */
   digitalNetId: number;
-  /** Node ID in the compiled analog domain for this boundary. */
+  /** Shared analog MNA node ID for the boundary hub. */
   analogNodeId: number;
-  /** Signal direction: which domain drives. */
-  direction: "digital-to-analog" | "analog-to-digital";
+  /** Boundary role of this pin. */
+  role: "output" | "input";
+  /** True for output crossings (always tri-state-capable). */
+  isTriState: boolean;
   /** Bit width of the crossing signal. */
   bitWidth: number;
-  /** Electrical characteristics for threshold/drive computations. */
+  /** Per-pin electrical characteristics for threshold/drive computations. */
   electricalSpec: PinElectricalSpec;
 }
 

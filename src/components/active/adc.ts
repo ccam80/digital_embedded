@@ -14,7 +14,7 @@
  *   D0..D(N-1)  digital output bits, LSB first
  *
  * Conversion:
- *   code = clamp(floor((V_in - V_gnd) / (V_ref - V_gnd) Ã— 2^N), 0, 2^N - 1)
+ *   code = clamp(floor((V_in - V_gnd) / (V_ref - V_gnd) × 2^N), 0, 2^N - 1)
  */
 
 import { AbstractCircuitElement } from "../../core/element.js";

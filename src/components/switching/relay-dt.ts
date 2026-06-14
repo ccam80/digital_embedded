@@ -128,7 +128,7 @@ export class RelayDTElement extends AbstractCircuitElement {
   getBoundingBox(): Rect {
     const poles = this._properties.getOrDefault<number>("poles", 1);
     // Drawn geometry per pole: contact arm to y=0.5, pole stub to y=1 at x=2.
-    // Coil (always present): rect (0.5,-1)â†’(1.5,-3), leads to x=0,x=2 at y=-2.
+    // Coil (always present): rect (0.5,-1)→(1.5,-3), leads to x=0,x=2 at y=-2.
     // MaxY = poles * 2 - 1 (topmost pole stub) but for 1 pole = 1.
     const maxY = poles === 1 ? 1 : (poles - 1) * 2 + 1;
     return { x: this.position.x, y: this.position.y - 3, width: COMP_WIDTH, height: maxY + 3 };
@@ -141,7 +141,7 @@ export class RelayDTElement extends AbstractCircuitElement {
     ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
 
-    // Pole stub (open L): (2,1) â†’ (1.75,1) â†’ (1.75,0.6)- use drawPath so the
+    // Pole stub (open L): (2,1) → (1.75,1) → (1.75,0.6)- use drawPath so the
     // rasterizer treats it as an open polyline matching the Java fixture (closed=false).
     ctx.drawPath({ operations: [
       { op: "moveTo", x: 2, y: 1 },

@@ -1230,10 +1230,10 @@ function vdmosModelCard(
  * .tran analysis. The SPICE transient spec syntax is identical for V and I sources.
  *
  * Supported waveforms (all exact- no approximations):
- *   sine     â†’ SIN(VO VA FREQ TD THETA PHASE_DEG)
- *   square   â†’ PULSE(V1 V2 TD TR TF PW PER)
- *   triangle â†’ PULSE(V1 V2 TD halfPeriod halfPeriod 0 PER)
- *   sawtooth â†’ PULSE(V1 V2 TD (period-fallTime) fallTime 0 PER)
+ *   sine     → SIN(VO VA FREQ TD THETA PHASE_DEG)
+ *   square   → PULSE(V1 V2 TD TR TF PW PER)
+ *   triangle → PULSE(V1 V2 TD halfPeriod halfPeriod 0 PER)
+ *   sawtooth → PULSE(V1 V2 TD (period-fallTime) fallTime 0 PER)
  *
  * Rejected waveforms (throw): sweep, am, fm, noise, expression- none of these
  * are representable as a SPICE transient primitive. A .tran parity comparison
@@ -1247,7 +1247,7 @@ function vdmosModelCard(
  *   emission is therefore exact- no approximation or sub-riseTime discrepancy.
  *
  * Triangle-wave note:
- *   After the -Ï€/2 phase alignment in computeWaveformValue, at t=0 (phase=0) our
+ *   After the -π/2 phase alignment in computeWaveformValue, at t=0 (phase=0) our
  *   triangle sits at V1 = dc - amp and rises linearly to V2 over the first half
  *   period, then falls linearly back to V1 over the second half. SPICE PULSE with
  *   TR=TF=halfPeriod and PW=0 reproduces this exactly (the rising edge is the

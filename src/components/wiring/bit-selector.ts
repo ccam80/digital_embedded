@@ -2,7 +2,7 @@
  * BitSelector component- selects a single bit from a multi-bit input.
  * Output = (input >> selector) & 1.
  *
- * The input width is 2^selectorBits, so selectorBits=3 â†’ 8-bit input.
+ * The input width is 2^selectorBits, so selectorBits=3 → 8-bit input.
  *
  * Properties:
  *   - selectorBits: number of selector bits (default 3, gives 8-bit input)
@@ -109,7 +109,7 @@ export class BitSelectorElement extends AbstractCircuitElement {
 
   draw(ctx: RenderContext): void {
     // Java BitSelShape trapezoid: wider on left, narrower on right.
-    // Exact Java coords: (0.05,-1.2)â†’(1.95,-0.75)â†’(1.95,0.75)â†’(0.05,1.2)
+    // Exact Java coords: (0.05,-1.2)→(1.95,-0.75)→(1.95,0.75)→(0.05,1.2)
     const poly = [
       { x: 0.05, y: -1.2 },
       { x: 1.95, y: -0.75 },

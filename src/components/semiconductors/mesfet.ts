@@ -70,9 +70,9 @@ export const { paramDefs: MESFET_PARAM_DEFS, defaults: MESFET_PARAM_DEFAULTS } =
     // mesmpar.c:36-39 MES_MOD_B; messetup.c:38-40 default 0.3.
     B:      { default: 0.3,    unit: "1/V",  description: "Doping tail extending parameter" },
     // mesmpar.c:40-43 MES_MOD_RD; messetup.c:47-49 default 0.
-    RD:     { default: 0,      unit: "Î",    description: "Drain ohmic resistance" },
+    RD:     { default: 0,      unit: "Ω",    description: "Drain ohmic resistance" },
     // mesmpar.c:44-47 MES_MOD_RS; messetup.c:50-52 default 0.
-    RS:     { default: 0,      unit: "Î",    description: "Source ohmic resistance" },
+    RS:     { default: 0,      unit: "Ω",    description: "Source ohmic resistance" },
     // mesmpar.c:48-51 MES_MOD_CGS; messetup.c:53-55 default 0.
     CGS:    { default: 0,      unit: "F",    description: "G-S junction capacitance" },
     // mesmpar.c:52-55 MES_MOD_CGD; messetup.c:56-58 default 0.

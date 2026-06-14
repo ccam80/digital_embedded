@@ -108,7 +108,7 @@ describe("AnalogEngineTypes", () => {
         totalSlots: 0,
         tranStep: 0,
       },
-      bridgeAdaptersByGroupId: new Map(),
+      bridgeAdaptersByPinKey: new Map(),
     };
 
     // Assignment to CompiledCircuit must be valid (structural subtype check)

@@ -87,7 +87,7 @@ export function executeText(
 }
 
 // ---------------------------------------------------------------------------
-// TEXT_ATTRIBUTE_MAPPINGS- .dig XML attribute â†’ PropertyBag conversions
+// TEXT_ATTRIBUTE_MAPPINGS- .dig XML attribute → PropertyBag conversions
 // ---------------------------------------------------------------------------
 
 export const TEXT_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [

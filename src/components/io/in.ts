@@ -82,7 +82,7 @@ export class InElement extends AbstractCircuitElement {
 
     ctx.save();
 
-    // Body rectangle: (-1.55,-0.75) â†’ (-0.05,0.75), closed, NORMAL fill then stroke
+    // Body rectangle: (-1.55,-0.75) → (-0.05,0.75), closed, NORMAL fill then stroke
     ctx.setColor("COMPONENT_FILL");
     ctx.drawPolygon([
       { x: -1.55, y: -0.75 },
@@ -211,7 +211,7 @@ export const InDefinition: StandaloneComponentDefinition = {
   category: ComponentCategory.IO,
   helpText:
     "In- interactive input component.\n" +
-    "Click to toggle the output value (1-bit: toggle 0â†”1; multi-bit: opens value editor).\n" +
+    "Click to toggle the output value (1-bit: toggle 0↔1; multi-bit: opens value editor).\n" +
     "The executeFn is a pass-through; the signal value is set externally by user interaction.",
   models: {
     digital: { executeFn: executeIn, inputSchema: ["out"], outputSchema: ["out"] },

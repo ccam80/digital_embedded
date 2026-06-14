@@ -234,8 +234,8 @@ export const OrDefinition: StandaloneComponentDefinition = {
   category: ComponentCategory.LOGIC,
   helpText:
     "Or gate- performs bitwise OR of all inputs.\n" +
-    "Configurable input count (2â€“5) and bit width (1â€“32).\n" +
-    "Both IEEE/US (curved) and IEC/DIN (rectangular with â‰¥1) shapes are supported.\n" +
+    "Configurable input count (2–5) and bit width (1–32).\n" +
+    "Both IEEE/US (curved) and IEC/DIN (rectangular with ≥1) shapes are supported.\n" +
     "Individual inputs can be inverted via the inverterConfig property.",
   modelRegistry: {
     behavioral: {

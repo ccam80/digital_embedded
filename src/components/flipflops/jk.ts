@@ -2,10 +2,10 @@
  * JK Flip-Flop- edge-triggered with J/K control inputs.
  *
  * On rising clock edge:
- *   J=0, K=0 â†’ no change (hold)
- *   J=1, K=0 â†’ set (Q=1)
- *   J=0, K=1 â†’ reset (Q=0)
- *   J=1, K=1 â†’ toggle (Q=~Q)
+ *   J=0, K=0 → no change (hold)
+ *   J=1, K=0 → set (Q=1)
+ *   J=0, K=1 → reset (Q=0)
+ *   J=1, K=1 → toggle (Q=~Q)
  *
  * Input layout:  [J=0, C=1, K=2]
  * Output layout: [Q=0, ~Q=1]
@@ -380,7 +380,7 @@ export const JKDefinition: StandaloneComponentDefinition = {
   category: ComponentCategory.FLIP_FLOPS,
   helpText:
     "JK Flip-Flop- edge-triggered with J/K control inputs.\n" +
-    "On rising clock edge: J=0,K=0 â†’ hold; J=1,K=0 â†’ set; J=0,K=1 â†’ reset; J=1,K=1 â†’ toggle.\n" +
+    "On rising clock edge: J=0,K=0 → hold; J=1,K=0 → set; J=0,K=1 → reset; J=1,K=1 → toggle.\n" +
     "Q and ~Q outputs are always complementary.",
   modelRegistry: {
     behavioral: {

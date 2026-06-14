@@ -231,7 +231,7 @@ export class CCCSAnalogElement extends ControlledSourceElement {
    * Stamp NR-linearized Norton equivalent for the controlled current output.
    * Port of cccsload.c:35-36 value-side- no allocElement calls.
    *
-   * I_out â‰ˆ f'(I0) * I_sense + [f(I0) - f'(I0)*I0]
+   * I_out ≈ f'(I0) * I_sense + [f(I0) - f'(I0)*I0]
    *
    * SPICE F-element convention: current flows FROM posNode TO negNode, so
    *   G[posNode, contBranch] += gm
@@ -340,7 +340,7 @@ export class CCCSElement extends AbstractCircuitElement {
     ctx.save();
     ctx.setLineWidth(1);
 
-    // Body- polyline box (1,-1)â†’(5,-1)â†’(5,3)â†’(1,3)â†’(1,-1)
+    // Body- polyline box (1,-1)→(5,-1)→(5,3)→(1,3)→(1,-1)
     ctx.setColor("COMPONENT");
     ctx.drawLine(1, -1, 5, -1);
     ctx.drawLine(5, -1, 5, 3);
@@ -363,9 +363,9 @@ export class CCCSElement extends AbstractCircuitElement {
     ctx.setColor("TEXT");
     ctx.setFont({ family: "sans-serif", size: 0.6 });
     ctx.drawText("sense+", 1.2, 0, { horizontal: "left", vertical: "middle" });
-    ctx.drawText("senseâˆ’", 1.2, 2, { horizontal: "left", vertical: "middle" });
+    ctx.drawText("sense−", 1.2, 2, { horizontal: "left", vertical: "middle" });
     ctx.drawText("out+",   4.8, 0, { horizontal: "right", vertical: "middle" });
-    ctx.drawText("outâˆ’",   4.8, 2, { horizontal: "right", vertical: "middle" });
+    ctx.drawText("out−",   4.8, 2, { horizontal: "right", vertical: "middle" });
 
     ctx.restore();
   }

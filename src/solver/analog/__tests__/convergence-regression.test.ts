@@ -59,7 +59,7 @@ describe("convergence regression", () => {
 
     expect(result.converged).toBe(true);
 
-    // Diode anode voltage should show forward drop ~0.6â€“0.75V
+    // Diode anode voltage should show forward drop ~0.6–0.75V
     const vAnode = diodeAnodeVoltage(engine);
     expect(vAnode).toBeGreaterThan(0.55);
     expect(vAnode).toBeLessThan(0.80);

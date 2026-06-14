@@ -59,7 +59,7 @@ import { PropertyBag } from "../../core/properties.js";
  * Concrete analog simulation engine.
  *
  * Lifecycle:
- *   new MNAEngine() â†’ init(circuit) â†’ dcOperatingPoint() / step() â†’ reset() / dispose()
+ *   new MNAEngine() → init(circuit) → dcOperatingPoint() / step() → reset() / dispose()
  *
  * The engine starts in STOPPED state. init() transitions to STOPPED (ready).
  * start() transitions to RUNNING. stop() transitions to PAUSED.
@@ -101,7 +101,7 @@ export class MNAEngine implements AnalogEngine {
   // -------------------------------------------------------------------------
   private _isSetup: boolean = false;
   /**
-   * Mirrors ngspice dctran.c `firsttime` (line 189). Flips false â†’ true on
+   * Mirrors ngspice dctran.c `firsttime` (line 189). Flips false → true on
    * the first step() after init/reset, gating the warm-start transient DCOP
    * (dctran.c:117-360 `if(restart || CKTtime==0)` block). Cleared by
    * init()/reset()/dispose() so a fresh transient run re-runs the DCOP.
@@ -369,7 +369,7 @@ export class MNAEngine implements AnalogEngine {
 
     // ---- Single retry loop (ngspice dctran.c:715 for(;;)) ----
     // Both NR failure and LTE rejection feed back to the top.
-    // Each iteration: stamp companions â†’ NR solve â†’ LTE check.
+    // Each iteration: stamp companions → NR solve → LTE check.
     let newDt = dt;
     let worstRatio = 0;
     let olddelta = dt;    // ngspice dctran.c:729- tracks previous delta for two-strike delmin
@@ -479,7 +479,7 @@ export class MNAEngine implements AnalogEngine {
       ctx.limitingCollector = this.limitingCollector;
       // Wire the transient mode ladder ONLY when a phase hook is attached
       // (harness mode). It fires on intra-NR-call INITF transitions
-      // (MODEINITTRANâ†’FLOAT, MODEINITPREDâ†’FLOAT) so harness attempt-grouping
+      // (MODEINITTRAN→FLOAT, MODEINITPRED→FLOAT) so harness attempt-grouping
       // matches the ngspice bridge's split-on-cktMode-change rule.
       //
       // Ownership of attempt boundaries:
@@ -519,12 +519,12 @@ export class MNAEngine implements AnalogEngine {
       // ngspice dctran.c:794- fires UNCONDITIONALLY inside the for(;;) retry
       // loop, AFTER NIiter and BEFORE the converged/non-converged branch. Sets
       // the cktMode that the NEXT NIiter call's iter-1 cktLoad will see;
-      // niiter.c:1075-1076 then clears MODEINITPREDâ†’MODEINITFLOAT after that
+      // niiter.c:1075-1076 then clears MODEINITPRED→MODEINITFLOAT after that
       // first cktLoad. Must run on every outer iteration so NR-fail retries,
-      // LTE-reject retries, and the acceptâ†’next-step transition all enter their
+      // LTE-reject retries, and the accept→next-step transition all enter their
       // next NR call with MODEINITPRED set. Device load() consumers
-      // (diode.ts:522, bjt.ts:862, capacitor.ts:279, â€¦) branch on this bit and
-      // run the state1â†’state0 + xfact-extrapolation arm only when set.
+      // (diode.ts:522, bjt.ts:862, capacitor.ts:279, …) branch on this bit and
+      // run the state1→state0 + xfact-extrapolation arm only when set.
       ctx.cktMode = (ctx.cktMode & MODEUIC) | MODETRAN | MODEINITPRED;
 
       // ngspice dctran.c:795-799- firsttime block fires AFTER NIiter on every
@@ -1594,7 +1594,7 @@ export class MNAEngine implements AnalogEngine {
   /**
    * Return the instantaneous power dissipated by analog element `elementId`.
    *
-   * Computed as sum(V_pin_i Ã— I_into_i) across all pins.
+   * Computed as sum(V_pin_i × I_into_i) across all pins.
    */
   getElementPower(elementId: number): number {
     const el = this._compiled?.elements[elementId];
@@ -1662,7 +1662,7 @@ export class MNAEngine implements AnalogEngine {
       this._ctx.refreshTolerances(this._params);
       // ngspice cktdefs.h:185- MODEUIC is an orthogonal mode bit preserved
       // across every analysis-mode reset (dcop.c:82, dctran.c:346, acan.c:285
-      // all do `(CKTmode & MODEUIC) | â€¦`). When `configure()` toggles
+      // all do `(CKTmode & MODEUIC) | …`). When `configure()` toggles
       // params.uic mid-life (the ngspice-equivalent of re-running .tran with a
       // different UIC argument), refresh the bit on the context so the next
       // _transientDcop() / step() picks it up. Without this update the
@@ -1674,7 +1674,7 @@ export class MNAEngine implements AnalogEngine {
     }
     // ngspice cktdojob.c sets CKTfinalTime per .tran job before dctran reads it.
     // Our compile() seeds the sentinel with whatever tStop was known at compile
-    // time (often undefined â†’ Infinity for the harness path). When configure()
+    // time (often undefined → Infinity for the harness path). When configure()
     // later supplies the real tStop, re-seed so the [0, finalTime] sentinel and
     // _finalTime carry the new boundary. Without this, getClampedDt's
     // approaching-breakpoint clamp compares against Infinity and the sim

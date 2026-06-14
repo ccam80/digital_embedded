@@ -142,7 +142,7 @@ export class PolarityLedElement extends AbstractCircuitElement {
 }
 
 // ---------------------------------------------------------------------------
-// executePolarityLed- anode=1 and cathode=0 â†’ lit
+// executePolarityLed- anode=1 and cathode=0 → lit
 // ---------------------------------------------------------------------------
 
 export function executePolarityLed(
@@ -212,7 +212,7 @@ export const PolarityLedDefinition: StandaloneComponentDefinition = {
   category: ComponentCategory.IO,
   helpText:
     "PolarityAwareLED- LED that considers anode/cathode orientation.\n" +
-    "Lights up when anode is high AND cathode is low (current flows anodeâ†’cathode).\n" +
+    "Lights up when anode is high AND cathode is low (current flows anode→cathode).\n" +
     "Color is configurable.",
   models: {
     digital: { executeFn: executePolarityLed, inputSchema: ["A", "K"], outputSchema: [] },

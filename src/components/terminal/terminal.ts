@@ -48,7 +48,7 @@ import {
 // ---------------------------------------------------------------------------
 // Layout constants
 // Java Terminal uses GenericShape: 3 inputs, 0 outputs, width=3
-// â†’ COMP_WIDTH=3, COMP_HEIGHT=3
+// → COMP_WIDTH=3, COMP_HEIGHT=3
 // ---------------------------------------------------------------------------
 
 const COMP_WIDTH = 3;

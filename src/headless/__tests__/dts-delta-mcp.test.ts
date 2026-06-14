@@ -40,7 +40,7 @@ const BJT_FINITE_PARAMS: Record<string, number> = {
 };
 
 // ---------------------------------------------------------------------------
-// Fixture registry � minimal registry with NpnBJT
+// Fixture registry — minimal registry with NpnBJT
 // ---------------------------------------------------------------------------
 
 function makeBjtRegistry(): ComponentRegistry {
@@ -75,7 +75,7 @@ function makeElement(
 // Tests
 // ---------------------------------------------------------------------------
 
-describe("dts-delta MCP surface � per-element modelParamDeltas round-trip", () => {
+describe("dts-delta MCP surface — per-element modelParamDeltas round-trip", () => {
   it("BF delta survives facade.serialize() / facade.deserialize()", () => {
     const registry = makeBjtRegistry();
     const facade = new DefaultSimulatorFacade(registry);

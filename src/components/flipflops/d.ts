@@ -400,7 +400,7 @@ const CMOS_D_FF_NETLIST: MnaSubcircuitNetlist = {
   // Internal: ~C=6, m_in=7, m_out=8, s_in=9
   // PMOS/NMOS pins: [D, G, S] (Drain, Gate, Source)
   netlist: [
-    // Master TG1_p: D=VDD_side(source), G=C, S=m_in  â†’ [VDD, C, m_in]- wait, TG passes Dâ†’m_in
+    // Master TG1_p: D=VDD_side(source), G=C, S=m_in  → [VDD, C, m_in]- wait, TG passes D→m_in
     // TG1: D pin connects to D(0), output m_in(7). PMOS: [D=0, G=C_bar=6, S=7], NMOS: [D=0, G=C=1, S=7]
     [0, 6, 7],  // m_tg1_p: D=D(0), G=~C(6), S=m_in(7)
     [0, 1, 7],  // m_tg1_n: D=D(0), G=C(1), S=m_in(7)
@@ -410,13 +410,13 @@ const CMOS_D_FF_NETLIST: MnaSubcircuitNetlist = {
     // Master INV2 (feedback): input=m_out(8), output=m_in(7)- latch closure
     [4, 8, 7],  // m_inv2_p: D=VDD(4), G=m_out(8), S=m_in(7)
     [7, 8, 5],  // m_inv2_n: D=m_in(7), G=m_out(8), S=GND(5)
-    // Slave TG2: m_out(8)â†’s_in(9), passes when C=0 (PMOS gate=C, NMOS gate=~C)
+    // Slave TG2: m_out(8)→s_in(9), passes when C=0 (PMOS gate=C, NMOS gate=~C)
     [8, 1, 9],  // s_tg2_p: D=m_out(8), G=C(1), S=s_in(9)
     [8, 6, 9],  // s_tg2_n: D=m_out(8), G=~C(6), S=s_in(9)
     // Slave INV3: input=s_in(9), output=Q(2)
     [4, 9, 2],  // s_inv3_p: D=VDD(4), G=s_in(9), S=Q(2)
     [2, 9, 5],  // s_inv3_n: D=Q(2), G=s_in(9), S=GND(5)
-    // Slave INV4 (feedback): input=Q(2), output=s_in(9) â†’ drives ~Q(3) too
+    // Slave INV4 (feedback): input=Q(2), output=s_in(9) → drives ~Q(3) too
     [4, 2, 9],  // s_inv4_p: D=VDD(4), G=Q(2), S=s_in(9)
     [9, 2, 5],  // s_inv4_n: D=s_in(9), G=Q(2), S=GND(5)
     // Clock INV: input=C(1), output=~C(6)

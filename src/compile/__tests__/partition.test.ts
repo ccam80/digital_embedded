@@ -205,7 +205,7 @@ describe("partitionByDomain", () => {
 
       // Pure digital group
       const gDigital = makeGroup(0, [makePin(0, 0, "digital", PinDirection.OUTPUT)]);
-      // Boundary group: digital output â†’ analog input
+      // Boundary group: digital output → analog input
       const gBoundary = makeGroup(1, [
         makePin(0, 1, "digital", PinDirection.OUTPUT),
         makePin(1, 0, "analog", PinDirection.BIDIRECTIONAL),
@@ -230,7 +230,7 @@ describe("partitionByDomain", () => {
       expect(result.bridges).toHaveLength(1);
     });
 
-    it("bridge direction is digital-to-analog when digital output pin present", () => {
+    it("bridge role is output when digital output pin present", () => {
       const elD = makeElement("And", 0);
       const elA = makeElement("Resistor", 1);
       const registry = makeRegistry([makeDigitalDef("And"), makeAnalogDef("Resistor")]);
@@ -247,10 +247,10 @@ describe("partitionByDomain", () => {
 
       const result = partitionByDomain([gBoundary], [elD, elA], registry, assignments);
 
-      expect(result.bridges[0].direction).toBe("digital-to-analog");
+      expect(result.bridges[0].role).toBe("output");
     });
 
-    it("bridge direction is analog-to-digital when no digital output pin", () => {
+    it("bridge role is input when no digital output pin", () => {
       const elD = makeElement("And", 0);
       const elA = makeElement("Resistor", 1);
       const registry = makeRegistry([makeDigitalDef("And"), makeAnalogDef("Resistor")]);
@@ -268,7 +268,7 @@ describe("partitionByDomain", () => {
 
       const result = partitionByDomain([gBoundary], [elD, elA], registry, assignments);
 
-      expect(result.bridges[0].direction).toBe("analog-to-digital");
+      expect(result.bridges[0].role).toBe("input");
     });
 
     it("bridge stub is added to both digital and analog partitions", () => {
@@ -290,8 +290,8 @@ describe("partitionByDomain", () => {
 
       expect(result.digital.bridgeStubs).toHaveLength(1);
       expect(result.analog.bridgeStubs).toHaveLength(1);
-      expect(result.digital.bridgeStubs[0].boundaryGroupId).toBe(5);
-      expect(result.analog.bridgeStubs[0].boundaryGroupId).toBe(5);
+      expect(result.digital.bridgeStubs[0].analogGroupId).toBe(5);
+      expect(result.analog.bridgeStubs[0].analogGroupId).toBe(5);
     });
 
     it("bridge bitWidth comes from group.bitWidth", () => {
@@ -314,7 +314,7 @@ describe("partitionByDomain", () => {
       expect(result.bridges[0].bitWidth).toBe(4);
     });
 
-    it("boundary group appears in both partition group lists", () => {
+    it("boundary group: analog keeps the merged hub; digital gets a private singleton net per crossing pin", () => {
       const elD = makeElement("And", 0);
       const elA = makeElement("Resistor", 1);
       const registry = makeRegistry([makeDigitalDef("And"), makeAnalogDef("Resistor")]);
@@ -331,10 +331,20 @@ describe("partitionByDomain", () => {
 
       const result = partitionByDomain([gBoundary], [elD, elA], registry, assignments);
 
-      const dGroupIds = result.digital.groups.map((g) => g.groupId);
+      // The analog partition keeps the merged hub group (id 7); nothing pins it.
       const aGroupIds = result.analog.groups.map((g) => g.groupId);
-      expect(dGroupIds).toContain(7);
       expect(aGroupIds).toContain(7);
+
+      // The digital partition does NOT carry the merged boundary group- each
+      // crossing digital pin lands in its own singleton private net so two
+      // crossing pins cannot shortcut through one shared digital net.
+      const dGroupIds = result.digital.groups.map((g) => g.groupId);
+      expect(dGroupIds).not.toContain(7);
+      const privateGroups = result.digital.groups.filter(
+        (g) => g.pins.length === 1 && g.pins[0]!.domain === "digital",
+      );
+      expect(privateGroups).toHaveLength(1);
+      expect(privateGroups[0]!.pins[0]!.elementIndex).toBe(0);
     });
   });
 
@@ -420,23 +430,22 @@ describe("partitionByDomain", () => {
   });
 
   describe("electrical spec on bridge", () => {
-    it("picks electricalSpec from component definition pinElectrical", () => {
-      const analogDef: StandaloneComponentDefinition = {
-        name: "SpecResistor",
+    it("picks electricalSpec from the crossing digital pin's component pinElectrical", () => {
+      const digitalDef: StandaloneComponentDefinition = {
+        name: "SpecDriver",
         typeId: 0,
         factory: () => { throw new Error(); },
         pinLayout: [],
         propertyDefs: [],
         attributeMap: [],
-        category: "PASSIVES" as never,
+        category: "LOGIC" as never,
         helpText: "",
         pinElectrical: { vOH: 5.0, vOL: 0.1, rOut: 100 },
-        models: {},
-        modelRegistry: { behavioral: { kind: 'inline' as const, factory: () => { throw new Error(); }, paramDefs: [], params: {} } },
+        models: { digital: DIGITAL_MODEL },
       };
-      const el0 = makeElement("And", 0);
-      const el1 = makeElement("SpecResistor", 1);
-      const registry = makeRegistry([makeDigitalDef("And"), analogDef]);
+      const el0 = makeElement("SpecDriver", 0);
+      const el1 = makeElement("Resistor", 1);
+      const registry = makeRegistry([digitalDef, makeAnalogDef("Resistor")]);
 
       const gBoundary = makeGroup(1, [
         makePin(0, 0, "digital", PinDirection.OUTPUT),
@@ -452,7 +461,7 @@ describe("partitionByDomain", () => {
       expect(result.bridges[0].electricalSpec).toEqual({ vOH: 5.0, vOL: 0.1, rOut: 100 });
     });
 
-    it("returns empty spec when no analog electrical override is present", () => {
+    it("returns empty spec when the crossing digital component has no electrical override", () => {
       const el0 = makeElement("And", 0);
       const el1 = makeElement("Resistor", 1);
       const registry = makeRegistry([makeDigitalDef("And"), makeAnalogDef("Resistor")]);
@@ -468,9 +477,10 @@ describe("partitionByDomain", () => {
 
       const result = partitionByDomain([gBoundary], [el0, el1], registry, assignments);
 
-      expect(result.bridges[0].electricalSpec).toEqual(
-        expect.objectContaining({ vOH: 3.3, vOL: 0, vIH: 2.0, vIL: 0.8 }),
-      );
+      // electricalSpecForPin reads the crossing digital component's cascade only;
+      // the circuit-level logic family fills unspecified fields later in
+      // resolvePinElectrical, so an un-overridden crossing yields an empty spec.
+      expect(result.bridges[0].electricalSpec).toEqual({});
     });
   });
 

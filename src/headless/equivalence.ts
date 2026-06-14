@@ -50,7 +50,11 @@ export async function testEquivalence(
 
   if (inputLabels.length === 0 && outputLabels.length === 0) {
     throw new Error(
-      "No input/output labels found. Equivalence testing requires labeled components.",
+      "No input/output labels found. Equivalence testing is DIGITAL-ONLY: " +
+        "it enumerates binary vectors over labeled In/Clock/Out components. " +
+        "Analog sources and probes are not recognised here — for analog " +
+        "circuits compare DC operating points (circuit_dc_op) or transient " +
+        "samples (circuit_sample_at_times) instead.",
     );
   }
 

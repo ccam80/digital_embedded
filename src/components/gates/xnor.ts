@@ -68,7 +68,7 @@ export class XNOrElement extends AbstractCircuitElement {
     const inputCount = this._properties.getOrDefault<number>("inputCount", 2);
     const wideShape = this._properties.getOrDefault<boolean>("wideShape", false);
     const { topBorder, bodyHeight } = gateBodyMetrics(inputCount);
-    // Back curve starts at x=0.0; bubble at w+0.5, r=0.45 â†’ maxX = w+0.95+0.05=w+1.
+    // Back curve starts at x=0.0; bubble at w+0.5, r=0.45 → maxX = w+0.95+0.05=w+1.
     return {
       x: this.position.x,
       y: this.position.y - topBorder,
@@ -237,7 +237,7 @@ export const XNOrDefinition: StandaloneComponentDefinition = {
   category: ComponentCategory.LOGIC,
   helpText:
     "XNOr gate- performs bitwise NOT(XOR) of all inputs.\n" +
-    "Configurable input count (2â€“5) and bit width (1â€“32).\n" +
+    "Configurable input count (2–5) and bit width (1–32).\n" +
     "Both IEEE/US (curved with bubble) and IEC/DIN (rectangular with =1 and bubble) shapes are supported.\n" +
     "Individual inputs can be inverted via the inverterConfig property.",
   modelRegistry: {

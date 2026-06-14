@@ -38,8 +38,8 @@ import {
 // ---------------------------------------------------------------------------
 // Layout constants
 // Java LedMatrix uses GenericShape: 2 inputs (r-data, c-addr), 0 outputs, width=3
-// Non-symmetric â†’ offs=0. r-data@(0,0), c-addr@(0,1)
-// â†’ COMP_WIDTH=3, COMP_HEIGHT=2
+// Non-symmetric → offs=0. r-data@(0,0), c-addr@(0,1)
+// → COMP_WIDTH=3, COMP_HEIGHT=2
 // ---------------------------------------------------------------------------
 
 const COMP_WIDTH = 3;
@@ -181,7 +181,7 @@ export function executeLedMatrix(
 }
 
 // ---------------------------------------------------------------------------
-// LED_MATRIX_ATTRIBUTE_MAPPINGS- .dig XML attribute â†’ PropertyBag conversions
+// LED_MATRIX_ATTRIBUTE_MAPPINGS- .dig XML attribute → PropertyBag conversions
 // ---------------------------------------------------------------------------
 
 export const LED_MATRIX_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [

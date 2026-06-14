@@ -204,7 +204,7 @@ export const NAndDefinition: StandaloneComponentDefinition = {
   category: ComponentCategory.LOGIC,
   helpText:
     "NAnd gate- performs bitwise NOT(AND) of all inputs.\n" +
-    "Configurable input count (2â€“5) and bit width (1â€“32).\n" +
+    "Configurable input count (2–5) and bit width (1–32).\n" +
     "Both IEEE/US (curved with bubble) and IEC/DIN (rectangular with & and bubble) shapes are supported.\n" +
     "Individual inputs can be inverted via the inverterConfig property.",
   modelRegistry: {

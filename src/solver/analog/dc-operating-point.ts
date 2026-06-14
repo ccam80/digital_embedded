@@ -1164,7 +1164,11 @@ function gillespieSrc(
       }
       // cktop.c:539-545- restore CKTrhsOld + CKTstate0 from snapshot.
       restoreSnapshot(ctx.rhsOld, savedVoltages, statePool, savedState0);
-      srcFact = convFact + raise;
+      // cktop.c:633 — the failed retry re-solves at ConvFact itself (the last
+      // converged factor); the next forward step is taken by the success branch
+      // via convFact + raise. Adding raise here would advance past the point
+      // that just failed and desync the step schedule from ngspice's.
+      srcFact = convFact;
     }
 
     if (srcFact > 1) {

@@ -37,7 +37,7 @@ import {
 // ---------------------------------------------------------------------------
 
 // Circle at (0.85, 0) radius 0.75, pin at (0, 0) on left edge
-// X lines: (0.5, 0.35)â†’(1.2, -0.35) and (0.5, -0.35)â†’(1.2, 0.35)
+// X lines: (0.5, 0.35)→(1.2, -0.35) and (0.5, -0.35)→(1.2, 0.35)
 const CIRCLE_CX = 0.85;
 const CIRCLE_R = 0.75;
 
@@ -80,7 +80,7 @@ export class BreakElement extends AbstractCircuitElement {
   }
 
   getBoundingBox(): Rect {
-    // Circle at cx=0.85, r=0.75 â†’ x spans [0.1, 1.6]
+    // Circle at cx=0.85, r=0.75 → x spans [0.1, 1.6]
     return {
       x: this.position.x + CIRCLE_CX - CIRCLE_R,
       y: this.position.y - CIRCLE_R,

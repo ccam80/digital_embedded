@@ -100,7 +100,7 @@ export class VaractorElement extends AbstractCircuitElement {
     // Body (triangle, plate bars) stays COMPONENT color
     ctx.setColor("COMPONENT");
 
-    // Diode triangle: tip at platef=0.6 along lead1(1.5)â†’lead2(2.5) = x:2.1
+    // Diode triangle: tip at platef=0.6 along lead1(1.5)→lead2(2.5) = x:2.1
     const hs = 0.5;
     ctx.drawPolygon([
       { x: 1.5, y: -hs },

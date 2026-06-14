@@ -242,9 +242,9 @@ function buildTestRegistry(): ComponentRegistry {
  *   Vs- = Ground (node 0)
  *
  * Wire layout (integer grid):
- *   x=10 â†’ node 1 (Vs+, R1-A)
- *   x=20 â†’ node 2 (R1-B, R2-A)
- *   x=0  â†’ ground (Vs-, R2-B, Gnd pin)
+ *   x=10 → node 1 (Vs+, R1-A)
+ *   x=20 → node 2 (R1-B, R2-A)
+ *   x=0  → ground (Vs-, R2-B, Gnd pin)
  */
 function buildResistorDividerCircuit(): { circuit: Circuit; registry: ComponentRegistry } {
   const circuit = new Circuit();
@@ -277,7 +277,7 @@ describe("AnalogCompiler", () => {
     const { circuit, registry } = buildResistorDividerCircuit();
     const compiled = compileUnified(circuit, registry).analog!;
 
-    // Vs, R1, R2 â†’ 3 analog elements (Ground is skipped by the compiler)
+    // Vs, R1, R2 → 3 analog elements (Ground is skipped by the compiler)
     expect(compiled.elements.length).toBe(3);
 
     // 2 non-ground nodes: node at x=10 (Vs+/R1-A) and node at x=20 (R1-B/R2-A)
@@ -343,7 +343,7 @@ describe("AnalogCompiler", () => {
   });
 
   it("detects_floating_node", () => {
-    // R1 with one end at x=30 that no other element touches â†’ node at x=30 is floating
+    // R1 with one end at x=30 that no other element touches → node at x=30 is floating
     const circuit = new Circuit();
     const registry = buildTestRegistry();
 
@@ -369,7 +369,7 @@ describe("AnalogCompiler", () => {
 
   it("detects_voltage_source_loop", () => {
     // Vs1: pos=node1(x=10), neg=node2(x=20)
-    // Vs2: pos=node2(x=20), neg=node1(x=10)  â†’ KVL loop
+    // Vs2: pos=node2(x=20), neg=node1(x=10)  → KVL loop
     const circuit = new Circuit();
     const registry = buildTestRegistry();
 
@@ -394,7 +394,7 @@ describe("AnalogCompiler", () => {
   });
 
   it("detects_missing_ground", () => {
-    // No Ground element â†’ node map builder emits no-ground diagnostic
+    // No Ground element → node map builder emits no-ground diagnostic
     const circuit = new Circuit();
     const registry = buildTestRegistry();
 
@@ -578,7 +578,7 @@ function buildPinLoadingTestRegistry(
 }
 
 /**
- * Build a circuit with: Ground (0,0), AnalogR (20,0)â†’(22,0), Nand at (10,0)
+ * Build a circuit with: Ground (0,0), AnalogR (20,0)→(22,0), Nand at (10,0)
  * with pins In_1=(10,1), In_2=(10,2), out=(12,1).
  */
 function buildPinLoadingCircuit(
@@ -672,7 +672,7 @@ describe("Task 6.4.1- _pinLoading threaded to behavioural factory", () => {
     }, registry);
     compileUnified(circuit, registry);
 
-    // In_1 overridden to ideal â†’ false; In_2 and out follow "all" â†’ true
+    // In_1 overridden to ideal → false; In_2 and out follow "all" → true
     expect(capturedPinLoading).toBeDefined();
     expect(capturedPinLoading!["In_1"]).toBe(false);
     expect(capturedPinLoading!["In_2"]).toBe(true);
@@ -683,8 +683,8 @@ describe("Task 6.4.1- _pinLoading threaded to behavioural factory", () => {
     // Verify the bridge-adapter and behavioural-factory code paths invoke the
     // same shared resolvePinLoading helper by confirming they track the same
     // circuit-level mode:
-    //  "all"  â†’ gate _pinLoading["out"] = true
-    //  "none" â†’ gate _pinLoading["out"] = false
+    //  "all"  → gate _pinLoading["out"] = true
+    //  "none" → gate _pinLoading["out"] = false
     let capturedPinLoading: Record<string, boolean> | undefined;
 
     const registry = buildPinLoadingTestRegistry((props) => {

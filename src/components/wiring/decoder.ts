@@ -1,5 +1,5 @@
 ﻿/**
- * Decoder component- N-bit input â†’ 2^N one-hot outputs.
+ * Decoder component- N-bit input → 2^N one-hot outputs.
  * Only output[input_value] is 1; all others are 0.
  *
  * Properties:
@@ -134,7 +134,7 @@ export class DecoderElement extends AbstractCircuitElement {
     const selectorBits = this._properties.getOrDefault<number>("selectorBits", 1);
     const outputCount = 1 << selectorBits;
     // Java DecoderShape uses a trapezoid scaled to outputCount outputs.
-    // Reference (2-output / selectorBits=1): (0.05,0.25)â†’(1.95,-0.2)â†’(1.95,2.2)â†’(0.05,1.75)
+    // Reference (2-output / selectorBits=1): (0.05,0.25)→(1.95,-0.2)→(1.95,2.2)→(0.05,1.75)
     // Left edge height = 1.5, right edge height = 2.4 for 2 outputs.
     // Scale: left inset = 0.25, right overshoot = 0.2 * h/2
     const h = outputCount; // right-edge total height in grid units
@@ -156,7 +156,7 @@ export class DecoderElement extends AbstractCircuitElement {
     ctx.setLineWidth(1);
     ctx.drawPolygon(poly, false);
 
-    // First output label "0" near top-right, RIGHTTOP anchor â†’ (1.85, 0.1)
+    // First output label "0" near top-right, RIGHTTOP anchor → (1.85, 0.1)
     ctx.setColor("TEXT");
     ctx.setFont({ family: "sans-serif", size: 0.75, weight: "normal" });
     ctx.drawText("0", 1.85, 0.1, { horizontal: "right", vertical: "top" });

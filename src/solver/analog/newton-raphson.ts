@@ -89,13 +89,13 @@ const _pnjlimResult: PnjlimResult = { value: 0, limited: false };
  *   vold <= 0: arg = 2*vold - 1
  *   if vnew < arg, clamp vnew = arg and flag limited
  *
- * Variable mapping (ngspice â†’ ours):
- *   vnew   â†’ vnew   (proposed new junction voltage)
- *   vold   â†’ vold   (previous junction voltage)
- *   vt     â†’ vt     (thermal voltage, kT/q â‰ˆ 0.02585 V at 300 K)
- *   vcrit  â†’ vcrit  (critical voltage, â‰ˆ0.6 V for silicon)
- *   *icheck â†’ limited (true when ngspice sets *icheck = 1)
- *   log    â†’ Math.log (natural logarithm)
+ * Variable mapping (ngspice → ours):
+ *   vnew   → vnew   (proposed new junction voltage)
+ *   vold   → vold   (previous junction voltage)
+ *   vt     → vt     (thermal voltage, kT/q ≈ 0.02585 V at 300 K)
+ *   vcrit  → vcrit  (critical voltage, ≈0.6 V for silicon)
+ *   *icheck → limited (true when ngspice sets *icheck = 1)
+ *   log    → Math.log (natural logarithm)
  */
 export function pnjlim(vnew: number, vold: number, vt: number, vcrit: number): PnjlimResult {
   let limited: boolean;

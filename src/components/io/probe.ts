@@ -241,7 +241,7 @@ class AnalogProbeElement extends AnalogElement {
   setParam(_key: string, _value: number): void {}
 
   getPinCurrents(_rhs: Float64Array): number[] {
-    // Probe stamps nothingï¿½ it is a pure voltage measurement with no loading.
+    // Probe stamps nothing— it is a pure voltage measurement with no loading.
     // Return zero current for the single input pin.
     return [0];
   }

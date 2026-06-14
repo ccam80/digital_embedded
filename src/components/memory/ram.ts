@@ -369,7 +369,7 @@ export const RAMSinglePortDefinition: StandaloneComponentDefinition = {
 // Outputs: D (dataBits, bidirectional)
 //
 // CS=1 selects chip. WE=1 writes D (from the bidirectional net) to memory[A].
-// OE=1 && CS=1 && !WE â†’ D = memory[A]; else D = 0.
+// OE=1 && CS=1 && !WE → D = memory[A]; else D = 0.
 // Fully combinational- no clock.
 //
 // internalStateCount: 0

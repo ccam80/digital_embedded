@@ -2,10 +2,10 @@
  * RS Flip-Flop Async- level-sensitive (no clock), SR latch.
  *
  * Level-sensitive SR latch behavior (no clock):
- *   S=0, R=0 â†’ hold (or recover from forbidden state)
- *   S=1, R=0 â†’ Q=1, ~Q=0
- *   S=0, R=1 â†’ Q=0, ~Q=1
- *   S=1, R=1 â†’ forbidden (Q=0, ~Q=0 per Digital's implementation)
+ *   S=0, R=0 → hold (or recover from forbidden state)
+ *   S=1, R=0 → Q=1, ~Q=0
+ *   S=0, R=1 → Q=0, ~Q=1
+ *   S=1, R=1 → forbidden (Q=0, ~Q=0 per Digital's implementation)
  *
  * Input layout:  [S=0, R=1]
  * Output layout: [Q=0, ~Q=1]
@@ -291,7 +291,7 @@ export const RSAsyncDefinition: StandaloneComponentDefinition = {
   category: ComponentCategory.FLIP_FLOPS,
   helpText:
     "RS Flip-Flop Async- level-sensitive SR latch (no clock).\n" +
-    "S=1, R=0 â†’ Q=1; S=0, R=1 â†’ Q=0; S=0, R=0 â†’ hold; S=1, R=1 â†’ forbidden (Q=~Q=0).\n" +
+    "S=1, R=0 → Q=1; S=0, R=1 → Q=0; S=0, R=0 → hold; S=1, R=1 → forbidden (Q=~Q=0).\n" +
     "Changes propagate immediately without a clock edge.",
   modelRegistry: {
     behavioral: {

@@ -291,18 +291,28 @@ function ptMax(arg1: number, arg2: number): number {
  * `exp`/`log`/`log10` carry the ngspice PTexp/PTlog/PTlog10 clamps
  * (`ptfuncs.c:273-304`). `sinh`/`cosh`/`tanh` are the bare library hyperbolics
  * matching PTsinh/PTcosh/PTtanh (`ptfuncs.c:263-267,312-316,332-336`).
+ *
+ * The transcendentals are wrapped in call-time thunks (`(x) => Math.tanh(x)`)
+ * rather than stored as the bare `Math.*` reference so the active `Math`
+ * implementation is resolved per call. A bare reference snapshots whatever
+ * `Math.tanh` was at module-load time, which permanently pins the V8 libm and
+ * makes any later `Math.*` replacement invisible to B-source evaluation; the
+ * thunk lets the same `Math.tanh` the rest of the engine sees take effect
+ * (production V8, or ucrtbase under the parity harness's libm shim). The
+ * non-transcendental entries (`sqrt`/`abs`/`min`/`max`/`floor`/`ceil`/`round`)
+ * are IEEE-exact across libms, so they stay as direct references.
  */
 export const BUILTIN_FUNCTIONS: Record<string, (...args: number[]) => number> = {
-  sin: Math.sin,
-  cos: Math.cos,
-  tan: Math.tan,
-  sinh: Math.sinh,
-  cosh: Math.cosh,
-  tanh: Math.tanh,
-  asin: Math.asin,
-  acos: Math.acos,
-  atan: Math.atan,
-  atan2: Math.atan2,
+  sin: (x) => Math.sin(x),
+  cos: (x) => Math.cos(x),
+  tan: (x) => Math.tan(x),
+  sinh: (x) => Math.sinh(x),
+  cosh: (x) => Math.cosh(x),
+  tanh: (x) => Math.tanh(x),
+  asin: (x) => Math.asin(x),
+  acos: (x) => Math.acos(x),
+  atan: (x) => Math.atan(x),
+  atan2: (y, x) => Math.atan2(y, x),
   exp: ptExp,
   log: ptLog,
   log10: ptLog10,
@@ -313,7 +323,7 @@ export const BUILTIN_FUNCTIONS: Record<string, (...args: number[]) => number> = 
   floor: Math.floor,
   ceil: Math.ceil,
   round: Math.round,
-  pow: Math.pow,
+  pow: (a, b) => Math.pow(a, b),
 };
 
 /**
@@ -334,18 +344,23 @@ export const BSOURCE_FUNCTIONS: Record<string, (...args: number[]) => number> = 
   sin: ptSin,
   cos: ptCos,
   tan: ptTan,
-  // Hyperbolics (ptfuncs.c:263-267,312-316,332-336).
-  sinh: Math.sinh,
-  cosh: Math.cosh,
-  tanh: Math.tanh,
+  // Hyperbolics (ptfuncs.c:263-267,312-316,332-336). Call-time thunks, not bare
+  // `Math.*` references: a bare reference snapshots the V8 libm at module-load and
+  // makes any later `Math.*` replacement invisible, so B-source evaluation would
+  // permanently use V8 even when the rest of the engine runs on another libm
+  // (ucrtbase under the parity harness's shim). ngspice computes these as bare
+  // library calls, so the thunk simply forwards to the active `Math` impl.
+  sinh: (x) => Math.sinh(x),
+  cosh: (x) => Math.cosh(x),
+  tanh: (x) => Math.tanh(x),
   // Inverse trig / hyperbolic (ptfuncs.c:152-186).
-  asin: Math.asin,
-  acos: Math.acos,
-  atan: Math.atan,
-  asinh: Math.asinh,
-  acosh: Math.acosh,
-  atanh: Math.atanh,
-  atan2: Math.atan2,
+  asin: (x) => Math.asin(x),
+  acos: (x) => Math.acos(x),
+  atan: (x) => Math.atan(x),
+  asinh: (x) => Math.asinh(x),
+  acosh: (x) => Math.acosh(x),
+  atanh: (x) => Math.atanh(x),
+  atan2: (y, x) => Math.atan2(y, x),
   // Clamped transcendentals (ptfuncs.c:273-324).
   exp: ptExp,
   log: ptLog,

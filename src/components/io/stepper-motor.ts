@@ -9,7 +9,7 @@
  * StepperMotorUnipolar: 4 coil inputs (A, B, C, D)
  *
  * Both motors:
- *   - Track current step position (0â€“3 for full-step, 0â€“7 for half-step)
+ *   - Track current step position (0–3 for full-step, 0–7 for half-step)
  *   - Output current step position on a bus output for display
  *   - Interactive: position updates when coil pattern changes
  *
@@ -98,8 +98,8 @@ function buildUnipolarPinDeclarations(): PinDeclaration[] {
 
 // ---------------------------------------------------------------------------
 // Shared draw helper
-// Java fixture: outer rect (-2,-1.5)â†’(3,3.5) [5x5], circle cx=0.5,cy=1,r=2 THIN,
-// line (0.5,1)â†’(0.5,-1) NORMAL.
+// Java fixture: outer rect (-2,-1.5)→(3,3.5) [5x5], circle cx=0.5,cy=1,r=2 THIN,
+// line (0.5,1)→(0.5,-1) NORMAL.
 // ---------------------------------------------------------------------------
 
 function drawMotorBody(ctx: RenderContext): void {
@@ -139,7 +139,7 @@ export class StepperMotorBipolarElement extends AbstractCircuitElement {
   }
 
   getBoundingBox(): Rect {
-    // Java: rect (-2,-1.5) to (3,3.5) â†’ width=5, height=5
+    // Java: rect (-2,-1.5) to (3,3.5) → width=5, height=5
     return { x: this.position.x - 2, y: this.position.y - 1.5, width: 5, height: 5 };
   }
 
@@ -170,7 +170,7 @@ export class StepperMotorUnipolarElement extends AbstractCircuitElement {
   }
 
   getBoundingBox(): Rect {
-    // Java: rect (-2,-1.5) to (3,3.5) â†’ width=5, height=5
+    // Java: rect (-2,-1.5) to (3,3.5) → width=5, height=5
     return { x: this.position.x - 2, y: this.position.y - 1.5, width: 5, height: 5 };
   }
 

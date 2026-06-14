@@ -296,7 +296,7 @@ describe("spice-import-dialog: parse and apply", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Tests: end-to-end compile flow- import â†’ store â†’ compile â†’ params applied
+// Tests: end-to-end compile flow- import → store → compile → params applied
 // ---------------------------------------------------------------------------
 
 describe("spice-import-dialog: compile integration", () => {
@@ -393,7 +393,7 @@ describe("spice-import-dialog: compile integration", () => {
     return { capturedModelParams, diagnostics: compiled.diagnostics };
   }
 
-  it("import .MODEL card â†’ store in metadata.models â†’ compile applies IS override", () => {
+  it("import .MODEL card → store in metadata.models → compile applies IS override", () => {
     const modelCard = ".MODEL 2N2222 NPN(IS=1e-14 BF=200)";
     const parsed = parseModelCard(modelCard);
 
@@ -409,7 +409,7 @@ describe("spice-import-dialog: compile integration", () => {
     expect(capturedModelParams!["BF"]).toBe(200);
   });
 
-  it("import .MODEL card â†’ model name stored on element via model property â†’ visible in PropertyBag", () => {
+  it("import .MODEL card → model name stored on element via model property → visible in PropertyBag", () => {
     const modelCard = ".MODEL BC547 NPN(IS=6e-15 BF=110)";
     const parsed = parseModelCard(modelCard);
 

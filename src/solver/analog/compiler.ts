@@ -5,8 +5,8 @@
  * `ConcreteCompiledAnalogCircuit` that the MNA engine can simulate.
  *
  * Steps:
- *  1. Build node map (wire groups â†’ MNA node IDs, ground = 0)
- *  2. Resolve pinâ†’node bindings for each element
+ *  1. Build node map (wire groups → MNA node IDs, ground = 0)
+ *  2. Resolve pin→node bindings for each element
  *  3. Call factory for primitives, recursively expand composites
  *     (`expandCompositeInstance`) into a flat list of leaves with
  *     pre-allocated internal-net IDs
@@ -16,11 +16,13 @@
 
 import { Circuit } from "../../core/circuit.js";
 import type { CircuitElement } from "../../core/element.js";
-import type { ComponentRegistry } from "../../core/registry.js";
+import { AbstractCircuitElement } from "../../core/element.js";
+import type { ComponentRegistry, StandaloneComponentDefinition } from "../../core/registry.js";
 import { resolvePinLayout } from "../../core/registry.js";
 import type { Diagnostic } from "../../compile/types.js";
-import { pinWorldPosition } from "../../core/pin.js";
-import type { ResolvedPin } from "../../core/pin.js";
+import { pinWorldPosition, PinDirection } from "../../core/pin.js";
+import type { ResolvedPin, Pin, PinDeclaration } from "../../core/pin.js";
+import type { RenderContext, Rect } from "../../core/renderer-interface.js";
 import type { ResolvedGroupPin } from "../../compile/types.js";
 import { PropertyBag } from "../../core/properties.js";
 import { makeDiagnostic } from "./diagnostics.js";
@@ -33,9 +35,6 @@ import {
 import { defaultLogicFamily } from "../../core/logic-family.js";
 import { resolvePinElectrical } from "../../core/pin-electrical.js";
 import type { ResolvedPinElectrical } from "../../core/pin-electrical.js";
-import { makeBridgeOutputAdapter, makeBridgeInputAdapter } from "./bridge-adapter.js";
-import type { BridgeOutputDriverElement } from "./behavioral-drivers/bridge-output-driver.js";
-import type { BridgeInputDriverElement } from "./behavioral-drivers/bridge-input-driver.js";
 import type { LogicFamilyConfig } from "../../core/logic-family.js";
 import type { SolverPartition, PartitionedComponent, DigitalCompilerFn, ComponentDefinition, MnaModel } from "../../compile/types.js";
 import type { ModelEntry } from "../../core/registry.js";
@@ -94,7 +93,7 @@ function modelEntryToMnaModel(entry: ModelEntry): MnaModel | null {
  *
  * @param nodeId          - MNA node ID for the pin (from groupToNodeId).
  * @param mode            - Circuit-level digitalPinLoading setting.
- * @param nodeIdToOverride - Per-net loading overrides (nodeId â†’ "loaded"|"ideal").
+ * @param nodeIdToOverride - Per-net loading overrides (nodeId → "loaded"|"ideal").
  * @param isCrossDomain   - True when the pin is at a cross-domain boundary
  *                          (bridge adapter); false for purely behavioural pins.
  */
@@ -770,7 +769,7 @@ function runPassA_partition(
  *
  * Identifies the Ground group by checking whether any PartitionedComponent in
  * the partition is a Ground element whose pin appears in that group.
- * Ground group â†’ node 0; all other groups â†’ sequential from 1.
+ * Ground group → node 0; all other groups → sequential from 1.
  */
 function buildAnalogNodeMapFromPartition(
   partition: SolverPartition,
@@ -854,7 +853,7 @@ function buildAnalogNodeMapFromPartition(
     // Boundary groups will be assigned node IDs starting at 1 below.
   }
 
-  // Assign node IDs: ground groups â†’ 0; remaining groups â†’ 1, 2, 3, â€¦ in
+  // Assign node IDs: ground groups → 0; remaining groups → 1, 2, 3, … in
   // ngspice deck-line first-encounter order.
   //
   // ngspice numbers MNA nodes during deck PARSE (not during CKTsetup). Each
@@ -868,7 +867,7 @@ function buildAnalogNodeMapFromPartition(
   // `partition.components` in the same order here and assign node IDs as we
   // encounter each component's pins.
   //
-  // We use the typeIdâ†’loadOrder lookup `getNgspiceLoadOrderByTypeId`
+  // We use the typeId→loadOrder lookup `getNgspiceLoadOrderByTypeId`
   // (`core/analog-types.ts`)- load order is a per-DEVICE-TYPE concept in
   // ngspice (its position in `DEVices[]`), not per-model or per-instance, so
   // the typeId is the right key. This avoids the chicken-and-egg of needing
@@ -879,7 +878,7 @@ function buildAnalogNodeMapFromPartition(
       groupToNodeId.set(g.groupId, 0);
     }
   }
-  // Build a position â†’ groupId index for O(1) lookup as we walk pins.
+  // Build a position → groupId index for O(1) lookup as we walk pins.
   const positionToGroupId = new Map<string, number>();
   for (const g of groups) {
     for (const gp of g.pins) {
@@ -989,7 +988,7 @@ function buildAnalogNodeMapFromPartition(
       groupToNodeId.set(gid, nextNodeId++);
     };
     if (deckLabels !== undefined) {
-      // Build a label â†’ ResolvedPin index lookup for this component.
+      // Build a label → ResolvedPin index lookup for this component.
       const labelToPinIdx = new Map<string, number>();
       for (let pi = 0; pi < pc.resolvedPins.length; pi++) {
         labelToPinIdx.set(pc.resolvedPins[pi]!.pinLabel, pi);
@@ -1104,6 +1103,210 @@ function buildAnalogNodeMapFromPartition(
   };
 }
 
+// ---------------------------------------------------------------------------
+// Per-pin boundary adapters: one internalOnly composite per crossing digital
+// pin. The analog hub net is a shared node nothing pins; each crossing pin's
+// adapter `node` port attaches to it and presents a finite-impedance pin
+// (tri-state Thevenin for outputs, rIn/cIn + threshold for inputs).
+// ---------------------------------------------------------------------------
+
+/**
+ * Runtime handle the coordinator uses to drive (output) or read (input) one
+ * crossing pin's boundary adapter. Output adapters route `ctrl`/`en` through
+ * the wrapper's setParam; input adapters expose the `nResult` MNA node id whose
+ * voltage the coordinator thresholds back to a digital bit.
+ */
+export interface BridgePinAdapterHandle {
+  pinKey: string;
+  role: "output" | "input";
+  /** The expanded composite wrapper; setParam routes ctrl/en (output) and the
+   *  coordinator reads resultNodeId voltage (input). */
+  wrapper: SubcircuitWrapperElement;
+  /** MNA node id of the input adapter's `nResult` net; -1 for output. */
+  resultNodeId: number;
+}
+
+interface BoundaryAdapterInfo {
+  pinKey: string;
+  role: "output" | "input";
+  /** Resolved instance label of the synthetic adapter (== its instanceId and
+   *  its `label` property). Keys compositeInternalIds for `${label}#nResult`
+   *  and matches the wrapper's resolved label in analogElements. */
+  label: string;
+}
+
+/**
+ * A synthetic one-pin (`node`) analog component instance standing in for one
+ * crossing digital pin's boundary adapter. Carries a single `node` pin at the
+ * shared analog hub world-position so the node-map builder binds it to the hub
+ * node; the compose route then expands it into the boundary-adapter composite.
+ */
+class BoundaryAdapterElement extends AbstractCircuitElement {
+  constructor(
+    typeId: string,
+    instanceId: string,
+    position: { x: number; y: number },
+    props: PropertyBag,
+  ) {
+    super(typeId, instanceId, position, 0, false, props);
+  }
+
+  getPins(): readonly Pin[] {
+    const decls: PinDeclaration[] = [
+      {
+        kind: "signal",
+        direction: PinDirection.OUTPUT,
+        label: "node",
+        defaultBitWidth: 1,
+        position: { x: 0, y: 0 },
+        isNegatable: false,
+        isClockCapable: false,
+      },
+    ];
+    return this.derivePins(decls, []);
+  }
+
+  getBoundingBox(): Rect {
+    return { x: this.position.x, y: this.position.y, width: 0, height: 0 };
+  }
+
+  draw(_ctx: RenderContext): void {
+    // Synthetic compile-time element- never rendered.
+  }
+}
+
+/**
+ * Build the synthetic adapter element for one crossing pin. Its PropertyBag
+ * carries `model: "default"` plus the resolved per-pin electricals as model
+ * params (ctrl=0/en=1 for outputs), so the composite netlist reads user-set
+ * values exactly like a flip-flop composite passes electricals to its pins.
+ */
+function makeBoundaryAdapterElement(
+  typeId: string,
+  instanceId: string,
+  position: { x: number; y: number },
+  role: "output" | "input",
+  loaded: boolean,
+  spec: ResolvedPinElectrical,
+): BoundaryAdapterElement {
+  const props = new PropertyBag([
+    ["model", "default"],
+    ["label", instanceId],
+  ]);
+  if (role === "output") {
+    props.setModelParam("rOut", spec.rOut);
+    // cOut exists only on the Loaded output variant's paramDefs.
+    if (loaded) props.setModelParam("cOut", spec.cOut);
+    props.setModelParam("vOH", spec.vOH);
+    props.setModelParam("vOL", spec.vOL);
+    props.setModelParam("rHiZ", spec.rHiZ);
+    // midEn is the composite's own normalized-enable threshold (default 0.5),
+    // not a pin-electrical field; let the adapter paramDefs supply it.
+    props.setModelParam("ctrl", 0);
+    props.setModelParam("en", 1);
+  } else {
+    // rIn/cIn exist only on the Loaded input variant's paramDefs.
+    if (loaded) {
+      props.setModelParam("rIn", spec.rIn);
+      props.setModelParam("cIn", spec.cIn);
+    }
+    props.setModelParam("vIH", spec.vIH);
+    props.setModelParam("vIL", spec.vIL);
+  }
+  return new BoundaryAdapterElement(typeId, instanceId, position, props);
+}
+
+/**
+ * Synthesize one boundary-adapter PartitionedComponent per crossing pin from
+ * `partition.bridgeStubs`. Output crossings expand the tri-state output adapter
+ * (Loaded/Unloaded); input crossings expand the input adapter (Loaded/Unloaded).
+ * The Loaded vs Unloaded variant follows the per-net loading override (an
+ * `ideal` net selects the Unloaded variant) and the circuit-level loading mode.
+ */
+function synthesizeBoundaryAdapters(
+  partition: SolverPartition,
+  registry: ComponentRegistry,
+  family: LogicFamilyConfig,
+  digitalPinLoading: "cross-domain" | "all" | "none",
+  perNetLoadingOverrides: ReadonlyMap<number, "loaded" | "ideal"> | undefined,
+): {
+  adapterComponents: PartitionedComponent[];
+  adapterInfoByPinKey: Map<string, BoundaryAdapterInfo>;
+} {
+  const adapterComponents: PartitionedComponent[] = [];
+  const adapterInfoByPinKey = new Map<string, BoundaryAdapterInfo>();
+
+  for (const stub of partition.bridgeStubs) {
+    const bd = stub.descriptor;
+    const hubPin = bd.boundaryGroup.pins.find((p) => p.domain === "analog");
+    const hubRef = hubPin ?? bd.boundaryGroup.pins[0];
+    if (hubRef === undefined) continue;
+    const hubPos = hubRef.worldPosition;
+
+    // Loaded vs Unloaded: an explicit per-net `ideal` override (or loading
+    // mode "none") selects the Unloaded variant; otherwise the boundary pin is
+    // a cross-domain pin and loads (Loaded variant).
+    const override = perNetLoadingOverrides?.get(bd.analogGroupId);
+    const loaded =
+      override === "ideal" ? false
+      : override === "loaded" ? true
+      : digitalPinLoading === "none" ? false
+      : true;
+
+    const adapterName =
+      bd.role === "output"
+        ? (loaded ? "DigitalOutputBoundaryAdapterLoaded" : "DigitalOutputBoundaryAdapterUnloaded")
+        : (loaded ? "DigitalInputBoundaryAdapterLoaded" : "DigitalInputBoundaryAdapterUnloaded");
+    const def = registry.get(adapterName);
+    if (def === undefined) {
+      throw new Error(
+        `compileAnalogPartition: boundary adapter "${adapterName}" is not ` +
+          `registered. Register it in register-all.ts before compiling.`,
+      );
+    }
+
+    const spec = resolvePinElectrical(family, bd.electricalSpec);
+    const syntheticInstanceId = `bridge-adapter:${bd.pinKey}`;
+
+    const element = makeBoundaryAdapterElement(
+      adapterName,
+      syntheticInstanceId,
+      hubPos,
+      bd.role,
+      loaded,
+      spec,
+    );
+
+    const resolvedPin: ResolvedGroupPin = {
+      elementIndex: -1,
+      pinIndex: 0,
+      pinLabel: "node",
+      direction: bd.role === "output" ? PinDirection.OUTPUT : PinDirection.INPUT,
+      bitWidth: 1,
+      worldPosition: hubPos,
+      wireVertex: null,
+      domain: "analog",
+      kind: "signal",
+    };
+
+    const partComp: PartitionedComponent = {
+      element,
+      definition: def as StandaloneComponentDefinition,
+      modelKey: "default",
+      model: null,
+      resolvedPins: [resolvedPin],
+    };
+    adapterComponents.push(partComp);
+    adapterInfoByPinKey.set(bd.pinKey, {
+      pinKey: bd.pinKey,
+      role: bd.role,
+      label: syntheticInstanceId,
+    });
+  }
+
+  return { adapterComponents, adapterInfoByPinKey };
+}
+
 /**
  * Compile an analog partition into a `ConcreteCompiledAnalogCircuit`.
  *
@@ -1114,7 +1317,7 @@ function buildAnalogNodeMapFromPartition(
  * is preserved.
  */
 export function compileAnalogPartition(
-  partition: SolverPartition,
+  partitionIn: SolverPartition,
   registry: ComponentRegistry,
   logicFamily?: LogicFamilyConfig,
   outerCircuit?: Circuit,
@@ -1122,11 +1325,35 @@ export function compileAnalogPartition(
   digitalPinLoading: "cross-domain" | "all" | "none" = "cross-domain",
   perNetLoadingOverrides?: ReadonlyMap<number, "loaded" | "ideal">,
 ): ConcreteCompiledAnalogCircuit {
+  let partition: SolverPartition = partitionIn;
   const diagnostics: Diagnostic[] = [];
 
   // Extract typed inline runtime models for use in route resolution.
   const runtimeModelMap: Record<string, Record<string, ModelEntry>> | undefined =
     outerCircuit?.metadata.models;
+
+  // Synthesize one boundary-adapter PartitionedComponent per crossing pin from
+  // partition.bridgeStubs and inject them into the analog component set BEFORE
+  // Pass A, so the route resolver, the node-map deck walk (which mints each
+  // adapter's composite-internal nets), and the main element loop expand them
+  // uniformly as composites. Each adapter's single `node` pin sits on the
+  // shared analog hub world-position so it binds to the hub MNA node; nothing
+  // pins the hub. This replaces the hand-rolled BridgeOutput/InputDriverElement
+  // ideal-voltage-source stamp.
+  const { adapterComponents, adapterInfoByPinKey } = synthesizeBoundaryAdapters(
+    partition,
+    registry,
+    logicFamily ?? defaultLogicFamily(),
+    digitalPinLoading,
+    perNetLoadingOverrides,
+  );
+  if (adapterComponents.length > 0) {
+    partition = {
+      components: [...partition.components, ...adapterComponents],
+      groups: partition.groups,
+      bridgeStubs: partition.bridgeStubs,
+    };
+  }
 
   // Pass A: resolve component routes + merged params + (for composites) the
   // resolved MnaSubcircuitNetlist + subcktParams + parentLabel. Must run
@@ -1159,7 +1386,7 @@ export function compileAnalogPartition(
     runtimeModelMap,
   );
 
-  // Build a reverse map from MNA node ID â†’ per-net loading override so that
+  // Build a reverse map from MNA node ID → per-net loading override so that
   // bridge synthesis sites can consult per-net overrides instead of relying
   // solely on the circuit-level digitalPinLoading setting.
   const nodeIdToLoadingOverride = new Map<number, "loaded" | "ideal">();
@@ -1198,7 +1425,6 @@ export function compileAnalogPartition(
   const elementToCircuitElement = new Map<number, CircuitElement>();
   const elementPinVertices = new Map<number, Array<{ x: number; y: number } | null>>();
   const elementResolvedPins = new Map<number, ResolvedPin[]>();
-  const elementBridgeAdapters = new Map<number, Array<BridgeOutputDriverElement | BridgeInputDriverElement>>();
 
   const timeRef = { value: 0 };
   const getTime = (): number => timeRef.value;
@@ -1292,7 +1518,7 @@ export function compileAnalogPartition(
       const flatOverrides: Record<string, number> = props.has("_pinElectricalOverrides")
         ? props.get<Record<string, number>>("_pinElectricalOverrides")
         : {};
-      // Build per-pin overrides from flat composite keys (e.g. "A.rOut" â†’ { A: { rOut: ... } })
+      // Build per-pin overrides from flat composite keys (e.g. "A.rOut" → { A: { rOut: ... } })
       const userOverrides: Record<string, Partial<ResolvedPinElectrical>> = {};
       for (const [compositeKey, val] of Object.entries(flatOverrides)) {
         const dotIdx = compositeKey.indexOf('.');
@@ -1450,45 +1676,37 @@ export function compileAnalogPartition(
     }
   }
 
-  // Bridge stub processing- create MNA elements for each cross-domain boundary.
-  const bridgeAdaptersByGroupId = new Map<number, Array<BridgeOutputDriverElement | BridgeInputDriverElement>>();
+  // Per-pin boundary adapters were synthesized into partition.components and
+  // expanded as composites by the main element loop above (their wrapper +
+  // leaves are already in analogElements). Index the expanded wrapper handles
+  // by pinKey and resolve each input adapter's `nResult` MNA node id from
+  // compositeInternalIds so the coordinator can read the threshold result.
+  const bridgeAdaptersByPinKey = new Map<string, BridgePinAdapterHandle>();
 
-  for (const stub of partition.bridgeStubs) {
-    const { boundaryGroupId, descriptor } = stub;
-    const nodeId = groupToNodeId.get(boundaryGroupId);
-    if (nodeId === undefined) continue;
+  for (const [pinKey, info] of adapterInfoByPinKey) {
+    // The wrapper element's label is the synthetic instance id (info.label).
+    const wrapper = analogElements.find(
+      (el) => el.label === info.label,
+    ) as SubcircuitWrapperElement | undefined;
+    if (wrapper === undefined) continue; // unconnected hub pin → excluded
 
-    // Determine loaded flag using the shared resolvePinLoading helper.
-    const loaded = resolvePinLoading(
-      nodeId,
-      digitalPinLoading,
-      nodeIdToLoadingOverride,
-      true,
-    );
-
-    const spec = resolvePinElectrical(circuitFamily, descriptor.electricalSpec);
-    const adapters: Array<BridgeOutputDriverElement | BridgeInputDriverElement> = [];
-
-    if (descriptor.direction === "digital-to-analog") {
-      // Digital output pin drives the analog node- BridgeOutputDriverElement (voltage source).
-      // Branch row allocated inside adapter.setup() via ctx.makeCur, matching
-      // VSRCsetup (vsrcset.c:40-44).
-      const adapter = makeBridgeOutputAdapter(spec, nodeId, loaded);
-      // Label for coordinator pin-param dispatch (e.g. "out.rOut" â†’ endsWith(":out"))
-      const driverPin = descriptor.boundaryGroup.pins.find(p => p.domain === "digital");
-      if (driverPin) adapter.label = `bridge-${boundaryGroupId}:${driverPin.pinLabel}`;
-      analogElements.push(adapter);
-      adapters.push(adapter);
+    if (info.role === "input") {
+      // nResult is a composite-internal net keyed `${label}#nResult`.
+      const resultNodeId = compositeInternalIds.get(`${info.label}#nResult`);
+      bridgeAdaptersByPinKey.set(pinKey, {
+        pinKey,
+        role: "input",
+        wrapper,
+        resultNodeId: resultNodeId ?? -1,
+      });
     } else {
-      // Analog voltage drives digital input- BridgeInputDriverElement (loading sense)
-      const adapter = makeBridgeInputAdapter(spec, nodeId, loaded);
-      const sensePin = descriptor.boundaryGroup.pins.find(p => p.domain === "digital");
-      if (sensePin) adapter.label = `bridge-${boundaryGroupId}:${sensePin.pinLabel}`;
-      analogElements.push(adapter);
-      adapters.push(adapter);
+      bridgeAdaptersByPinKey.set(pinKey, {
+        pinKey,
+        role: "output",
+        wrapper,
+        resultNodeId: -1,
+      });
     }
-
-    bridgeAdaptersByGroupId.set(boundaryGroupId, adapters);
   }
 
   // Architectural alignment A1: sort by ngspiceLoadOrder so that
@@ -1496,7 +1714,7 @@ export function compileAnalogPartition(
   // ngspice does (every R, every C, ..., every V, ...). Within each bucket,
   // walk in REVERSE deck order: ngspice's `cktcrte.c:63-65` prepends every
   // parsed instance to the model's GENinstances linked list, so when CKTsetup
-  // walks that list headâ†’tail it visits instances in reverse-deck order. To
+  // walks that list head→tail it visits instances in reverse-deck order. To
   // mirror that, we sort by (ngspiceLoadOrder ASC, originalIndex DESC). The
   // netlist generator emits the deck back in forward-within-bucket order
   // (see netlist-generator.ts) so that ngspice's prepend re-reverses to
@@ -1631,8 +1849,7 @@ export function compileAnalogPartition(
     elementPinVertices,
     elementResolvedPins,
     groupToNodeId,
-    elementBridgeAdapters,
-    bridgeAdaptersByGroupId,
+    bridgeAdaptersByPinKey,
     diagnostics,
     timeRef,
     statePool,

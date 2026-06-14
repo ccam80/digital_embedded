@@ -13,7 +13,7 @@ import type {
   ConnectivityGroup,
   PartitionedComponent,
   SolverPartition,
-  BridgeDescriptor,
+  BridgePinDescriptor,
   BridgeStub,
   ResolvedGroupPin,
 } from "./types.js";
@@ -26,7 +26,7 @@ import type { ModelAssignment } from "./extract-connectivity.js";
 export interface PartitionResult {
   digital: SolverPartition;
   analog: SolverPartition;
-  bridges: BridgeDescriptor[];
+  bridges: BridgePinDescriptor[];
 }
 
 // ---------------------------------------------------------------------------
@@ -34,48 +34,21 @@ export interface PartitionResult {
 // ---------------------------------------------------------------------------
 
 /**
- * Determine the bridge direction at a boundary group.
- *
- * "digital-to-analog": a digital output pin drives the net- the digital
- *   domain is the source, analog is the sink.
- * "analog-to-digital": an analog output (or no digital output) drives the
- *   net- the analog domain is the source, digital is the sink.
- *
- * Tie-break: when both domains have outputs, digital-to-analog wins (digital
- * is the event-driven driver; analog receives the threshold crossing).
+ * Resolve the per-pin electrical spec for ONE crossing digital pin from its
+ * own component definition, using the standard override cascade
+ * (pinElectricalOverrides[pinLabel] ?? pinElectrical ?? {}). The circuit-level
+ * logic family fills any unspecified field later, in resolvePinElectrical.
  */
-function bridgeDirection(
-  group: ConnectivityGroup,
-): "digital-to-analog" | "analog-to-digital" {
-  const hasDigitalOutput = group.pins.some(
-    (p) => p.domain === "digital" && p.direction === PinDirection.OUTPUT,
-  );
-  return hasDigitalOutput ? "digital-to-analog" : "analog-to-digital";
-}
-
-/**
- * Pick the electrical spec for a boundary group.
- *
- * Prefer the first analog-domain pin's spec (from the ComponentDefinition), since
- * the analog side defines electrical characteristics. Falls back to an empty
- * spec when no override is present (circuit-level logic family fills it in).
- */
-function electricalSpecForGroup(
-  group: ConnectivityGroup,
+function electricalSpecForPin(
+  pin: ResolvedGroupPin,
   elements: readonly CircuitElement[],
   registry: ComponentRegistry,
 ): PinElectricalSpec {
-  for (const pin of group.pins) {
-    if (pin.domain !== "analog") continue;
-    const el = elements[pin.elementIndex];
-    if (!el) continue;
-    const def = registry.getStandalone(el.typeId);
-    if (!def) continue;
-    const perPin = def.pinElectricalOverrides?.[pin.pinLabel];
-    if (perPin) return perPin;
-    if (def.pinElectrical) return def.pinElectrical;
-  }
-  return {};
+  const el = elements[pin.elementIndex];
+  if (!el) return {};
+  const def = registry.getStandalone(el.typeId);
+  if (!def) return {};
+  return def.pinElectricalOverrides?.[pin.pinLabel] ?? def.pinElectrical ?? {};
 }
 
 // ---------------------------------------------------------------------------
@@ -193,11 +166,17 @@ export function partitionByDomain(
   }
 
   // -------------------------------------------------------------------------
-  // Step 4: Classify groups and build BridgeDescriptors
+  // Step 4: Classify groups and build per-pin BridgePinDescriptors
   // -------------------------------------------------------------------------
   const digitalGroups: ConnectivityGroup[] = [];
   const analogGroups: ConnectivityGroup[] = [];
-  const bridges: BridgeDescriptor[] = [];
+  const bridges: BridgePinDescriptor[] = [];
+
+  // Synthetic group IDs for the per-pin private digital nets must not collide
+  // with real group IDs. Real group IDs come from extractConnectivityGroups
+  // (0..groups.length-1); start synthetic IDs past the max.
+  let nextSyntheticGroupId =
+    groups.reduce((m, g) => Math.max(m, g.groupId), -1) + 1;
 
   for (const g of groups) {
     const hasDigital = g.domains.has("digital");
@@ -212,7 +191,11 @@ export function partitionByDomain(
     // MNA nodes that break the analog topology.
     const isNeutralOnly = !hasDigital && !hasAnalog;
 
-    if (hasDigital || isNeutralOnly) digitalGroups.push(g);
+    // For a BOUNDARY group, the merged group is NOT pushed onto the digital
+    // partition: each crossing digital pin gets its OWN singleton digital
+    // group below so the digital backend mints a private net per pin. A
+    // non-boundary digital (or neutral-only) group is pushed as-is.
+    if (!isBoundary && (hasDigital || isNeutralOnly)) digitalGroups.push(g);
     if (hasAnalog) {
       analogGroups.push(g);
     } else if (isNeutralOnly) {
@@ -223,15 +206,44 @@ export function partitionByDomain(
     }
 
     if (isBoundary) {
-      const direction = bridgeDirection(g);
-      const electricalSpec = electricalSpecForGroup(g, elements, registry);
       const bitWidth = g.bitWidth ?? 1;
-      bridges.push({
-        boundaryGroup: g,
-        direction,
-        bitWidth,
-        electricalSpec,
-      });
+      // One descriptor + one singleton private digital group per crossing
+      // digital pin. The analog hub group (g) is kept in analogGroups above
+      // and nothing pins it.
+      for (const pin of g.pins) {
+        if (pin.domain !== "digital") continue;
+        const el = elements[pin.elementIndex];
+        const instanceId = el?.instanceId ?? `el${pin.elementIndex}`;
+        const pinKey = `${instanceId}:${pin.pinLabel}`;
+        const role: "output" | "input" =
+          pin.direction === PinDirection.OUTPUT ? "output" : "input";
+
+        // Private singleton digital group: same single pin, no wires, digital
+        // domain only. Gives the digital compiler an isolated net to address.
+        const privateGroupId = nextSyntheticGroupId++;
+        const privatePin: ResolvedGroupPin = { ...pin };
+        const privateGroup: ConnectivityGroup = {
+          groupId: privateGroupId,
+          pins: [privatePin],
+          wires: [],
+          domains: new Set(["digital"]),
+          bitWidth,
+        };
+        digitalGroups.push(privateGroup);
+
+        bridges.push({
+          boundaryGroup: g,
+          analogGroupId: g.groupId,
+          pinKey,
+          pinLabel: pin.pinLabel,
+          elementIndex: pin.elementIndex,
+          pinIndex: pin.pinIndex,
+          role,
+          isTriState: role === "output",
+          bitWidth,
+          electricalSpec: electricalSpecForPin(pin, elements, registry),
+        });
+      }
     }
   }
 
@@ -243,7 +255,8 @@ export function partitionByDomain(
 
   for (const bd of bridges) {
     const stub: BridgeStub = {
-      boundaryGroupId: bd.boundaryGroup.groupId,
+      pinKey: bd.pinKey,
+      analogGroupId: bd.analogGroupId,
       descriptor: bd,
     };
     digitalBridgeStubs.push(stub);

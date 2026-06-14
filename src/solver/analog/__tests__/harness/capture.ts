@@ -62,7 +62,7 @@ const TYPE_TO_PREFIX: Record<string, string> = {
 // emitted deck and can never drift from the family ordinals again.
 
 /**
- * Build a map from element index â†’ human-readable component label.
+ * Build a map from element index → human-readable component label.
  *
  * Composite leaves (sub-elements emitted by `expandCompositeInstance`) have
  * NO entry in `compiled.elementToCircuitElement` — only the wrapper does.

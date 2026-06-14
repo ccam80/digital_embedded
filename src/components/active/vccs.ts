@@ -277,9 +277,9 @@ export class VCCSElement extends AbstractCircuitElement {
     ctx.setColor("TEXT");
     ctx.setFont({ family: "sans-serif", size: 0.6 });
     ctx.drawText("ctrl+", 1.2, -1, { horizontal: "left", vertical: "middle" });
-    ctx.drawText("ctrlâˆ’", 1.2, 1, { horizontal: "left", vertical: "middle" });
+    ctx.drawText("ctrl−", 1.2, 1, { horizontal: "left", vertical: "middle" });
     ctx.drawText("out+",  4.8, -1, { horizontal: "right", vertical: "middle" });
-    ctx.drawText("outâˆ’",  4.8, 1, { horizontal: "right", vertical: "middle" });
+    ctx.drawText("out−",  4.8, 1, { horizontal: "right", vertical: "middle" });
 
     ctx.restore();
   }

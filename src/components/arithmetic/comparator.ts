@@ -30,7 +30,7 @@ import {
 // 2 inputs (even), symmetric: correct=1 for i>=1, offs=floor(2/2)=1
 const COMP_WIDTH = 3;
 
-// Java GenericShape: 2 inputs, 3 outputs â†’ symmetric=false (outputs!=1)
+// Java GenericShape: 2 inputs, 3 outputs → symmetric=false (outputs!=1)
 // Non-symmetric: no gap correction, offs=0
 // Inputs at y=0,1; Outputs at y=0,1,2
 function buildComparatorPinDeclarations(bitWidth: number): PinDeclaration[] {

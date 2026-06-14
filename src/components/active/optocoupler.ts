@@ -280,7 +280,7 @@ export const OptocouplerDefinition: StandaloneComponentDefinition = {
   helpText:
     "Optocoupler- 4-terminal element (anode, cathode, collector, emitter). " +
     "LED input (dioload.c) + 0V sense source (vsrcload.c) + CCCS coupling (CTR) + phototransistor output (bjtload.c). " +
-    "I_collector â‰ˆ CTR * I_LED. Galvanic isolation between LED and phototransistor.",
+    "I_collector ≈ CTR * I_LED. Galvanic isolation between LED and phototransistor.",
 
   factory(props: PropertyBag): OptocouplerElement {
     return new OptocouplerElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);

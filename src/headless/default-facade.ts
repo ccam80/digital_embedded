@@ -252,6 +252,15 @@ export class DefaultSimulatorFacade implements SimulatorFacade {
           inputLabels.add(label);
         }
       }
+      // Analog labels include measurement points (Probe) and digital sinks
+      // (Out) — those are OUTPUT columns; counting them as inputs would
+      // swallow leading output columns into the input split.
+      for (const el of circuit.elements) {
+        if (el.typeId === 'Out' || el.typeId === 'Probe') {
+          const label = el.getProperties().getOrDefault<string>('label', '');
+          if (label) inputLabels.delete(label);
+        }
+      }
       if (inputLabels.size > 0) {
         // Parse the header line to count how many leading columns are inputs
         const headerLine = resolvedData.split('\n').find(l => l.trim().length > 0 && !l.trim().startsWith('#'));

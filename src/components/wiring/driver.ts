@@ -38,7 +38,7 @@ import {
  *
  * Java SIZE = 20px = 1 grid unit.  SIZE2 = 10px = 0.5 grid units.
  * Pin layout: input at (-1, 0), sel at (0, ±1), output at (1, 0).
- * Triangle from roughly (-1, -0.6) â†’ (1, 0) â†’ (-1, 0.6).
+ * Triangle from roughly (-1, -0.6) → (1, 0) → (-1, 0.6).
  * Component origin is at the center (where the sel pin stem meets the triangle).
  */
 
@@ -112,7 +112,7 @@ export class DriverElement extends AbstractCircuitElement {
     const invertOutput = this._properties.getOrDefault<boolean>("invertDriverOutput", false);
     const flipSelPos = this._properties.getOrDefault<boolean>("flipSelPos", false);
     // Triangle: (-0.95,-0.6) to (0.95,0.6). Sel stem extends to y=-1 or y=+1.
-    // For invertOutput: bubble at (1.2,0) r=0.25 â†’ maxX=1.45; output pin at x=2.
+    // For invertOutput: bubble at (1.2,0) r=0.25 → maxX=1.45; output pin at x=2.
     const maxX = invertOutput ? 2 : 0.95;
     const selMinY = flipSelPos ? -0.6 : -1;
     const selMaxY = flipSelPos ? 1 : 0.6;
@@ -133,8 +133,8 @@ export class DriverElement extends AbstractCircuitElement {
     ctx.save();
 
     // Triangle body pointing right, centred on origin.
-    // Java: (-SIZE+1, -SIZE2-2) â†’ (SIZE-1, 0) â†’ (-SIZE+1, SIZE2+2)
-    // Grid: (-0.95, -0.6)      â†’ (0.95, 0)    â†’ (-0.95, 0.6)
+    // Java: (-SIZE+1, -SIZE2-2) → (SIZE-1, 0) → (-SIZE+1, SIZE2+2)
+    // Grid: (-0.95, -0.6)      → (0.95, 0)    → (-0.95, 0.6)
     const triLeft = -0.95;
     const triRight = 0.95;
     const triHalf = 0.6;

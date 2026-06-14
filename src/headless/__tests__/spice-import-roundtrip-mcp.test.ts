@@ -42,7 +42,7 @@ function createElement(
 function buildBjtCircuit(): { circuit: Circuit; facade: DefaultSimulatorFacade } {
   const facade = new DefaultSimulatorFacade(registry);
   // Layout chosen so no pin world-position coincides with an unintended wire
-  // endpoint.  Pin positions (local â†’ world):
+  // endpoint.  Pin positions (local → world):
   //   Gnd  at {0, 0}: out={0,0}
   //   Vcc  at {0, 4}: neg={0,4}, pos={4,4}
   //   Rc   at {4, 4}: A={4,4},   B={8,4}
@@ -224,9 +224,9 @@ describe('spice-import round-trip MCP surface -- IS override changes DC operatin
 
   it('compile with default IS vs IS=1e-20 produces different collector voltage', () => {
     // Build two circuits:
-    //   Default: IS=1e-14 (standard NPN). At Vb=0.7V, Ic is large â†’ BJT saturates,
+    //   Default: IS=1e-14 (standard NPN). At Vb=0.7V, Ic is large → BJT saturates,
     //            collector voltage drops well below Vcc.
-    //   Override: IS=1e-20 (tiny). At Vb=0.7V, Ic â‰ˆ 0 â†’ BJT in cutoff,
+    //   Override: IS=1e-20 (tiny). At Vb=0.7V, Ic ≈ 0 → BJT in cutoff,
     //            collector voltage stays near Vcc (5V).
     // The difference in collector voltage must exceed 1V.
 
@@ -254,7 +254,7 @@ describe('spice-import round-trip MCP surface -- IS override changes DC operatin
     // Both circuits must have the same number of nodes
     expect(dcOverride!.nodeVoltages.length).toBe(dcDefault!.nodeVoltages.length);
 
-    // IS=1e-20 â†’ cutoff â†’ Vc near 5V. Default IS=1e-16 â†’ less saturated than IS=1e-14.
+    // IS=1e-20 → cutoff → Vc near 5V. Default IS=1e-16 → less saturated than IS=1e-14.
     // At least one node voltage must differ by more than 0.5V.
     const voltagesDefault = Array.from(dcDefault!.nodeVoltages);
     const voltagesOverride = Array.from(dcOverride!.nodeVoltages);
@@ -403,7 +403,7 @@ describe('spice-import MCP tool path- applySpiceImportResult + facade compile/qu
     expect(dc!.converged).toBe(true);
   });
 
-  it('IS=1e-20 override: BJT in cutoff, DC converges with â‰¥3 node voltages', () => {
+  it('IS=1e-20 override: BJT in cutoff, DC converges with ≥3 node voltages', () => {
     const { circuit, facade } = buildBjtCircuit();
 
     const q1 = circuit.elements.find(
@@ -424,7 +424,7 @@ describe('spice-import MCP tool path- applySpiceImportResult + facade compile/qu
     expect(dc!.nodeVoltages.length).toBeGreaterThanOrEqual(3);
   });
 
-  it('serialize â†’ deserialize preserves SPICE model name and params', () => {
+  it('serialize → deserialize preserves SPICE model name and params', () => {
     const { circuit, facade } = buildBjtCircuit();
 
     const q1 = circuit.elements.find(

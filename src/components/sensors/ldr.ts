@@ -58,7 +58,7 @@ const MIN_RESISTANCE = 1e-12;
 
 export const { paramDefs: LDR_PARAM_DEFS, defaults: LDR_DEFAULTS } = defineModelParams({
   primary: {
-    rDark:  { default: 1e6,  unit: "Î",   description: "Resistance in darkness (lux = 0)" },
+    rDark:  { default: 1e6,  unit: "Ω",   description: "Resistance in darkness (lux = 0)" },
     lux:    { default: 500,  unit: "lux", description: "Current light level in lux" },
   },
   secondary: {
@@ -366,7 +366,7 @@ export const LDRDefinition: StandaloneComponentDefinition = {
   category: ComponentCategory.PASSIVES,
   helpText:
     "LDR (Light Dependent Resistor)  resistance varies with illumination. " +
-    "Power-law model: R = R_dark Ã— (lux / lux_ref)^(-γ).",
+    "Power-law model: R = R_dark × (lux / lux_ref)^(-γ).",
   models: {},
   modelRegistry: {
     "behavioral": {

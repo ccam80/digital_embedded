@@ -209,6 +209,16 @@ import { DigitalOutputPinUnloadedDefinition } from "./digital-pins/digital-outpu
 import { DigitalOutputPinTriStateLoadedDefinition } from "./digital-pins/digital-output-pin-tristate-loaded.js";
 import { DigitalOutputPinTriStateUnloadedDefinition } from "./digital-pins/digital-output-pin-tristate-unloaded.js";
 
+// Digital↔analog boundary adapters (internalOnly — synthesized per crossing pin)
+import {
+  DigitalOutputBoundaryAdapterLoadedDefinition,
+  DigitalOutputBoundaryAdapterUnloadedDefinition,
+} from "./digital-pins/digital-output-boundary-adapter.js";
+import {
+  DigitalInputBoundaryAdapterLoadedDefinition,
+  DigitalInputBoundaryAdapterUnloadedDefinition,
+} from "./digital-pins/digital-input-boundary-adapter.js";
+
 // Behavioral output driver (internalOnly)
 import { BehavioralOutputDriverDefinition, BehavioralOutputDriverTriStateDefinition } from "../solver/analog/behavioral-output-driver.js";
 
@@ -499,6 +509,12 @@ export function createDefaultRegistry(
   registry.register(DigitalOutputPinUnloadedDefinition);
   registry.register(DigitalOutputPinTriStateLoadedDefinition);
   registry.register(DigitalOutputPinTriStateUnloadedDefinition);
+
+  // Digital↔analog boundary adapters (internalOnly)
+  registry.register(DigitalOutputBoundaryAdapterLoadedDefinition);
+  registry.register(DigitalOutputBoundaryAdapterUnloadedDefinition);
+  registry.register(DigitalInputBoundaryAdapterLoadedDefinition);
+  registry.register(DigitalInputBoundaryAdapterUnloadedDefinition);
 
   // Behavioral output driver (internalOnly)
   registry.register(BehavioralOutputDriverDefinition);

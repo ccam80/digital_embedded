@@ -9,13 +9,13 @@
  *
  * DiodeForward: unidirectional diode driving a pull-down output net (wired-OR).
  *   - Single input pin "in", single bidirectional output "out".
- *   - When in=1 â†’ out drives 1; when in=0 â†’ out is high-Z.
+ *   - When in=1 → out drives 1; when in=0 → out is high-Z.
  *   - Requires a pull-down resistor on the output net.
  *
  * DiodeBackward: unidirectional diode driving a pull-up output net (wired-AND).
  *   - Single input pin "in", single bidirectional output "out".
- *   - When in=1 â†’ out drives 1 (contributes high to pull-up net).
- *   - When in=0 â†’ out drives 0.
+ *   - When in=1 → out drives 1 (contributes high to pull-up net).
+ *   - When in=0 → out drives 0.
  *   - Requires a pull-up resistor on the output net.
  *
  * Bidirectional / high-Z semantics are handled by the bus resolution layer. A
@@ -56,8 +56,8 @@ import {
 // DiodeForeward: in(0,0),   out(0,1)
 //
 // Java draws:
-//   Polygon: (-0.5,-0.95) â†’ (0.5,-0.95) â†’ (0,-0.05), closed
-//   Line:    (-0.5,-0.05) â†’ (0.5,-0.05)
+//   Polygon: (-0.5,-0.95) → (0.5,-0.95) → (0,-0.05), closed
+//   Line:    (-0.5,-0.05) → (0.5,-0.05)
 // Pins: out1 at (0,0), out2 at (0,-1)
 const COMP_WIDTH = 1;  // fits the ±0.5 x extent
 const COMP_HEIGHT = 1; // fits the -1..0 y extent
@@ -142,10 +142,10 @@ function buildDiodeForwardPinDeclarations(): PinDeclaration[] {
 /**
  * Draw the Diode symbol body.
  * Matches Java DiodeShape exactly:
- *   Polygon (closed): (-0.5,-0.95) â†’ (0.5,-0.95) â†’ (0,-0.05)
- *   Line: (-0.5,-0.05) â†’ (0.5,-0.05)   [cathode bar]
+ *   Polygon (closed): (-0.5,-0.95) → (0.5,-0.95) → (0,-0.05)
+ *   Line: (-0.5,-0.05) → (0.5,-0.05)   [cathode bar]
  * Pins: out1 at (0,0), out2 at (0,-1).
- * The polygon tip touches pin out1 at (0,-0.05â‰ˆ0), cathode bar at -0.05.
+ * The polygon tip touches pin out1 at (0,-0.05≈0), cathode bar at -0.05.
  * The base spans ±0.5 at y=-0.95, touching pin out2 at (0,-1) from below.
  */
 function drawDiodeBody(ctx: RenderContext, label: string): void {
@@ -181,7 +181,7 @@ function drawDiodeBodyForward(ctx: RenderContext, label: string): void {
   ctx.setColor("COMPONENT");
   ctx.setLineWidth(1);
 
-  // Downward-pointing triangle: top-left â†’ top-right â†’ bottom-centre
+  // Downward-pointing triangle: top-left → top-right → bottom-centre
   ctx.drawPath({
     operations: [
       { op: "moveTo", x: -0.5, y: 0.05 },
@@ -210,7 +210,7 @@ function drawDiodeBodyBackward(ctx: RenderContext, label: string): void {
   ctx.setColor("COMPONENT");
   ctx.setLineWidth(1);
 
-  // Upward-pointing triangle: bottom-left â†’ bottom-right â†’ top-centre
+  // Upward-pointing triangle: bottom-left → bottom-right → top-centre
   ctx.drawPath({
     operations: [
       { op: "moveTo", x: -0.5, y: -0.95 },
@@ -466,7 +466,7 @@ export function executeDiode(index: number, state: Uint32Array, highZs: Uint32Ar
 // ---------------------------------------------------------------------------
 // executeDiodeForward- flat simulation function (wired-OR diode)
 //
-// in=1 â†’ out drives 1; in=0 (or blown) â†’ out high-Z so the net's pull-down
+// in=1 → out drives 1; in=0 (or blown) → out high-Z so the net's pull-down
 // resistor resolves it low.
 // ---------------------------------------------------------------------------
 
@@ -488,7 +488,7 @@ export function executeDiodeForward(index: number, state: Uint32Array, highZs: U
 // ---------------------------------------------------------------------------
 // executeDiodeBackward- flat simulation function (wired-AND diode)
 //
-// Actively drives out to the input value (in=1 â†’ 1, in=0 â†’ 0); blown â†’ high-Z.
+// Actively drives out to the input value (in=1 → 1, in=0 → 0); blown → high-Z.
 // ---------------------------------------------------------------------------
 
 export function executeDiodeBackward(index: number, state: Uint32Array, highZs: Uint32Array, layout: ComponentLayout): void {
@@ -567,7 +567,7 @@ export const PldDiodeForwardDefinition: StandaloneComponentDefinition = {
   category: ComponentCategory.PLD,
   helpText:
     "DiodeForward- forward diode for wired-OR PLD arrays.\n" +
-    "in=1 â†’ out=1; in=0 â†’ out=high-Z. Requires pull-down on output net.\n" +
+    "in=1 → out=1; in=0 → out=high-Z. Requires pull-down on output net.\n" +
     "blown=true permanently opens the diode.",
   models: {
     digital: {
@@ -589,7 +589,7 @@ export const PldDiodeBackwardDefinition: StandaloneComponentDefinition = {
   category: ComponentCategory.PLD,
   helpText:
     "DiodeBackward- backward diode for wired-AND PLD arrays.\n" +
-    "in=1 â†’ out=1; in=0 â†’ out=0. Requires pull-up on output net.\n" +
+    "in=1 → out=1; in=0 → out=0. Requires pull-up on output net.\n" +
     "blown=true permanently opens the diode.",
   models: {
     digital: {

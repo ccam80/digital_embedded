@@ -166,7 +166,7 @@ function createLedAnalogElementViaDiode(
   props: PropertyBag,
   getTime: () => number,
 ): AnalogElement {
-  // Inject K=0 (cathode â†’ ground); remap "in" â†’ "A".
+  // Inject K=0 (cathode → ground); remap "in" → "A".
   const remappedPinNodes = new Map<string, number>([
     ["A", pinNodes.get("in")!],
     ["K", 0],

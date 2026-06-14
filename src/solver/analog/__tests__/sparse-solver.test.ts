@@ -195,7 +195,7 @@ describe("SparseSolver", () => {
   });
 
   it("mna_resistor_divider_3x3", () => {
-    // MNA stamp for: Vs=5V between node 1 and ground, R1=1kÃƒÅ½Ã‚© (node1-node2), R2=1kÃƒÅ½Ã‚© (node2-ground)
+    // MNA stamp for: Vs=5V between node 1 and ground, R1=1kΩ (node1-node2), R2=1kΩ (node2-ground)
     // Nodes: 1=V1, 2=V2, branch 3=Ivs (current through voltage source)
     // Matrix size = 3 (2 nodes + 1 branch)
     //
@@ -366,7 +366,7 @@ function build50NodeBenchmarkCircuit(registry: ComponentRegistry): Circuit {
     { id: "vs",  type: "DcVoltageSource", props: { voltage: 10.0 } },
   ];
 
-  // Chain resistors: node 50 ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ 49 ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ ... ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ 1 ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ GND (50 resistors)
+  // Chain resistors: node 50 → 49 → ... → 1 → GND (50 resistors)
   for (let i = 50; i >= 2; i--) {
     components.push({ id: `r${i}_${i - 1}`, type: "Resistor", props: { resistance: 1000 + i * 10 } });
   }
@@ -382,7 +382,7 @@ function build50NodeBenchmarkCircuit(registry: ComponentRegistry): Circuit {
     components.push({ id: `d${i}`, type: "Diode", props: {} });
   }
 
-  // Inductor: node 25 ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ GND
+  // Inductor: node 25 → GND
   components.push({ id: "l25", type: "Inductor", props: { inductance: 1e-3 } });
 
   // Cross-link resistors
@@ -404,7 +404,7 @@ function build50NodeBenchmarkCircuit(registry: ComponentRegistry): Circuit {
   }
 
   const connections: Array<[string, string]> = [
-    // Voltage source: pos ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ node 50, neg ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ GND
+    // Voltage source: pos → node 50, neg → GND
     ["vs:pos",      "r50_49:pos"],
     ["vs:neg",      "gnd:out"],
     // Chain: link each resistor's neg to the next one's pos
@@ -412,9 +412,9 @@ function build50NodeBenchmarkCircuit(registry: ComponentRegistry): Circuit {
       const i = 50 - k; // i goes from 50 down to 3
       return [`r${i}_${i - 1}:neg`, `r${i - 1}_${i - 2}:pos`];
     }),
-    // r2_1:neg ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ r1_0:pos (node 1)
+    // r2_1:neg → r1_0:pos (node 1)
     ["r2_1:neg", "r1_0:pos"],
-    // r1_0:neg ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ GND
+    // r1_0:neg → GND
     ["r1_0:neg", "gnd:out"],
   ];
 
@@ -453,14 +453,14 @@ describe("SparseSolver real MNA circuit", () => {
   it("mna_50node_realistic_circuit_performance", async () => {
     // 50-node MNA circuit with realistic topology:
     //
-    //   Vs=10V source: node 50 ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ GND (branch row 50)
-    //   Resistor chain: node 50 ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ 49 ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ 48 ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ ... ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ 1 ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ GND (50 resistors)
+    //   Vs=10V source: node 50 → GND (branch row 50)
+    //   Resistor chain: node 50 → 49 → 48 → ... → 1 → GND (50 resistors)
     //   Shunt capacitors: every 5th node to GND (10 caps at nodes 5,10,...,50)
     //   Shunt diodes: every 7th node to GND (7 diodes at nodes 7,14,...,49)
-    //   Inductor: node 25 ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ GND (branch row 51)
+    //   Inductor: node 25 → GND (branch row 51)
     //   Cross-links: 5 feedback resistors spanning non-adjacent nodes
     //
-    // Matrix: 50 nodes + 2 branches = 52ÃƒÆ’Ã¢â‚¬â€52
+    // Matrix: 50 nodes + 2 branches = 52×52
     // ~70 elements, ~150 nonzeros, ~5.5% density (realistic MNA)
 
     const session = await ComparisonSession.createSelfCompare({
@@ -492,7 +492,7 @@ describe("SparseSolver real MNA circuit", () => {
     expect(engine.getState()).not.toBe(EngineState.ERROR);
     expect(transientSteps).toBe(100);
 
-    // Performance targets for a 52ÃƒÆ’Ã¢â‚¬â€52 real MNA matrix:
+    // Performance targets for a 52×52 real MNA matrix:
     // DC OP: < 20ms (multiple NR iterations with 7 nonlinear diodes)
     // Per transient step: < 2ms
     expect(tDcOp).toBeLessThan(20);
@@ -1302,9 +1302,9 @@ describe("SparseSolver Markowitz linked structure", () => {
     // while a singleton row has lower magnitude but mProd=0.
     //
     // Matrix (1-based):
-    // [2, 1, 1]    row 1: 2 off-diag ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ mRow=2
-    // [1, 5, 0]    row 2: 1 off-diag ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ mRow=1 (singleton candidate)
-    // [1, 0, 5]    row 3: 1 off-diag ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ mRow=1 (singleton candidate)
+    // [2, 1, 1]    row 1: 2 off-diag → mRow=2
+    // [1, 5, 0]    row 2: 1 off-diag → mRow=1 (singleton candidate)
+    // [1, 0, 5]    row 3: 1 off-diag → mRow=1 (singleton candidate)
     //
     // Singletons (rows 2,3) should be preferred over row 1 for first pivot.
     const solver = new SparseSolver();
@@ -1782,7 +1782,7 @@ describe("SparseSolver SMPpreOrder", () => {
     // ngspice SwapCols (sputils.c:283-301) does NOT touch any Element->Col
     // field; only spcLinkRows (spbuild.c:923) refreshes pElement->Col on the
     // first factor. Preorder swap must leave _elCol values untouched.
-    // 1-based 3x3 MNA: zero diagonal at (3,3) ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ preorder swaps cols 1 and 3.
+    // 1-based 3x3 MNA: zero diagonal at (3,3) → preorder swaps cols 1 and 3.
     const solver = new SparseSolver();
     solver._initStructure();
     solver.stampElement(solver.allocElement(1, 1), 1);
@@ -1864,26 +1864,26 @@ describe("SparseSolver no-AMD Markowitz ordering", () => {
   });
 
   it("solve_without_amd_voltage_source_branch", () => {
-    // Circuit with voltage source branch equations (off-diagonal Ãƒâ€šÃ‚±1 entries).
+    // Circuit with voltage source branch equations (off-diagonal ±1 entries).
     // This is the classic MNA stamp for V1=5V between node 1 (ground ref) and node 0:
     //   Node 0: G*v0 + Ivs = 0      => row 0
     //   KVL: v0 - V1 = 0             => row 1 (branch eq)
-    // Concretely: 3-node MNA with a 1ÃƒÅ½Ã‚© resistor from node 0 to node 2, and V=5V source.
+    // Concretely: 3-node MNA with a 1Ω resistor from node 0 to node 2, and V=5V source.
     // Nodes: 0=top of resistor, 1=bottom of resistor (gnd ref), 2=branch current
     // Stamp: R from node 0 to gnd:  A[0][0]+=1, A[0][0] already has conductance
     // Simpler: use the standard voltage-divider MNA from test-helpers
     //
     // Manual MNA (2 nodes + 1 branch):
     //   n=3, node0=v_top, node1=v_bot (gnd=0V effectively via source), node2=I_branch
-    //   Resistor 1ÃƒÅ½Ã‚© node0ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢gnd: A[0][0]+=1
-    //   Voltage source V=5 node0ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢gnd via branch: A[0][2]+=1, A[2][0]+=1, A[2][2]=0, rhs[2]=5
+    //   Resistor 1Ω node0→gnd: A[0][0]+=1
+    //   Voltage source V=5 node0→gnd via branch: A[0][2]+=1, A[2][0]+=1, A[2][2]=0, rhs[2]=5
     //   Ground: set row/col 1 to identity (or just 2-node system)
     //
     // Use the simpler 2-node + 1-branch MNA:
     //   node 0 (top), node 1 (branch current Ivs)
     //   Conductance G=1 at node 0: A[0][0]=1
     //   VS stamp: A[0][1]=1 (KCL), A[1][0]=1 (KVL), rhs[1]=5
-    //   Solution: v0=5, Ivs=-5 (current flows out of + terminal into node 0 ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ Ivs=+5
+    //   Solution: v0=5, Ivs=-5 (current flows out of + terminal into node 0 → Ivs=+5
     //   but since Ivs enters KCL with +sign and current convention: Ivs=-5)
     //   From KCL: G*v0 + Ivs = 0 => 1*5 + Ivs = 0 => Ivs = -5
     //   From KVL: v0 = 5 => v0 = 5

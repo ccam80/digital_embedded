@@ -29,7 +29,7 @@
  * after linearizing around the current operating point. Combined with the
  * Jacobian entries, the branch equation becomes:
  *   V_out+ - V_out- - f'(Vctrl0)*V_ctrl = f(Vctrl0) - f'(Vctrl0)*Vctrl0
- * which at convergence (V_ctrl = Vctrl0) gives V_out = f(Vctrl0). âˆŽ
+ * which at convergence (V_ctrl = Vctrl0) gives V_out = f(Vctrl0). ∎
  */
 
 import { AbstractCircuitElement } from "../../core/element.js";
@@ -239,8 +239,8 @@ export class VCVSAnalogElement extends ControlledSourceElement {
    * Branch equation: V_out+ - V_out- - f'(Vctrl)*V_ctrl = f(Vctrl0) - f'*Vctrl0
    *
    * C sub-matrix Jacobian entries (control node columns in branch row k):
-   *   C[k, nCtrlP] -= f'     âˆ‚(branch_eq)/âˆ‚V_ctrlP = -f'
-   *   C[k, nCtrlN] += f'     âˆ‚(branch_eq)/âˆ‚V_ctrlN = +f'
+   *   C[k, nCtrlP] -= f'     ∂(branch_eq)/∂V_ctrlP = -f'
+   *   C[k, nCtrlN] += f'     ∂(branch_eq)/∂V_ctrlN = +f'
    *
    * RHS[k] = f(Vctrl0) - f'(Vctrl0) * Vctrl0
    */
@@ -264,7 +264,7 @@ export class VCVSAnalogElement extends ControlledSourceElement {
    * The control port is an ideal voltage sensor (infinite impedance), so it
    * draws zero current. The output port current is the branch variable.
    * Positive = current flowing INTO the pin.
-   * KCL: 0 + 0 + I_out - I_out = 0. âˆŽ
+   * KCL: 0 + 0 + I_out - I_out = 0. ∎
    */
   getPinCurrents(rhs: Float64Array): number[] {
     const iOut = rhs[this.branchIndex];
@@ -331,9 +331,9 @@ export class VCVSElement extends AbstractCircuitElement {
     ctx.setColor("TEXT");
     ctx.setFont({ family: "sans-serif", size: 0.6 });
     ctx.drawText("ctrl+", 1.2, 0, { horizontal: "left", vertical: "middle" });
-    ctx.drawText("ctrlâˆ’", 1.2, 2, { horizontal: "left", vertical: "middle" });
+    ctx.drawText("ctrl−", 1.2, 2, { horizontal: "left", vertical: "middle" });
     ctx.drawText("out+",  4.8, 0, { horizontal: "right", vertical: "middle" });
-    ctx.drawText("outâˆ’",  4.8, 2, { horizontal: "right", vertical: "middle" });
+    ctx.drawText("out−",  4.8, 2, { horizontal: "right", vertical: "middle" });
 
     ctx.restore();
   }

@@ -1,7 +1,7 @@
 ﻿/**
  * FGPFET- P-channel floating-gate MOSFET.
  *
- * Behaves like PFET (G=0 â†’ conducting) except when the floating gate is
+ * Behaves like PFET (G=0 → conducting) except when the floating gate is
  * "programmed" (blown=true). A programmed FGPFET is permanently non-conducting
  * regardless of gate input.
  *
@@ -195,7 +195,7 @@ export class FGPFETElement extends AbstractCircuitElement {
 // ---------------------------------------------------------------------------
 // executeFGPFET- flat simulation function
 //
-// G=0 and not blown â†’ closed=1; else closed=0
+// G=0 and not blown → closed=1; else closed=0
 // State layout: [closedFlag=0, blownFlag=1]
 // ---------------------------------------------------------------------------
 

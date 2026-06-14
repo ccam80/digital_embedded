@@ -130,29 +130,29 @@ export class BusSplitterElement extends AbstractCircuitElement {
     ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
 
-    // Left side: D pin lead (0,0)â†’(0.5,0) and OE pin lead (0,1)â†’(0.5,1)
+    // Left side: D pin lead (0,0)→(0.5,0) and OE pin lead (0,1)→(0.5,1)
     ctx.drawLine(0, 0, 0.5, 0);
     ctx.drawLine(0, 1, 0.5, 1);
 
-    // Text labels for D and OE on the left (RIGHTBOTTOM anchor â†’ right,bottom)
+    // Text labels for D and OE on the left (RIGHTBOTTOM anchor → right,bottom)
     ctx.setFont(labelFont);
     ctx.setColor("TEXT");
     drawTextUpright(ctx, "D",  -0.1, -0.15, { horizontal: "right", vertical: "bottom" }, flip);
     drawTextUpright(ctx, "OE", -0.1,  0.85, { horizontal: "right", vertical: "bottom" }, flip);
 
-    // Right side: lead lines from (1,y)â†’(0.5,y) and labels for each bit
+    // Right side: lead lines from (1,y)→(0.5,y) and labels for each bit
     ctx.setColor("COMPONENT");
     for (let i = 0; i < bits; i++) {
       const y = i * spreading;
       ctx.drawLine(1, y, 0.5, y);
       ctx.setFont(labelFont);
       ctx.setColor("TEXT");
-      // LEFTBOTTOM anchor â†’ left,bottom; label offset mirrors Java: x=1.1, y=bitY-0.15
+      // LEFTBOTTOM anchor → left,bottom; label offset mirrors Java: x=1.1, y=bitY-0.15
       drawTextUpright(ctx, `D${i}`, 1.1, y - 0.15, { horizontal: "left", vertical: "bottom" }, flip);
       ctx.setColor("COMPONENT");
     }
 
-    // Filled vertical bar: (0.4,-0.1)â†’(0.6,-0.1)â†’(0.6,barBottom)â†’(0.4,barBottom), FILLED
+    // Filled vertical bar: (0.4,-0.1)→(0.6,-0.1)→(0.6,barBottom)→(0.4,barBottom), FILLED
     // Use drawPolygon with explicit coords to avoid drawRect float error
     // (0.4+0.2 != 0.6 and -0.1+barHeight != barBottom in IEEE 754).
     const barBottom = Math.max(1, lastBitY) + 0.1;

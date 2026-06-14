@@ -12,8 +12,7 @@ import type { Diagnostic } from "../../compile/types.js";
 import type { Wire } from "../../core/circuit.js";
 import type { CircuitElement } from "../../core/element.js";
 import type { AnalogElement } from "./element.js";
-import type { BridgeOutputDriverElement } from "./behavioral-drivers/bridge-output-driver.js";
-import type { BridgeInputDriverElement } from "./behavioral-drivers/bridge-input-driver.js";
+import type { BridgePinAdapterHandle } from "./compiler.js";
 import type { ResolvedPin } from "../../core/pin.js";
 import { StatePool } from "./state-pool.js";
 import type { DeviceFamily } from "./ngspice-load-order.js";
@@ -102,15 +101,10 @@ export class ConcreteCompiledAnalogCircuit implements CompiledAnalogCircuit {
    *  for zero-wire groups where components connect via pin overlap). */
   readonly groupToNodeId: Map<number, number>;
 
-  /** Maps element index → bridge adapters owned by that element. Used by the
-   *  coordinator to route composite pin-param keys (e.g. "A.rOut") to the
-   *  correct bridge adapter at runtime without re-scanning all elements. */
-  readonly elementBridgeAdapters: Map<number, Array<BridgeOutputDriverElement | BridgeInputDriverElement>>;
-
-  /** Maps boundary group ID → bridge adapters for that cross-domain boundary.
-   *  Populated by compileAnalogPartition after the main element loop.
-   *  The coordinator looks up adapters by boundaryGroupId to drive/read each boundary. */
-  readonly bridgeAdaptersByGroupId: Map<number, Array<BridgeOutputDriverElement | BridgeInputDriverElement>>;
+  /** Maps crossing-pin pinKey ("instanceId:pinLabel") → per-pin boundary
+   *  adapter handle. The coordinator drives output adapters (ctrl/en) and
+   *  reads input adapters' result-node voltage. One entry per crossing pin. */
+  readonly bridgeAdaptersByPinKey: Map<string, BridgePinAdapterHandle>;
 
   /** Diagnostics emitted during compilation (topology issues, missing models, etc.). */
   readonly diagnostics: Diagnostic[];
@@ -155,8 +149,7 @@ export class ConcreteCompiledAnalogCircuit implements CompiledAnalogCircuit {
     elementPinVertices?: Map<number, Array<{ x: number; y: number } | null>>;
     elementResolvedPins?: Map<number, ResolvedPin[]>;
     groupToNodeId?: Map<number, number>;
-    elementBridgeAdapters?: Map<number, Array<BridgeOutputDriverElement | BridgeInputDriverElement>>;
-    bridgeAdaptersByGroupId?: Map<number, Array<BridgeOutputDriverElement | BridgeInputDriverElement>>;
+    bridgeAdaptersByPinKey?: Map<string, BridgePinAdapterHandle>;
     diagnostics?: Diagnostic[];
     timeRef?: { value: number };
     statePool: StatePool | null;
@@ -175,8 +168,7 @@ export class ConcreteCompiledAnalogCircuit implements CompiledAnalogCircuit {
     this.elementPinVertices = params.elementPinVertices ?? new Map();
     this.elementResolvedPins = params.elementResolvedPins ?? new Map();
     this.groupToNodeId = params.groupToNodeId ?? new Map();
-    this.elementBridgeAdapters = params.elementBridgeAdapters ?? new Map();
-    this.bridgeAdaptersByGroupId = params.bridgeAdaptersByGroupId ?? new Map();
+    this.bridgeAdaptersByPinKey = params.bridgeAdaptersByPinKey ?? new Map();
     this.diagnostics = params.diagnostics ?? [];
     this.timeRef = params.timeRef ?? { value: 0 };
     this.statePool = params.statePool;

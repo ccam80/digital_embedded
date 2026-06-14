@@ -45,9 +45,9 @@ import {
 // ---------------------------------------------------------------------------
 // Layout constants
 // Java Keyboard uses GenericShape: 2 inputs (C, en), 2 outputs (D, av), width=3
-// Non-symmetric (2 outputs) â†’ offs=0
+// Non-symmetric (2 outputs) → offs=0
 // Input C@(0,0), en@(0,1); Output D@(3,0), av@(3,1)
-// â†’ COMP_WIDTH=3, COMP_HEIGHT=2
+// → COMP_WIDTH=3, COMP_HEIGHT=2
 // ---------------------------------------------------------------------------
 
 const COMP_WIDTH = 3;

@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "lastScanned": 1780966098055,
+  "lastScanned": 1781396449024,
   "projectRoot": "C:\\local_working_projects\\digital_in_browser",
   "techStack": {
     "languages": [
@@ -42,8 +42,8 @@
     "runtime": null
   },
   "build": {
-    "buildCommand": "cd C:/local_working_projects/digital_in_browser && npx tsc --noEmit 2>&1 | node -e \"const l=require('fs').readFileSync(0,'utf8').split('\\n').filter(x=>/error TS/.test(x)); console.log('tsc errors:',l.length); l.forEach(x=>console.log(x));\"",
-    "testCommand": "cd C:/local_working_projects/digital_in_browser && echo \"=== UNTRACKED (??) ===\" && git ls-files --others --exclude-standard | cat && echo \"=== .gitignore has ref/ngspice? ===\" && (git check-ignore ref/ngspice output vitest-relo.txt .claude/scheduled_tasks.lock 2>&1 | cat || echo \"none ignored\")",
+    "buildCommand": "npx tsc --noEmit 2>&1 | node -e \"const l=require('fs').readFileSync(0,'utf8').split('\\n').filter(x=>/error TS/.test(x)); const mine=l.filter(x=>/capture\\.ts|ucrt-libm-shim\\.ts|expression\\.ts/.test(x)); console.log('total TS errors:',l.length,' in my files:',mine.length); mine.forEach(x=>console.log('  '+x));\"",
+    "testCommand": "cd C:/local_working_projects/digital_in_browser\nrm -rf output/ scratch/ vitest-relo.txt vitest-relo2.txt\necho \"deleted: output/ scratch/ vitest-relo*.txt\"\necho \"=== recent commit trailer convention ===\"\ngit log -1 --format='%b' 69acb5df | tail -3\necho \"=== diffstat summary ===\"\ngit diff --stat | tail -1\necho \"=== representative component ripple (gates/and.ts) ===\"\ngit diff src/components/gates/and.ts | head -40",
     "lintCommand": "npm run lint",
     "devCommand": "npm run dev",
     "scripts": {
@@ -87,14 +87,14 @@
       "path": "app",
       "purpose": "Application code",
       "fileCount": 0,
-      "lastAccessed": 1780966098023,
+      "lastAccessed": 1781396448989,
       "keyFiles": []
     },
     "circuits": {
       "path": "circuits",
       "purpose": null,
       "fileCount": 6,
-      "lastAccessed": 1780966098023,
+      "lastAccessed": 1781396448989,
       "keyFiles": [
         "and-gate.dig",
         "half-adder.dig",
@@ -107,7 +107,7 @@
       "path": "dist",
       "purpose": "Distribution/build output",
       "fileCount": 1,
-      "lastAccessed": 1780966098024,
+      "lastAccessed": 1781396448989,
       "keyFiles": [
         "index.html"
       ]
@@ -116,21 +116,21 @@
       "path": "docs",
       "purpose": "Documentation",
       "fileCount": 0,
-      "lastAccessed": 1780966098039,
+      "lastAccessed": 1781396449006,
       "keyFiles": []
     },
     "e2e": {
       "path": "e2e",
       "purpose": null,
       "fileCount": 0,
-      "lastAccessed": 1780966098040,
+      "lastAccessed": 1781396449007,
       "keyFiles": []
     },
     "fixtures": {
       "path": "fixtures",
       "purpose": "Test fixtures",
       "fileCount": 19,
-      "lastAccessed": 1780966098040,
+      "lastAccessed": 1781396449007,
       "keyFiles": [
         "ac_rlc.dts",
         "analog-rc-workflow.dig",
@@ -143,37 +143,41 @@
       "path": "lib",
       "purpose": "Library code",
       "fileCount": 0,
-      "lastAccessed": 1780966098040,
+      "lastAccessed": 1781396449007,
       "keyFiles": []
     },
     "modules": {
       "path": "modules",
       "purpose": null,
       "fileCount": 0,
-      "lastAccessed": 1780966098040,
+      "lastAccessed": 1781396449007,
       "keyFiles": []
     },
     "output": {
       "path": "output",
       "purpose": null,
-      "fileCount": 1,
-      "lastAccessed": 1780966098040,
+      "fileCount": 17,
+      "lastAccessed": 1781396449008,
       "keyFiles": [
-        "and-bv-pilot.dts"
+        "and-bv-pilot.dts",
+        "baseline-fail-keys.json",
+        "baseline-vitest.txt",
+        "decoder-bv-pilot.dts",
+        "demux-bv-pilot.dts"
       ]
     },
     "ref": {
       "path": "ref",
       "purpose": null,
       "fileCount": 0,
-      "lastAccessed": 1780966098041,
+      "lastAccessed": 1781396449008,
       "keyFiles": []
     },
     "rename-maps": {
       "path": "rename-maps",
       "purpose": null,
       "fileCount": 8,
-      "lastAccessed": 1780966098041,
+      "lastAccessed": 1781396449008,
       "keyFiles": [
         "cccs.md",
         "ccvs.md",
@@ -185,21 +189,21 @@
     "scratch": {
       "path": "scratch",
       "purpose": null,
-      "fileCount": 5,
-      "lastAccessed": 1780966098041,
+      "fileCount": 8,
+      "lastAccessed": 1781396449008,
       "keyFiles": [
         "analysis-engine.diff",
         "baseline-failures.json",
         "cktop.diff",
-        "task-0.1.1-apply.mjs",
-        "task-0.1.2-apply.mjs"
+        "registry-dump.json",
+        "task-0.1.1-apply.mjs"
       ]
     },
     "scripts": {
       "path": "scripts",
       "purpose": "Build/utility scripts",
-      "fileCount": 14,
-      "lastAccessed": 1780966098041,
+      "fileCount": 15,
+      "lastAccessed": 1781396449009,
       "keyFiles": [
         "categorize-failures.mjs",
         "circuit-mcp-server.ts",
@@ -211,21 +215,21 @@
     "spec": {
       "path": "spec",
       "purpose": "Test specifications",
-      "fileCount": 6,
-      "lastAccessed": 1780966098042,
+      "fileCount": 9,
+      "lastAccessed": 1781396449010,
       "keyFiles": [
         "dig-format-excision.md",
+        "digital-analog-boundary-perpin-impl.md",
+        "real-opamp-boyle-composite.md",
         "spice-import-pipeline-gaps.md",
-        "spice-import-pipeline-plan.md",
-        "test-baseline.md",
-        "timed-simulation.md"
+        "spice-import-pipeline-plan.md"
       ]
     },
     "src": {
       "path": "src",
       "purpose": "Source code",
       "fileCount": 1,
-      "lastAccessed": 1780966098042,
+      "lastAccessed": 1781396449010,
       "keyFiles": [
         "main.ts"
       ]
@@ -233,9 +237,10 @@
     "test-results": {
       "path": "test-results",
       "purpose": null,
-      "fileCount": 2,
-      "lastAccessed": 1780966098043,
+      "fileCount": 3,
+      "lastAccessed": 1781396449010,
       "keyFiles": [
+        "playwright-failures.json",
         "test-failures.json"
       ]
     },
@@ -243,7 +248,7 @@
       "path": "tutorials",
       "purpose": null,
       "fileCount": 1,
-      "lastAccessed": 1780966098043,
+      "lastAccessed": 1781396449011,
       "keyFiles": [
         "index.json"
       ]
@@ -252,21 +257,21 @@
       "path": "vendor",
       "purpose": "Third-party code",
       "fileCount": 0,
-      "lastAccessed": 1780966098043,
+      "lastAccessed": 1781396449011,
       "keyFiles": []
     },
     "dist\\app": {
       "path": "dist\\app",
       "purpose": "Application code",
       "fileCount": 0,
-      "lastAccessed": 1780966098044,
+      "lastAccessed": 1781396449011,
       "keyFiles": []
     },
     "dist\\assets": {
       "path": "dist\\assets",
       "purpose": "Static assets",
       "fileCount": 5,
-      "lastAccessed": 1780966098044,
+      "lastAccessed": 1781396449012,
       "keyFiles": [
         "main-BzvxYKS9.js",
         "memory-editor-DEA45Iu0.js",
@@ -277,7 +282,7 @@
       "path": "e2e\\fixtures",
       "purpose": "Test fixtures",
       "fileCount": 8,
-      "lastAccessed": 1780966098045,
+      "lastAccessed": 1781396449012,
       "keyFiles": [
         "harness.html",
         "master1-digital.dts",
@@ -288,7 +293,7 @@
       "path": "src\\app",
       "purpose": "Application code",
       "fileCount": 25,
-      "lastAccessed": 1780966098046,
+      "lastAccessed": 1781396449014,
       "keyFiles": [
         "analysis-dialogs.ts",
         "app-context.ts",
@@ -299,7 +304,7 @@
       "path": "src\\components",
       "purpose": "UI components",
       "fileCount": 4,
-      "lastAccessed": 1780966098046,
+      "lastAccessed": 1781396449014,
       "keyFiles": [
         "draw-helpers.ts",
         "generic-shape.ts",
@@ -310,7 +315,7 @@
       "path": "src\\fixtures",
       "purpose": "Test fixtures",
       "fileCount": 0,
-      "lastAccessed": 1780966098046,
+      "lastAccessed": 1781396449014,
       "keyFiles": []
     }
   },
@@ -323,14 +328,32 @@
     },
     {
       "path": "src\\core\\registry.ts",
-      "accessCount": 172,
-      "lastAccessed": 1780980507021,
+      "accessCount": 178,
+      "lastAccessed": 1781097470194,
       "type": "file"
     },
     {
       "path": "src\\compile\\extract-connectivity.ts",
-      "accessCount": 59,
-      "lastAccessed": 1781000155625,
+      "accessCount": 61,
+      "lastAccessed": 1781092067409,
+      "type": "file"
+    },
+    {
+      "path": "src\\compile\\compile.ts",
+      "accessCount": 56,
+      "lastAccessed": 1781126056548,
+      "type": "file"
+    },
+    {
+      "path": "src\\solver\\digital\\digital-engine.ts",
+      "accessCount": 53,
+      "lastAccessed": 1781130077268,
+      "type": "file"
+    },
+    {
+      "path": "src\\compile\\partition.ts",
+      "accessCount": 49,
+      "lastAccessed": 1781097295616,
       "type": "file"
     },
     {
@@ -340,39 +363,21 @@
       "type": "file"
     },
     {
+      "path": "src\\solver\\digital\\compiler.ts",
+      "accessCount": 42,
+      "lastAccessed": 1781129514121,
+      "type": "file"
+    },
+    {
       "path": "src\\headless\\auto-layout.ts",
       "accessCount": 41,
       "lastAccessed": 1778641590542,
       "type": "file"
     },
     {
-      "path": "src\\solver\\digital\\digital-engine.ts",
-      "accessCount": 41,
-      "lastAccessed": 1780838872074,
-      "type": "file"
-    },
-    {
-      "path": "src\\compile\\compile.ts",
-      "accessCount": 40,
-      "lastAccessed": 1780834296954,
-      "type": "file"
-    },
-    {
-      "path": "src\\solver\\digital\\compiler.ts",
-      "accessCount": 38,
-      "lastAccessed": 1780837620020,
-      "type": "file"
-    },
-    {
       "path": "src\\editor\\__tests__\\wire-current-resolver.test.ts",
       "accessCount": 36,
       "lastAccessed": 1780894853798,
-      "type": "file"
-    },
-    {
-      "path": "src\\compile\\partition.ts",
-      "accessCount": 34,
-      "lastAccessed": 1779003278678,
       "type": "file"
     },
     {
@@ -389,8 +394,8 @@
     },
     {
       "path": "src/components/semiconductors/diode.ts",
-      "accessCount": 21,
-      "lastAccessed": 1780896577622,
+      "accessCount": 22,
+      "lastAccessed": 1781043604254,
       "type": "directory"
     },
     {
@@ -406,6 +411,12 @@
       "type": "file"
     },
     {
+      "path": "src\\compile\\__tests__\\partition.test.ts",
+      "accessCount": 19,
+      "lastAccessed": 1781098794041,
+      "type": "file"
+    },
+    {
       "path": "src\\components\\memory\\__tests__\\register.test.ts",
       "accessCount": 17,
       "lastAccessed": 1780837510392,
@@ -413,8 +424,14 @@
     },
     {
       "path": "src\\core\\circuit.ts",
-      "accessCount": 15,
-      "lastAccessed": 1780893607918,
+      "accessCount": 16,
+      "lastAccessed": 1781130502563,
+      "type": "file"
+    },
+    {
+      "path": "src\\core\\pin.ts",
+      "accessCount": 13,
+      "lastAccessed": 1781097505191,
       "type": "file"
     },
     {
@@ -442,10 +459,10 @@
       "type": "directory"
     },
     {
-      "path": "src\\core\\pin.ts",
+      "path": "src/solver/digital/digital-engine.ts",
       "accessCount": 10,
-      "lastAccessed": 1780893573513,
-      "type": "file"
+      "lastAccessed": 1781131135000,
+      "type": "directory"
     },
     {
       "path": "src/solver/digital/compiler.ts",
@@ -457,6 +474,18 @@
       "path": "src\\components\\wiring\\__tests__\\wiring.test.ts",
       "accessCount": 8,
       "lastAccessed": 1778582497526,
+      "type": "file"
+    },
+    {
+      "path": "src\\editor\\wire-current-resolver.ts",
+      "accessCount": 8,
+      "lastAccessed": 1781058758391,
+      "type": "file"
+    },
+    {
+      "path": "src\\headless\\__tests__\\digital-pin-loading-mcp.test.ts",
+      "accessCount": 8,
+      "lastAccessed": 1781099974119,
       "type": "file"
     },
     {
@@ -472,24 +501,6 @@
       "type": "file"
     },
     {
-      "path": "src\\editor\\wire-current-resolver.ts",
-      "accessCount": 7,
-      "lastAccessed": 1780893909617,
-      "type": "file"
-    },
-    {
-      "path": "src\\compile\\__tests__\\partition.test.ts",
-      "accessCount": 6,
-      "lastAccessed": 1778217653550,
-      "type": "file"
-    },
-    {
-      "path": "src/solver/digital/digital-engine.ts",
-      "accessCount": 6,
-      "lastAccessed": 1780829858395,
-      "type": "directory"
-    },
-    {
       "path": "src/headless/__tests__/default-facade.test.ts",
       "accessCount": 5,
       "lastAccessed": 1780997428971,
@@ -499,12 +510,6 @@
       "path": "src\\headless\\netlist.ts",
       "accessCount": 4,
       "lastAccessed": 1778323801969,
-      "type": "file"
-    },
-    {
-      "path": "src\\headless\\__tests__\\digital-pin-loading-mcp.test.ts",
-      "accessCount": 4,
-      "lastAccessed": 1778800153409,
       "type": "file"
     },
     {

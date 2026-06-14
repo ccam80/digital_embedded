@@ -233,7 +233,7 @@ export const XOrDefinition: StandaloneComponentDefinition = {
   category: ComponentCategory.LOGIC,
   helpText:
     "XOr gate- performs bitwise XOR of all inputs.\n" +
-    "Configurable input count (2â€“5) and bit width (1â€“32).\n" +
+    "Configurable input count (2–5) and bit width (1–32).\n" +
     "Both IEEE/US (curved with extra line) and IEC/DIN (rectangular with =1) shapes are supported.\n" +
     "Individual inputs can be inverted via the inverterConfig property.",
   modelRegistry: {

@@ -80,7 +80,7 @@ export class AsyncSeqElement extends AbstractCircuitElement {
 
     ctx.save();
 
-    // Filled rectangle: (0.5,0.5) â†’ (4.5,2.5)- 4x2 box
+    // Filled rectangle: (0.5,0.5) → (4.5,2.5)- 4x2 box
     ctx.setColor("COMPONENT_FILL");
     ctx.drawPolygon(
       [

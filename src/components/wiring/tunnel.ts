@@ -30,10 +30,10 @@ import {
 // Layout constants- matching Digital's TunnelShape
 // ---------------------------------------------------------------------------
 
-/** Triangle half-height in grid units (Digital: SIZE2 - 2 = 8px â‰ˆ 0.4 grid). */
+/** Triangle half-height in grid units (Digital: SIZE2 - 2 = 8px ≈ 0.4 grid). */
 const ARROW_HALF_H = 0.4;
 
-/** Triangle width in grid units (Digital: HEIGHT * sqrt(3) â‰ˆ 0.7 grid). */
+/** Triangle width in grid units (Digital: HEIGHT * sqrt(3) ≈ 0.7 grid). */
 const ARROW_W = 0.7;
 
 

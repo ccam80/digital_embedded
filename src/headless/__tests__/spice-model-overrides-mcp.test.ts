@@ -46,11 +46,11 @@ function createElement(
 // Helper: build a minimal NPN common-emitter circuit
 //
 // Topology:
-//   Vcc(5V) pos â†’ Rc(10kΩ) A, Rc B â†’ Q1 C
-//   Vb(0.7V) pos â†’ Q1 B
-//   Q1 E â†’ Ground
-//   Vcc neg â†’ Ground
-//   Vb neg â†’ Ground
+//   Vcc(5V) pos → Rc(10kΩ) A, Rc B → Q1 C
+//   Vb(0.7V) pos → Q1 B
+//   Q1 E → Ground
+//   Vcc neg → Ground
+//   Vb neg → Ground
 //
 // Component labels: Q1 (NpnBJT), Rc (Resistor), Vcc (DcVoltageSource), Vb (DcVoltageSource)
 // ---------------------------------------------------------------------------
@@ -59,7 +59,7 @@ function buildBjtCircuit(): { circuit: Circuit; facade: DefaultSimulatorFacade }
   const facade = new DefaultSimulatorFacade(registry);
 
   // Layout chosen so no pin world-position coincides with an unintended wire
-  // endpoint.  Pin positions (local â†’ world):
+  // endpoint.  Pin positions (local → world):
   //   Gnd  at {0, 0}: out={0,0}
   //   Vcc  at {0, 4}: neg={0,4}, pos={4,4}
   //   Rc   at {4, 4}: A={4,4},   B={8,4}

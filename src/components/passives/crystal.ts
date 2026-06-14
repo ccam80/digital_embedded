@@ -8,8 +8,8 @@
  *   Shunt arm:             C_0               (directly across pos and neg)
  *
  * This produces two resonant frequencies:
- *   Series resonance:   f_s = 1 / (2Ï€ âˆš(L_s · C_s))
- *   Parallel resonance: f_p  f_s · âˆš(1 + C_s / C_0)   (slightly above f_s)
+ *   Series resonance:   f_s = 1 / (2π √(L_s · C_s))
+ *   Parallel resonance: f_p  f_s · √(1 + C_s / C_0)   (slightly above f_s)
  *
  * Subcircuit factoring (CRYSTAL_NETLIST):
  *   Sub-elements: rS, lS, cS, c0  four canonical primitives.
@@ -23,8 +23,8 @@
  *   comparison emits the exact same R+L+C+C primitives.
  *
  * Derived parameters (computed at netlist-build time from frequency, qualityFactor):
- *   L_s = 1 / (4Ï€² · f² · C_s)
- *   R_s = 2Ï€ · f · L_s / Q
+ *   L_s = 1 / (4π² · f² · C_s)
+ *   R_s = 2π · f · L_s / Q
  */
 
 import { AbstractCircuitElement } from "../../core/element.js";
@@ -51,7 +51,7 @@ import type { MnaSubcircuitNetlist } from "../../core/mna-subcircuit-netlist.js"
 
 /**
  * Compute motional inductance from series resonant frequency and motional capacitance.
- * L_s = 1 / (4Ï€² · f² · C_s)
+ * L_s = 1 / (4π² · f² · C_s)
  */
 export function crystalMotionalInductance(freqHz: number, Cs: number): number {
   return 1 / (4 * Math.PI * Math.PI * freqHz * freqHz * Cs);
@@ -59,7 +59,7 @@ export function crystalMotionalInductance(freqHz: number, Cs: number): number {
 
 /**
  * Compute series resistance from frequency, motional inductance, and quality factor.
- * R_s = 2Ï€ · f · L_s / Q
+ * R_s = 2π · f · L_s / Q
  */
 export function crystalSeriesResistance(freqHz: number, Ls: number, Q: number): number {
   return (2 * Math.PI * freqHz * Ls) / Q;

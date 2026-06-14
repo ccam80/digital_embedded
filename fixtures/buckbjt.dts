@@ -547,7 +547,8 @@
               "vOH": 3.3,
               "vOL": 0
             }
-          }
+          },
+          "model": "2N7000"
         },
         "rotation": 90,
         "type": "NMOS"

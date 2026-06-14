@@ -13,13 +13,13 @@
  *   acceptStep() predicts the time-to-blow from the current operating
  *   point (t_blow = (rating - accum) / i²) and registers it via addBreakpoint.
  *   The transient controller then lands the next step exactly on the predicted
- *   blow instant, so the rColdâ†’rBlown jump never happens mid-step. This avoids
+ *   blow instant, so the rCold→rBlown jump never happens mid-step. This avoids
  *   LTE rejection / dt collapse from a discontinuity inside an integration interval.
  *   Mirrors ngspice vsrcacct.c:24-310 (DEVaccept breakpoint-scheduling hook).
  *
  * Cross-engine state propagation:
  *   The factory captures the CircuitElement's PropertyBag and writes
- *   `_thermalRatio` (0â†’1) and `blown` (boolean) into it each timestep.
+ *   `_thermalRatio` (0→1) and `blown` (boolean) into it each timestep.
  *   The visual FuseElement.draw() reads these for heat glow and blown rendering.
  *   The digital executeFuse reads `blown` for the bus resolver closed flag.
  *
@@ -263,7 +263,7 @@ export class AnalogFuseElement extends PoolBackedAnalogElement {
     return !this._intact;
   }
 
-  /** Ratio of accumulated I²t energy to i2tRating (0â†’1). */
+  /** Ratio of accumulated I²t energy to i2tRating (0→1). */
   get thermalRatio(): number {
     if (this._stateBase === -1 || !this._pool) return 0;
     const accum = this._pool.states[1][this._stateBase + SLOT_I2T_ACCUM];

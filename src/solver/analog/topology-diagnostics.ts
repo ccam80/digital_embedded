@@ -206,7 +206,7 @@ function detectVoltageSourceLoops(
   const vSources = elements.filter((e) => e.isBranch && e.typeHint === "voltage");
   if (vSources.length < 2) return false;
 
-  // Build adjacency list: node â†’ set of reachable nodes through voltage sources
+  // Build adjacency list: node → set of reachable nodes through voltage sources
   const adj = new Map<number, Set<number>>();
   for (const vs of vSources) {
     const [a, b] = vs.branchNodeIds ?? vs.nodeIds;

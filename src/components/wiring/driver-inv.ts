@@ -100,7 +100,7 @@ export class DriverInvSelElement extends AbstractCircuitElement {
 
   getBoundingBox(): Rect {
     // Triangle: x:[-0.95,0.95], y:[-0.6,0.6]
-    // Circle at (0,-0.7) r=0.3 â†’ y:[-1.0,-0.4] (extends below triangle)
+    // Circle at (0,-0.7) r=0.3 → y:[-1.0,-0.4] (extends below triangle)
     return {
       x: this.position.x - 0.95,
       y: this.position.y - 1.0,

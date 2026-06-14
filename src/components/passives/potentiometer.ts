@@ -3,8 +3,8 @@
  *
  * A three-terminal linear element modelled as two series resistors sharing a
  * common wiper node. The wiper position (0.0-1.0) determines the resistance split:
- *   R_top = R Ã— position
- *   R_bottom = R Ã— (1 - position)
+ *   R_top = R × position
+ *   R_bottom = R × (1 - position)
  *
  * Both resistances are clamped to a minimum to prevent division by zero.
  */

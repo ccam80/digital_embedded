@@ -46,8 +46,8 @@ import {
 // ---------------------------------------------------------------------------
 // Layout constants
 // Java VGA uses GenericShape: 6 inputs (R,G,B,H,V,C), 0 outputs, width=3
-// Non-symmetric â†’ offs=0. R@(0,0), G@(0,1), B@(0,2), H@(0,3), V@(0,4), C@(0,5)
-// â†’ COMP_WIDTH=3, COMP_HEIGHT=6
+// Non-symmetric → offs=0. R@(0,0), G@(0,1), B@(0,2), H@(0,3), V@(0,4), C@(0,5)
+// → COMP_WIDTH=3, COMP_HEIGHT=6
 // ---------------------------------------------------------------------------
 
 const COMP_WIDTH = 3;
@@ -307,7 +307,7 @@ export function executeVga(
 }
 
 // ---------------------------------------------------------------------------
-// VGA_ATTRIBUTE_MAPPINGS- .dig XML attribute â†’ PropertyBag conversions
+// VGA_ATTRIBUTE_MAPPINGS- .dig XML attribute → PropertyBag conversions
 // ---------------------------------------------------------------------------
 
 export const VGA_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [

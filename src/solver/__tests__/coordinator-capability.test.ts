@@ -204,7 +204,7 @@ function makeAnalogEl(
  * from element+wire topology so that transient simulation (time-advancing
  * MNA steps) can be verified.
  *
- * Topology: Vcc(5V)  R(1kÎ)  C(1µF)  GND, Vccâˆ’  GND
+ * Topology: Vcc(5V)  R(1kΩ)  C(1µF)  GND, Vcc−  GND
  * Node 1: Vcc+ / R.A   Node 2: R.B / C.pos   Node 0: GND
  */
 function buildRcCoordinator() {

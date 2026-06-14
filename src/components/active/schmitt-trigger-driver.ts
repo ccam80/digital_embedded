@@ -1,5 +1,5 @@
 ﻿/**
- * SchmittTriggerDriver â€” internal-only hybrid pin+stamp+state driver leaf for
+ * SchmittTriggerDriver — internal-only hybrid pin+stamp+state driver leaf for
  * the Schmitt Trigger composite (both inverting and non-inverting variants).
  *
  * Emitted by `SchmittInvertingDefinition` and
@@ -20,17 +20,17 @@
  *        Output goes HIGH when input rises above vTH.
  *        Output goes LOW  when input falls below vTL.
  *        Between thresholds, output holds previous state.
- *   2. Inverting flag: when inverting=1, the latch sense is flipped â€”
- *        input BELOW vTL  â†’ latch HIGH (output vOH).
- *        input ABOVE vTH  â†’ latch LOW  (output vOL).
+ *   2. Inverting flag: when inverting=1, the latch sense is flipped —
+ *        input BELOW vTL  → latch HIGH (output vOH).
+ *        input ABOVE vTH  → latch LOW  (output vOL).
  *        Non-inverting (inverting=0) uses the direct sense.
  *   3. Stamp model: two-node Norton source between `out` and `gnd`.
- *        G_drive = 1 / R_NORTON (stiff conductance, not rOut â€” rOut is handled
+ *        G_drive = 1 / R_NORTON (stiff conductance, not rOut — rOut is handled
  *        by the parent's separate Resistor sub-element). Stamps conductance on
  *        (out,out) (out,gnd) (gnd,out) (gnd,gnd) plus RHS current injection.
  *        Target voltage vTarget = latch ? vOH : vOL.
  *        I_Norton = G_drive * vTarget (equivalent Norton current at out node).
- *   4. `rOut` from the parent's param set is NOT a driver param â€” it is wired
+ *   4. `rOut` from the parent's param set is NOT a driver param — it is wired
  *        to the Resistor sub-element in the netlist. The driver's internal
  *        Norton conductance uses a fixed stiff value (R_NORTON = 1e-3 Ω).
  *   5. Bottom-of-load history write: OUTPUT_LATCH written to s0 exactly once.
@@ -46,7 +46,7 @@ import { PropertyBag } from "../../core/properties.js";
 import type { ComponentDefinition, ParamDef } from "../../core/registry.js";
 
 // ---------------------------------------------------------------------------
-// State schema â€” owned by this driver.
+// State schema — owned by this driver.
 // ---------------------------------------------------------------------------
 
 export const SCHMITT_TRIGGER_SCHEMA = defineStateSchema("SchmittTriggerDriverElement", [
@@ -57,13 +57,13 @@ export const SCHMITT_TRIGGER_SCHEMA = defineStateSchema("SchmittTriggerDriverEle
 ]);
 
 // ---------------------------------------------------------------------------
-// Slot constant â€” resolved from the driver-owned schema.
+// Slot constant — resolved from the driver-owned schema.
 // ---------------------------------------------------------------------------
 
 const SLOT_OUTPUT_LATCH = SCHMITT_TRIGGER_SCHEMA.indexOf.get("OUTPUT_LATCH")!;
 
 // ---------------------------------------------------------------------------
-// Pin layout â€” mirrors the parent netlist connectivity row [0, 3, 2]:
+// Pin layout — mirrors the parent netlist connectivity row [0, 3, 2]:
 //   pin 0 = in   (input voltage, read-only)
 //   pin 1 = out  (nDrive node, Norton-stamped)
 //   pin 2 = gnd  (reference node for Norton source)
@@ -76,7 +76,7 @@ const SCHMITT_TRIGGER_DRIVER_PIN_LAYOUT: PinDeclaration[] = [
 ];
 
 // ---------------------------------------------------------------------------
-// Param defs â€” internal-only mirror of the parent's netlist param surface.
+// Param defs — internal-only mirror of the parent's netlist param surface.
 // ---------------------------------------------------------------------------
 
 const SCHMITT_TRIGGER_DRIVER_PARAM_DEFS: ParamDef[] = [
@@ -146,7 +146,7 @@ export class SchmittTriggerDriverElement extends PoolBackedAnalogElement {
   }
 
   /**
-   * load() â€” hybrid Template D shape.
+   * load() — hybrid Template D shape.
    *
    * Reads input voltage from rhsOld, applies hysteresis using s1[OUTPUT_LATCH]
    * as the prior committed level, then stamps a stiff Norton source on (out,gnd)

@@ -101,7 +101,7 @@ export function executeRectangle(
 }
 
 // ---------------------------------------------------------------------------
-// RECTANGLE_ATTRIBUTE_MAPPINGS- .dig XML attribute â†’ PropertyBag conversions
+// RECTANGLE_ATTRIBUTE_MAPPINGS- .dig XML attribute → PropertyBag conversions
 // ---------------------------------------------------------------------------
 
 export const RECTANGLE_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [

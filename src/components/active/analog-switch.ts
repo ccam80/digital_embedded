@@ -69,8 +69,8 @@ import {
 
 export const { paramDefs: ANALOG_SWITCH_PARAM_DEFS, defaults: ANALOG_SWITCH_DEFAULTS } = defineModelParams({
   primary: {
-    rOn:          { default: 1,    unit: "Î",  description: "On-state resistance (SWonResistance, swdefs.h:68)" },
-    rOff:         { default: 1e9,  unit: "Î",  description: "Off-state resistance (SWoffResistance, swdefs.h:69)" },
+    rOn:          { default: 1,    unit: "Ω",  description: "On-state resistance (SWonResistance, swdefs.h:68)" },
+    rOff:         { default: 1e9,  unit: "Ω",  description: "Off-state resistance (SWoffResistance, swdefs.h:69)" },
     vThreshold:   { default: 1.65, unit: "V",  description: "Switching threshold voltage (SWvThreshold, swdefs.h:70)" },
     vHysteresis:  { default: 0,    unit: "V",  description: "Switching hysteresis voltage (SWvHysteresis, swdefs.h:71)" },
   },

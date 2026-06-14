@@ -82,16 +82,12 @@ function buildAnalogAndCircuit(
   return circuit;
 }
 
-/** Count total bridge adapters from bridgeAdaptersByGroupId map */
+/** Count total per-pin boundary adapters from bridgeAdaptersByPinKey map.
+ *  The map is flat- one handle per crossing digital pin- so size is the count. */
 function countBridgeAdapters(facade: DefaultSimulatorFacade): number {
   const compiled = facade.getCompiledUnified();
-  const map = compiled?.analog?.bridgeAdaptersByGroupId;
-  if (!map) return 0;
-  let count = 0;
-  for (const adapters of map.values()) {
-    count += adapters.length;
-  }
-  return count;
+  const map = compiled?.analog?.bridgeAdaptersByPinKey;
+  return map ? map.size : 0;
 }
 
 // ---------------------------------------------------------------------------
@@ -259,7 +255,10 @@ describe('digitalPinLoading MCP surface- bridge behavioral verification', () => 
     // Drive both inputs HIGH → And output = HIGH → bridge propagates HIGH voltage.
     facade.setSignal(compiled, 'A', 1);
     facade.setSignal(compiled, 'B', 1);
-    facade.step(compiled);
+    // The finite-impedance boundary adapter drives the node over the transient
+    // (unlike the retired ideal-VS bridge that pinned it instantly at DC-op),
+    // so settle across several steps before reading.
+    for (let i = 0; i < 20; i++) facade.step(compiled);
 
     // The Port at the bridge boundary reads the analog node voltage.
     // With vOH=3.3 through a 1kΩ resistor to ground, expect voltage near vOH.

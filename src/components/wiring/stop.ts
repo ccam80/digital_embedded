@@ -30,8 +30,8 @@ import {
 // ---------------------------------------------------------------------------
 // Layout constants
 // Java Stop uses GenericShape: 1 input (stop), 0 outputs, width=3
-// Non-symmetric â†’ offs=0. stop@(0,0)
-// â†’ COMP_WIDTH=3, COMP_HEIGHT=1
+// Non-symmetric → offs=0. stop@(0,0)
+// → COMP_WIDTH=3, COMP_HEIGHT=1
 // ---------------------------------------------------------------------------
 
 const COMP_WIDTH = 3;

@@ -2,8 +2,8 @@
  * T Flip-Flop- toggles on rising clock edge when T=1 (or unconditionally if no T input).
  *
  * With T input (withEnable=true):
- *   T=1 â†’ toggle Q on rising clock edge
- *   T=0 â†’ hold Q on rising clock edge
+ *   T=1 → toggle Q on rising clock edge
+ *   T=0 → hold Q on rising clock edge
  *
  * Without T input (withEnable=false):
  *   Toggles Q on every rising clock edge.

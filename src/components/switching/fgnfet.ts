@@ -1,7 +1,7 @@
 ﻿/**
  * FGNFET- N-channel floating-gate MOSFET.
  *
- * Behaves like NFET (G=1 â†’ conducting) except when the floating gate is
+ * Behaves like NFET (G=1 → conducting) except when the floating gate is
  * "programmed" (blown=true). A programmed FGNFET is permanently non-conducting
  * regardless of the gate input- it acts as a one-time programmable fuse-like
  * element used in PLD/ROM arrays.
@@ -176,11 +176,11 @@ export class FGNFETElement extends AbstractCircuitElement {
     ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
 
-    // Drain lead: (1,0) â†’ (0.55,0) â†’ (0.55,0.25)
+    // Drain lead: (1,0) → (0.55,0) → (0.55,0.25)
     ctx.drawLine(1, 0, 0.55, 0);
     ctx.drawLine(0.55, 0, 0.55, 0.25);
 
-    // Source lead: (1,2) â†’ (0.55,2) â†’ (0.55,1.75)
+    // Source lead: (1,2) → (0.55,2) → (0.55,1.75)
     ctx.drawLine(1, 2, 0.55, 2);
     ctx.drawLine(0.55, 2, 0.55, 1.75);
 
@@ -197,7 +197,7 @@ export class FGNFETElement extends AbstractCircuitElement {
     // Gate lead (THIN): (0.9,1) to (1.15,1)- extends to x=1.15 per Java fixture
     ctx.drawLine(0.9, 1, 1.15, 1);
 
-    // N-channel arrow (THIN_FILLED): tip at (0.75,1), base at (1,0.9)â†’(1,1.1)
+    // N-channel arrow (THIN_FILLED): tip at (0.75,1), base at (1,0.9)→(1,1.1)
     ctx.drawPolygon([
       { x: 0.75, y: 1 },
       { x: 1, y: 0.9 },
@@ -230,7 +230,7 @@ export class FGNFETElement extends AbstractCircuitElement {
 // ---------------------------------------------------------------------------
 // executeFGNFET- flat simulation function
 //
-// G=1 and not blown â†’ closed=1; else closed=0
+// G=1 and not blown → closed=1; else closed=0
 // The blown flag is baked into propertyDefs; not available here directly.
 // The engine reads blown from component properties during compilation and
 // writes it to state[stBase + 1]. We read it from there.

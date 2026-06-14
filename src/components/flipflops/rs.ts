@@ -2,10 +2,10 @@
  * RS Flip-Flop- edge-triggered with S/R control inputs.
  *
  * On rising clock edge:
- *   S=0, R=0 â†’ no change (hold)
- *   S=1, R=0 â†’ set (Q=1)
- *   S=0, R=1 â†’ reset (Q=0)
- *   S=1, R=1 â†’ undefined (random- per Digital's implementation)
+ *   S=0, R=0 → no change (hold)
+ *   S=1, R=0 → set (Q=1)
+ *   S=0, R=1 → reset (Q=0)
+ *   S=1, R=1 → undefined (random- per Digital's implementation)
  *
  * Input layout:  [S=0, C=1, R=2]
  * Output layout: [Q=0, ~Q=1]
@@ -314,7 +314,7 @@ export const RSDefinition: StandaloneComponentDefinition = {
   category: ComponentCategory.FLIP_FLOPS,
   helpText:
     "RS Flip-Flop- edge-triggered with S/R control inputs.\n" +
-    "On rising clock edge: S=0,R=0 â†’ hold; S=1,R=0 â†’ set; S=0,R=1 â†’ reset; S=1,R=1 â†’ undefined.\n" +
+    "On rising clock edge: S=0,R=0 → hold; S=1,R=0 → set; S=0,R=1 → reset; S=1,R=1 → undefined.\n" +
     "Q and ~Q outputs are always complementary (except on S=R=1).",
   modelRegistry: {
     behavioral: {

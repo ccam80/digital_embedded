@@ -33,7 +33,7 @@ export interface SweepConfig {
   start: number;
   /** Stop value (inclusive). */
   stop: number;
-  /** Number of simulation steps (including start and stop). Must be â‰¥ 2. */
+  /** Number of simulation steps (including start and stop). Must be ≥ 2. */
   steps: number;
   /** How to space the parameter values between start and stop. */
   scale: "linear" | "log";
@@ -89,7 +89,7 @@ export type SweepCircuitFactory = (
  *
  * @param start - First value
  * @param stop  - Last value
- * @param steps - Number of values (â‰¥ 2)
+ * @param steps - Number of values (≥ 2)
  * @param scale - 'linear' or 'log'
  */
 export function generateSweepValues(

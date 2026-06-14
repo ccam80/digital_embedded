@@ -2,7 +2,7 @@
  * Tests for Task 4.2: Switch Network Integration.
  *
  * Verifies:
- * - NFET forwards drainâ†’source when gate is high (unidirectional)
+ * - NFET forwards drain→source when gate is high (unidirectional)
  * - NFET sets highZ on source when gate is low (unidirectional)
  * - TransGate closes when S!=~S and S=1
  * - TransGate burn when S==~S (non-highZ)- treated as open in current implementation

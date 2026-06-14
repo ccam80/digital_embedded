@@ -483,6 +483,30 @@ export class DigitalEngine implements SimulationEngine, InitializableEngine {
     return netId < this._values.length ? (this._values[netId] ?? 0) : 0;
   }
 
+  /**
+   * Raw Hi-Z flag word for a net: 0 = fully driven, non-zero = at least one
+   * bit high-impedance. The tri-state Driver sets this to 0xFFFFFFFF on the
+   * output net when sel===0 (components/wiring/driver.ts:199). Read by the
+   * coordinator to drive a boundary output adapter's `en` rail so a released
+   * driver no longer sources onto the analog hub.
+   */
+  getSignalHighZ(netId: number): number {
+    return netId < this._highZs.length ? (this._highZs[netId] ?? 0) : 0;
+  }
+
+  /**
+   * Pre-clear a net's Hi-Z flag to driven (0). The net Hi-Z slots default to
+   * 0xFFFFFFFF (the UNDEFINED sentinel) and non-tri-state drivers (plain gates)
+   * never touch them, so a gate-driven net otherwise reads as Hi-Z forever. A
+   * caller that knows the net is about to be driven this step clears it first;
+   * a tri-state component (Driver, FET, bus) re-asserts Hi-Z during step() if it
+   * actually releases. Used by the mixed-signal coordinator before evaluating
+   * the digital engine so boundary OUTPUT nets reflect real drive vs release.
+   */
+  markNetDriven(netId: number): void {
+    if (netId < this._highZs.length) this._highZs[netId] = 0;
+  }
+
   getSignalValue(netId: number): BitVector {
     if (netId >= this._values.length) {
       return BitVector.allUndefined(1);

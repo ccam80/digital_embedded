@@ -286,7 +286,7 @@ export class CCVSElement extends AbstractCircuitElement {
     ctx.save();
     ctx.setLineWidth(1);
 
-    // Body- open polyline box (1,-1)â†’(5,-1)â†’(5,3)â†’(1,3) (no left edge)
+    // Body- open polyline box (1,-1)→(5,-1)→(5,3)→(1,3) (no left edge)
     ctx.setColor("COMPONENT");
     ctx.drawLine(1, -1, 5, -1);
     ctx.drawLine(5, -1, 5, 3);
@@ -308,9 +308,9 @@ export class CCVSElement extends AbstractCircuitElement {
     ctx.setColor("TEXT");
     ctx.setFont({ family: "sans-serif", size: 0.6 });
     ctx.drawText("sense+", 1.2, 0, { horizontal: "left", vertical: "middle" });
-    ctx.drawText("senseâˆ’", 1.2, 2, { horizontal: "left", vertical: "middle" });
+    ctx.drawText("sense−", 1.2, 2, { horizontal: "left", vertical: "middle" });
     ctx.drawText("out+",   4.8, 0, { horizontal: "right", vertical: "middle" });
-    ctx.drawText("outâˆ’",   4.8, 2, { horizontal: "right", vertical: "middle" });
+    ctx.drawText("out−",   4.8, 2, { horizontal: "right", vertical: "middle" });
 
     ctx.restore();
   }

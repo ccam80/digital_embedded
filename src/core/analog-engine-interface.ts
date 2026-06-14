@@ -18,8 +18,7 @@ import type { IntegrationMethod } from "../solver/analog/integration.js";
 import type { DiagnosticSuggestion } from "../compile/types.js";
 import type { ConvergenceLog } from "../solver/analog/convergence-log.js";
 import type { Diagnostic, DiagnosticCode } from "../compile/types.js";
-import type { BridgeOutputDriverElement } from "../solver/analog/behavioral-drivers/bridge-output-driver.js";
-import type { BridgeInputDriverElement } from "../solver/analog/behavioral-drivers/bridge-input-driver.js";
+import type { BridgePinAdapterHandle } from "../solver/analog/compiler.js";
 export type { AcParams, AcResult, DiagnosticSuggestion };
 export type { Diagnostic, DiagnosticCode };
 
@@ -462,17 +461,15 @@ export interface CompiledAnalogCircuit extends CompiledCircuit {
    */
   readonly ics?: Map<number, number>;
   /**
-   * Bridge adapters for cross-domain (digital↔analog) boundary groups, keyed
-   * by `boundaryGroupId`. The compiler instantiates one
-   * `BridgeOutputDriverElement` per digital-to-analog stub and one
-   * `BridgeInputDriverElement` per analog-to-digital stub, attached to the
-   * same MNA node as the boundary group's analog face. Read by the
-   * coordinator at step time to drive logic levels and read voltages.
+   * Per-pin boundary adapters for cross-domain (digital↔analog) crossings,
+   * keyed by the crossing pin's stable `pinKey` ("instanceId:pinLabel"). The
+   * compiler synthesizes one finite-impedance boundary-adapter composite per
+   * crossing pin (tri-state Thevenin output, or rIn/cIn + threshold input)
+   * attached to the shared analog hub node, which nothing pins. The
+   * coordinator drives output adapters (ctrl/en) and reads input adapters'
+   * result-node voltage at step time.
    */
-  readonly bridgeAdaptersByGroupId: ReadonlyMap<
-    number,
-    ReadonlyArray<BridgeOutputDriverElement | BridgeInputDriverElement>
-  >;
+  readonly bridgeAdaptersByPinKey: ReadonlyMap<string, BridgePinAdapterHandle>;
 }
 
 // ---------------------------------------------------------------------------

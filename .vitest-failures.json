@@ -1,36 +1,12 @@
 {
   "summary": {
-    "passed": 15815,
-    "failed": 154,
+    "passed": 15774,
+    "failed": 152,
     "skipped": 0,
     "totalFiles": 451,
-    "durationSeconds": 68.8
+    "durationSeconds": 69.3
   },
   "failures": [
-    {
-      "message": "expected 0.3999999999999999 to be less than 0.01",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\editor\\__tests__\\wire-current-resolver.test.ts",
-          "test": "parallel split at junction: branch wires carry their branch's current",
-          "line": 163,
-          "column": 66
-        }
-      ]
-    },
-    {
-      "message": "expected 0.9534883720930233 to be less than 0.01",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\editor\\__tests__\\wire-current-resolver.test.ts",
-          "test": "every junction's wires carry positive current and KCL is satisfied",
-          "line": 292,
-          "column": 55
-        }
-      ]
-    },
     {
       "message": "expected 4.999999999999995 to be less than or equal to 3.223814850025644",
       "count": 1,
@@ -56,8 +32,32 @@
       ]
     },
     {
+      "message": "expected 0.3999999999999999 to be less than 0.01",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\editor\\__tests__\\wire-current-resolver.test.ts",
+          "test": "parallel split at junction: branch wires carry their branch's current",
+          "line": 163,
+          "column": 66
+        }
+      ]
+    },
+    {
+      "message": "expected 0.9534883720930233 to be less than 0.01",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\editor\\__tests__\\wire-current-resolver.test.ts",
+          "test": "every junction's wires carry positive current and KCL is satisfied",
+          "line": 292,
+          "column": 55
+        }
+      ]
+    },
+    {
       "message": "expected 1 to be +0 // Object.is equality",
-      "count": 6,
+      "count": 9,
       "locations": [
         {
           "file": "src\\runtime\\__tests__\\timing-diagram.test.ts",
@@ -69,6 +69,24 @@
           "file": "src\\runtime\\__tests__\\timing-diagram.test.ts",
           "test": "restores the closest snapshot to time 0 when jumped to start",
           "line": 303,
+          "column": 35
+        },
+        {
+          "file": "src\\components\\gates\\__tests__\\not.test.ts",
+          "test": "digital_input_high_drives_output_low_1bit",
+          "line": 75,
+          "column": 35
+        },
+        {
+          "file": "src\\components\\gates\\__tests__\\not.test.ts",
+          "test": "digital_input_toggle_drives_output_inverse_1bit",
+          "line": 104,
+          "column": 24
+        },
+        {
+          "file": "src\\components\\gates\\__tests__\\not.test.ts",
+          "test": "digital_8bit_all_ones_inverts_to_zero",
+          "line": 139,
           "column": 35
         },
         {
@@ -212,228 +230,6 @@
       ]
     },
     {
-      "message": "expected 2.000979990139731 to be close to 2, received difference is 0.0009799901397311572, but expected 0.0005",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\components\\active\\__tests__\\real-opamp-raillim.test.ts",
-          "test": "dcop_unity_follower_tracks_vin",
-          "line": 117,
-          "column": 22
-        }
-      ]
-    },
-    {
-      "message": "expected false to be true // Object.is equality",
-      "count": 10,
-      "locations": [
-        {
-          "file": "src\\components\\active\\__tests__\\real-opamp-raillim.test.ts",
-          "test": "dcop_rail_saturation_clamps_to_vrail_pos",
-          "line": 141,
-          "column": 31
-        },
-        {
-          "file": "src\\components\\passives\\__tests__\\polarized-cap.test.ts",
-          "test": "dcop_paired_reverse_bias",
-          "line": 317,
-          "column": 78
-        },
-        {
-          "file": "src\\components\\passives\\__tests__\\polarized-cap.test.ts",
-          "test": "limiting_pnjlim_fires_on_clamp_diode_under_reverse_bias",
-          "line": 574,
-          "column": 83
-        },
-        {
-          "file": "src\\components\\passives\\__tests__\\tapped-transformer.test.ts",
-          "test": "dcop_paired_ac_sinusoid",
-          "line": 241,
-          "column": 78
-        },
-        {
-          "file": "src\\components\\passives\\__tests__\\transformer.test.ts",
-          "test": "dcop_paired_ac_step_down",
-          "line": 194,
-          "column": 78
-        },
-        {
-          "file": "src\\components\\semiconductors\\__tests__\\scr.test.ts",
-          "test": "limiting_pnjlim_fires_on_q1_or_q2_junction_during_dcop",
-          "line": 218,
-          "column": 24
-        },
-        {
-          "file": "src\\components\\switching\\__tests__\\fets.test.ts",
-          "test": "dcop_gate_on_drives_v_s_near_vs",
-          "line": 198,
-          "column": 27
-        },
-        {
-          "file": "src\\components\\switching\\__tests__\\relay.test.ts",
-          "test": "dcop_paired_dt_energised",
-          "line": 564,
-          "column": 28
-        },
-        {
-          "file": "src\\solver\\analog\\__tests__\\convergence-regression.test.ts",
-          "test": "RC circuit runs transient steps stably with capacitor near Vs",
-          "line": 110,
-          "column": 24
-        },
-        {
-          "file": "src\\solver\\analog\\__tests__\\monte-carlo.test.ts",
-          "test": "log_sweep",
-          "line": 445,
-          "column": 40
-        }
-      ]
-    },
-    {
-      "message": "expected +0 to be 1 // Object.is equality",
-      "count": 4,
-      "locations": [
-        {
-          "file": "src\\components\\active\\__tests__\\real-opamp-raillim.test.ts",
-          "test": "hotload_vSatPos_shifts_rail_clamp",
-          "line": 181,
-          "column": 67
-        },
-        {
-          "file": "src\\components\\active\\__tests__\\real-opamp.test.ts",
-          "test": "init_rail_sat_state_out_sat_flag_set",
-          "line": 173,
-          "column": 24
-        },
-        {
-          "file": "src\\components\\sensors\\__tests__\\spark-gap-rollback.test.ts",
-          "test": "hotload_vBreakdown_lower_below_source_fires_gap",
-          "line": 189,
-          "column": 62
-        },
-        {
-          "file": "src\\components\\sensors\\__tests__\\spark-gap.test.ts",
-          "test": "hotload_vBreakdown_drop_below_vsrc_fires_blocking_gap",
-          "line": 214,
-          "column": 62
-        }
-      ]
-    },
-    {
-      "message": "expected 0.15499418771796014 to be close to 0.5, received difference is 0.34500581228203986, but expected 0.005",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\components\\active\\__tests__\\real-opamp-raillim.test.ts",
-          "test": "hotload_vos_shifts_unity_follower_output",
-          "line": 206,
-          "column": 28
-        }
-      ]
-    },
-    {
-      "message": "expected 2.0009799901349496 to be close to 2, received difference is 0.0009799901349496487, but expected 0.0005",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\components\\active\\__tests__\\real-opamp-raillim.test.ts",
-          "test": "hotload_aol_shifts_finite_gain_error",
-          "line": 258,
-          "column": 20
-        }
-      ]
-    },
-    {
-      "message": "expected 1.6000025816870698 to be greater than 13.499999999",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\components\\active\\__tests__\\real-opamp-raillim.test.ts",
-          "test": "limiting_railLim_engaged_under_overdrive",
-          "line": 308,
-          "column": 26
-        }
-      ]
-    },
-    {
-      "message": "compareAllSteps: run produced 0 comparable steps:",
-      "count": 2,
-      "locations": [
-        {
-          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session-asserts.ts",
-          "test": "transient_step_end_paired_rail_saturation",
-          "line": 25,
-          "column": 11
-        },
-        {
-          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session-asserts.ts",
-          "test": "transient_step_end_paired_rail_saturation",
-          "line": 25,
-          "column": 11
-        }
-      ]
-    },
-    {
-      "message": "Step out of range: 0",
-      "count": 2,
-      "locations": [
-        {
-          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session.ts",
-          "test": "dcop_paired_rail_saturation",
-          "line": 1401,
-          "column": 13
-        },
-        {
-          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session.ts",
-          "test": "dcop_paired_rail_saturation",
-          "line": 1401,
-          "column": 13
-        }
-      ]
-    },
-    {
-      "message": "compareAllAttempts: run produced 0 comparable steps:",
-      "count": 2,
-      "locations": [
-        {
-          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session-asserts.ts",
-          "test": "full_iteration_paired_rail_saturation",
-          "line": 70,
-          "column": 11
-        },
-        {
-          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session-asserts.ts",
-          "test": "full_iteration_paired_rail_saturation",
-          "line": 70,
-          "column": 11
-        }
-      ]
-    },
-    {
-      "message": "expected -0.9002250730671187 to be close to -0.09082652134423251, received difference is 0.8093985517228862, but expected 0.00005",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\components\\active\\__tests__\\real-opamp.test.ts",
-          "test": "hotload_aol_changes_inverting_gain_error",
-          "line": 302,
-          "column": 20
-        }
-      ]
-    },
-    {
-      "message": "expected 0.0005359991040041479 to be close to 0.0005, received difference is 0.00003599910400414784, but expected 0.000005",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\components\\active\\__tests__\\real-opamp.test.ts",
-          "test": "preset_OPA2134_shifts_dc_output_by_vos_delta",
-          "line": 646,
-          "column": 32
-        }
-      ]
-    },
-    {
       "message": "expected 3.2999993400001326 to be close to 3.283582089552239, received difference is 0.01641725044789366, but expected 0.00005",
       "count": 2,
       "locations": [
@@ -560,6 +356,132 @@
       ]
     },
     {
+      "message": "expected +0 to be 1 // Object.is equality",
+      "count": 4,
+      "locations": [
+        {
+          "file": "src\\components\\gates\\__tests__\\buf.test.ts",
+          "test": "digital_input_high_drives_output_high_1bit",
+          "line": 73,
+          "column": 35
+        },
+        {
+          "file": "src\\components\\gates\\__tests__\\buf.test.ts",
+          "test": "digital_input_toggle_drives_output_same_1bit",
+          "line": 102,
+          "column": 24
+        },
+        {
+          "file": "src\\components\\sensors\\__tests__\\spark-gap-rollback.test.ts",
+          "test": "hotload_vBreakdown_lower_below_source_fires_gap",
+          "line": 189,
+          "column": 62
+        },
+        {
+          "file": "src\\components\\sensors\\__tests__\\spark-gap.test.ts",
+          "test": "hotload_vBreakdown_drop_below_vsrc_fires_blocking_gap",
+          "line": 214,
+          "column": 62
+        }
+      ]
+    },
+    {
+      "message": "expected +0 to be 15 // Object.is equality",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\components\\gates\\__tests__\\buf.test.ts",
+          "test": "digital_8bit_input_passes_through_unchanged",
+          "line": 115,
+          "column": 35
+        }
+      ]
+    },
+    {
+      "message": "expected +0 to be 170 // Object.is equality",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\components\\gates\\__tests__\\buf.test.ts",
+          "test": "digital_8bit_alternating_pattern_passes_through",
+          "line": 126,
+          "column": 35
+        }
+      ]
+    },
+    {
+      "message": "expected +0 to be 255 // Object.is equality",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\components\\gates\\__tests__\\buf.test.ts",
+          "test": "digital_8bit_all_ones_passes_through",
+          "line": 137,
+          "column": 35
+        }
+      ]
+    },
+    {
+      "message": "expected +0 to be 90 // Object.is equality",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\components\\gates\\__tests__\\buf.test.ts",
+          "test": "digital_double_buffer_is_identity",
+          "line": 161,
+          "column": 35
+        }
+      ]
+    },
+    {
+      "message": "expected 1 to be 240 // Object.is equality",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\components\\gates\\__tests__\\not.test.ts",
+          "test": "digital_8bit_input_inverts_to_complement_byte",
+          "line": 117,
+          "column": 35
+        }
+      ]
+    },
+    {
+      "message": "expected 1 to be 85 // Object.is equality",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\components\\gates\\__tests__\\not.test.ts",
+          "test": "digital_8bit_alternating_pattern_inverts_to_complement",
+          "line": 128,
+          "column": 35
+        }
+      ]
+    },
+    {
+      "message": "expected 1 to be 255 // Object.is equality",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\components\\gates\\__tests__\\not.test.ts",
+          "test": "digital_8bit_zero_inverts_to_all_ones",
+          "line": 150,
+          "column": 35
+        }
+      ]
+    },
+    {
+      "message": "expected 1 to be 237 // Object.is equality",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\components\\gates\\__tests__\\not.test.ts",
+          "test": "digital_double_inversion_is_identity",
+          "line": 166,
+          "column": 22
+        }
+      ]
+    },
+    {
       "message": "expected 3.3 to not be close to 3.3, received difference is 0, but expected 0.005",
       "count": 1,
       "locations": [
@@ -580,6 +502,30 @@
           "test": "hotload_Frequency_changes_breakpoint_schedule",
           "line": 163,
           "column": 19
+        }
+      ]
+    },
+    {
+      "message": "expected { type: 'digital', value: +0 } to match object { type: 'digital', value: 2 }",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\components\\memory\\__tests__\\program-counter.test.ts",
+          "test": "jump_then_increment_continues_from_loaded_value",
+          "line": 245,
+          "column": 50
+        }
+      ]
+    },
+    {
+      "message": "Bus conflict on net 1: conflicting drivers",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\solver\\digital\\bus-resolution.ts",
+          "test": "masked_addresses_are_independent_across_distinct_register_slots",
+          "line": 229,
+          "column": 12
         }
       ]
     },
@@ -740,6 +686,66 @@
       ]
     },
     {
+      "message": "expected false to be true // Object.is equality",
+      "count": 9,
+      "locations": [
+        {
+          "file": "src\\components\\passives\\__tests__\\polarized-cap.test.ts",
+          "test": "dcop_paired_reverse_bias",
+          "line": 317,
+          "column": 78
+        },
+        {
+          "file": "src\\components\\passives\\__tests__\\polarized-cap.test.ts",
+          "test": "limiting_pnjlim_fires_on_clamp_diode_under_reverse_bias",
+          "line": 574,
+          "column": 83
+        },
+        {
+          "file": "src\\components\\passives\\__tests__\\tapped-transformer.test.ts",
+          "test": "dcop_paired_ac_sinusoid",
+          "line": 241,
+          "column": 78
+        },
+        {
+          "file": "src\\components\\passives\\__tests__\\transformer.test.ts",
+          "test": "dcop_paired_ac_step_down",
+          "line": 194,
+          "column": 78
+        },
+        {
+          "file": "src\\components\\semiconductors\\__tests__\\scr.test.ts",
+          "test": "limiting_pnjlim_fires_on_q1_or_q2_junction_during_dcop",
+          "line": 218,
+          "column": 24
+        },
+        {
+          "file": "src\\components\\switching\\__tests__\\fets.test.ts",
+          "test": "dcop_gate_on_drives_v_s_near_vs",
+          "line": 198,
+          "column": 27
+        },
+        {
+          "file": "src\\components\\switching\\__tests__\\relay.test.ts",
+          "test": "dcop_paired_dt_energised",
+          "line": 564,
+          "column": 28
+        },
+        {
+          "file": "src\\solver\\analog\\__tests__\\convergence-regression.test.ts",
+          "test": "RC circuit runs transient steps stably with capacitor near Vs",
+          "line": 110,
+          "column": 24
+        },
+        {
+          "file": "src\\solver\\analog\\__tests__\\monte-carlo.test.ts",
+          "test": "log_sweep",
+          "line": 445,
+          "column": 40
+        }
+      ]
+    },
+    {
       "message": "739 per-iteration divergence(s); first: voltage step 0/iter 0 cap_cBody:p0/Rcap_rLeak:p0/Rcap_rEsr:p1 ours=-0.692890753762954 ngspice=-0.6928907537629597 absDelta=5.773159728050814e-15: expected 739 t...",
       "count": 1,
       "locations": [
@@ -886,30 +892,6 @@
           "test": "full_iteration_paired_matched_load",
           "line": 83,
           "column": 31
-        }
-      ]
-    },
-    {
-      "message": "expected { type: 'digital', value: +0 } to match object { type: 'digital', value: 2 }",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\components\\memory\\__tests__\\program-counter.test.ts",
-          "test": "jump_then_increment_continues_from_loaded_value",
-          "line": 245,
-          "column": 50
-        }
-      ]
-    },
-    {
-      "message": "Bus conflict on net 1: conflicting drivers",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\solver\\digital\\bus-resolution.ts",
-          "test": "masked_addresses_are_independent_across_distinct_register_slots",
-          "line": 229,
-          "column": 12
         }
       ]
     },
@@ -1244,7 +1226,7 @@
       ]
     },
     {
-      "message": "expected 5.000001536917821e-7 to be close to 0.999000999000999, received difference is 0.9990004990008453, but expected 0.0005",
+      "message": "expected 5.000002473198752e-7 to be close to 0.999000999000999, received difference is 0.9990004990007517, but expected 0.0005",
       "count": 2,
       "locations": [
         {
@@ -1346,25 +1328,19 @@
       ]
     },
     {
-      "message": "Matrix-entry structural divergence at step=0 attempt=0 iter=0:",
-      "count": 2,
+      "message": "step 0 branch Vbridge-adapter_603a2ba5-1829-4f2a-92b2-1fdcfea3f80d_out2_pin_vihSrc:branch: ours=0 ngspice=NaN absDelta=NaN: expected false to be true // Object.is equality",
+      "count": 1,
       "locations": [
         {
-          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session.ts",
+          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session-asserts.ts",
           "test": "transient_step_end_paired_pass_through",
-          "line": 3991,
-          "column": 13
-        },
-        {
-          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session.ts",
-          "test": "transient_step_end_paired_isolation",
-          "line": 3991,
-          "column": 13
+          "line": 46,
+          "column": 9
         }
       ]
     },
     {
-      "message": "232 per-iteration divergence(s); first: voltage step 0/iter 0 node_4 ours=-9.99999999998398e-8 ngspice=0 absDelta=9.99999999998398e-8: expected 232 to be +0 // Object.is equality",
+      "message": "928 per-iteration divergence(s); first: voltage step 0/iter 0 node_16 ours=0 ngspice=NaN absDelta=NaN: expected 928 to be +0 // Object.is equality",
       "count": 2,
       "locations": [
         {
@@ -1378,6 +1354,18 @@
           "test": "full_iteration_paired_isolation",
           "line": 83,
           "column": 31
+        }
+      ]
+    },
+    {
+      "message": "step 0 branch Vbridge-adapter_b25f44c4-1d76-454f-b559-dbacb2db069b_out2_pin_vihSrc:branch: ours=0 ngspice=NaN absDelta=NaN: expected false to be true // Object.is equality",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session-asserts.ts",
+          "test": "transient_step_end_paired_isolation",
+          "line": 46,
+          "column": 9
         }
       ]
     },

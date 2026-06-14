@@ -487,7 +487,10 @@ export function registerCircuitTools(
               .array(
                 z.object({
                   id: z.string().describe("Local identifier for use in connections"),
-                  type: z.string().describe('Component type, e.g. "And", "In", "Out"'),
+                  type: z.string().describe(
+                    'Component type — digital ("And", "In", "Out") or analog ' +
+                    '("Resistor", "Capacitor", "DcVoltageSource", "OpAmp", "Ground"); ' +
+                    'discover the full set with circuit_list'),
                   props: z
                     .record(z.unknown())
                     .optional()
@@ -669,20 +672,29 @@ export function registerCircuitTools(
 
         const failingVectors = results.vectors.filter((v) => !v.passed);
         if (failingVectors.length > 0) {
+          // Analog signals are VOLTAGES, not logic levels: annotate them so
+          // "expected 1" can never be misread as logic-high when it means
+          // one volt.
+          const analogLabels = new Set<string>();
+          for (const [label, addr] of engine.compiled.labelSignalMap) {
+            if (addr.domain === "analog") analogLabels.add(label);
+          }
+          const fmt = (k: string, val: unknown) =>
+            analogLabels.has(k) ? `${k}=${val} V` : `${k}=${val}`;
           lines.push(`\nFailing vectors (first ${Math.min(failingVectors.length, 10)}):`);
           for (let i = 0; i < Math.min(failingVectors.length, 10); i++) {
             const v = failingVectors[i]!;
             lines.push(`  Vector #${i + 1}:`);
             const inputStr = Object.entries(v.inputs)
-              .map(([k, val]) => `${k}=${val}`)
+              .map(([k, val]) => fmt(k, val))
               .join(", ");
             lines.push(`    Inputs:   ${inputStr || "(none)"}`);
             const expectedStr = Object.entries(v.expectedOutputs)
-              .map(([k, val]) => `${k}=${val}`)
+              .map(([k, val]) => fmt(k, val))
               .join(", ");
             lines.push(`    Expected: ${expectedStr || "(none)"}`);
             const actualStr = Object.entries(v.actualOutputs)
-              .map(([k, val]) => `${k}=${val}`)
+              .map(([k, val]) => fmt(k, val))
               .join(", ");
             lines.push(`    Actual:   ${actualStr || "(none)"}`);
           }

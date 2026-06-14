@@ -223,15 +223,15 @@ describe("TwoPhaseStep", () => {
     out.position = { x: 30, y: 0 };
     circuit.addElement(out);
 
-    // Wire In_data.out â†’ DFF_A.D
+    // Wire In_data.out → DFF_A.D
     circuit.addWire(new Wire({ x: 2, y: 0 }, { x: 10, y: 0 }));
-    // Wire In_clk.out â†’ DFF_A.C
+    // Wire In_clk.out → DFF_A.C
     circuit.addWire(new Wire({ x: 2, y: 10 }, { x: 10, y: 1 }));
-    // Wire DFF_A.C â†’ DFF_B.C (shared clock net)
+    // Wire DFF_A.C → DFF_B.C (shared clock net)
     circuit.addWire(new Wire({ x: 10, y: 1 }, { x: 20, y: 1 }));
-    // Wire DFF_A.Q â†’ DFF_B.D
+    // Wire DFF_A.Q → DFF_B.D
     circuit.addWire(new Wire({ x: 12, y: 0 }, { x: 20, y: 0 }));
-    // Wire DFF_B.Q â†’ Out.in
+    // Wire DFF_B.Q → Out.in
     circuit.addWire(new Wire({ x: 22, y: 0 }, { x: 30, y: 0 }));
 
     const compiled = compileUnified(circuit, registry).digital!;
@@ -254,8 +254,8 @@ describe("TwoPhaseStep", () => {
     // Toggle clock high, step.
     engine.setSignalValue(clkNetId, BitVector.fromNumber(1, 1));
     engine.step();
-    // DFF_A should have latched D=1 â†’ Q=1
-    // DFF_B sampled DFF_A's OLD output (0) â†’ Q=0
+    // DFF_A should have latched D=1 → Q=1
+    // DFF_B sampled DFF_A's OLD output (0) → Q=0
     expect(engine.getSignalRaw(qaNetId)).toBe(1);
     expect(engine.getSignalRaw(qbNetId)).toBe(0);
 
@@ -264,7 +264,7 @@ describe("TwoPhaseStep", () => {
     engine.step();
     engine.setSignalValue(clkNetId, BitVector.fromNumber(1, 1));
     engine.step();
-    // DFF_B now has DFF_A's value from previous cycle â†’ Q=1
+    // DFF_B now has DFF_A's value from previous cycle → Q=1
     expect(engine.getSignalRaw(qbNetId)).toBe(1);
   });
 
@@ -284,7 +284,7 @@ describe("TwoPhaseStep", () => {
     dffB.position = { x: 10, y: 0 };
     circuit.addElement(dffB);
 
-    // Cross-feedback: A.Q â†’ B.D, B.Q â†’ A.D
+    // Cross-feedback: A.Q → B.D, B.Q → A.D
     circuit.addWire(new Wire({ x: 2, y: 0 }, { x: 10, y: 0 }));
     circuit.addWire(new Wire({ x: 12, y: 0 }, { x: 0, y: 0 }));
     // Shared clock
@@ -336,7 +336,7 @@ describe("TwoPhaseStep", () => {
     // Rising clock edge + step: both sample simultaneously
     engine.setSignalValue(clkNetId, BitVector.fromNumber(1, 1));
     engine.step();
-    // A sampled B's OLD Q=0, B sampled A's OLD Q=1 â†’ they swap
+    // A sampled B's OLD Q=0, B sampled A's OLD Q=1 → they swap
     expect(engine.getSignalRaw(qaNetId)).toBe(0);
     expect(engine.getSignalRaw(qbNetId)).toBe(1);
   });
@@ -369,11 +369,11 @@ describe("TwoPhaseStep", () => {
     outEl.position = { x: 20, y: 0 };
     circuit.addElement(outEl);
 
-    // Wire In_A.out â†’ And.a
+    // Wire In_A.out → And.a
     circuit.addWire(new Wire({ x: 2, y: 0 }, { x: 10, y: 0 }));
-    // Wire In_B.out â†’ And.b
+    // Wire In_B.out → And.b
     circuit.addWire(new Wire({ x: 2, y: 5 }, { x: 10, y: 1 }));
-    // Wire And.out â†’ Out.in
+    // Wire And.out → Out.in
     circuit.addWire(new Wire({ x: 12, y: 0 }, { x: 20, y: 0 }));
 
     const compiled = compileUnified(circuit, registry).digital!;

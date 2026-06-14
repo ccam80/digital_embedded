@@ -291,7 +291,7 @@ const SWITCH_DT_PROPERTY_DEFS: PropertyDefinition[] = [
   {
     key: "Ron",
     type: PropertyType.FLOAT,
-    label: "Ron (ÃŽ)",
+    label: "Ron (Ω)",
     defaultValue: 1,
     min: 1e-12,
     description: "On-state resistance in ohms (analog mode)",
@@ -299,7 +299,7 @@ const SWITCH_DT_PROPERTY_DEFS: PropertyDefinition[] = [
   {
     key: "Roff",
     type: PropertyType.FLOAT,
-    label: "Roff (ÃŽ)",
+    label: "Roff (Ω)",
     defaultValue: 1e9,
     min: 1,
     description: "Off-state resistance in ohms (analog mode)",
@@ -350,7 +350,7 @@ export class SwitchDTAnalogElement extends PoolBackedAnalogElement implements Sp
 
     const closed = props.getOrDefault<boolean>("closed", false);
 
-    // SW_AB: A1 (pos) â†” B1 (neg)
+    // SW_AB: A1 (pos) ↔ B1 (neg)
     const propAB = new PropertyBag();
     propAB.set("Ron", props.getOrDefault<number>("Ron", 1));
     propAB.set("Roff", props.getOrDefault<number>("Roff", 1e9));
@@ -361,7 +361,7 @@ export class SwitchDTAnalogElement extends PoolBackedAnalogElement implements Sp
       propAB,
     );
 
-    // SW_AC: A1 (pos) â†” C1 (neg)
+    // SW_AC: A1 (pos) ↔ C1 (neg)
     // When closed=true: AB is on (Ron), AC is off (Roff).
     // When closed=false: AB is off (Roff), AC is on (Ron).
     // So SW_AC is the complement: it starts as !closed.

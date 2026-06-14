@@ -82,7 +82,7 @@ export const { paramDefs: ZENER_SPICE_L1_PARAM_DEFS, defaults: ZENER_SPICE_L1_DE
     N:   { default: 1,                   description: "Emission coefficient" },
   },
   secondary: {
-    RS:  { default: 0,        unit: "ÃŽ",  description: "Ohmic (series) resistance" },
+    RS:  { default: 0,        unit: "Ω",  description: "Ohmic (series) resistance" },
     CJO: { default: 0,        unit: "F",  description: "Zero-bias junction capacitance" },
     VJ:  { default: 1,        unit: "V",  description: "Junction built-in potential" },
     M:   { default: 0.5,                  description: "Grading coefficient" },
@@ -257,7 +257,7 @@ class ZenerAnalogElement extends PoolBackedAnalogElement {
     this._stateBase = ctx.allocStates(this.stateSize);
 
     // Internal node- diosetup.c:204-224
-    // ngspice gating: RS > 0 â†’ allocate anode-prime node
+    // ngspice gating: RS > 0 → allocate anode-prime node
     if (this._params.RS === 0 || !this._params.RS) {
       this._posPrimeNode = posNode;
     } else {
@@ -454,7 +454,7 @@ class ZenerAnalogElement extends PoolBackedAnalogElement {
     // Stamps through pre-allocated handles from setup()
     //
     // Series-resistance T-model (gspr) gating mirrors dioload.c:98 and the
-    // setup-side gating at diosetup.c:204 (DIOresist == 0 â†’ no prime node).
+    // setup-side gating at diosetup.c:204 (DIOresist == 0 → no prime node).
     // When RS == 0, _posPrimeNode aliases the external anode (zener.ts:264)
     // and the prime-side stamps collapse to no-ops- gspr is skipped to match.
     // When RS > 0, the seven stamps below mirror dioload.c:431-441 line for

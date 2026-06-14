@@ -5,7 +5,7 @@
  * simulation model. The compilation pipeline infers domain from what is
  * connected to it, not from the Port itself.
  *
- * Renders as a diamond (â—‡) with a stub wire and label text.
+ * Renders as a diamond (◇) with a stub wire and label text.
  */
 
 import { AbstractCircuitElement } from "../../core/element.js";

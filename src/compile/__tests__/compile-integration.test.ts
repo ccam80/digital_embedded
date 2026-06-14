@@ -30,6 +30,8 @@ import type { IntegrationMethod } from '../../solver/analog/integration.js';
 import type { LteParams } from '../../solver/analog/ckt-terr.js';
 import { createTestElementFromDecls } from '../../test-fixtures/test-element.js';
 import { noopExecFn } from '../../test-fixtures/execute-stubs.js';
+import { createDefaultRegistry } from '../../components/register-all.js';
+import { DefaultSimulatorFacade } from '../../headless/default-facade.js';
 
 // ---------------------------------------------------------------------------
 // Local class-based analog element stubs
@@ -572,25 +574,28 @@ describe('compileUnified- mixed digital+analog', () => {
   });
 
   it('bridges array is non-empty when circuit has cross-domain boundary', () => {
-    const registry = buildMixedRegistry();
+    // The per-pin boundary synthesis expands real adapter composites, so this
+    // case uses the production registry: And(digital):out → Resistor(analog) is
+    // a real cross-domain boundary.
+    const realRegistry = createDefaultRegistry();
+    const realFacade = new DefaultSimulatorFacade(realRegistry);
+    const circuit = realFacade.build({
+      components: [
+        { id: 'A', type: 'In', props: { label: 'A', bitWidth: 1 } },
+        { id: 'B', type: 'In', props: { label: 'B', bitWidth: 1 } },
+        { id: 'g', type: 'And', props: { model: 'digital' } },
+        { id: 'r', type: 'Resistor', props: { label: 'R', resistance: 1000 } },
+        { id: 'gnd', type: 'Ground' },
+      ],
+      connections: [
+        ['A:out', 'g:In_1'],
+        ['B:out', 'g:In_2'],
+        ['g:out', 'r:pos'],
+        ['r:neg', 'gnd:out'],
+      ],
+    });
 
-    // Use DABridge as the boundary element- it has both digital and analog models
-    // Digital side: AND output → DABridge digital input
-    // Analog side: DABridge analog pin → Resistor → Ground
-    const twoIn = [inputPin(0, 0, 'a'), inputPin(0, 1, 'b'), outputPin(2, 0, 'out')];
-    const bridgePins = [inputPin(0, 0, 'din'), outputPin(1, 0, 'aout')];
-
-    const circuit = new Circuit();
-    circuit.addElement(createTestElementFromDecls('And', 'and-1', twoIn));
-    circuit.addElement(createTestElementFromDecls('DABridge', 'bridge-1', bridgePins, undefined, { x: 4, y: 0 }));
-    circuit.addElement(makeAnalogElement('AnalogR', 'r1', [{ x: 5, y: 0 }, { x: 10, y: 0 }]));
-    circuit.addElement(makeAnalogElement('Ground', 'gnd1', [{ x: 10, y: 0 }]));
-
-    circuit.addWire(new Wire({ x: 2, y: 0 }, { x: 4, y: 0 }));  // AND out → bridge digital in
-    circuit.addWire(new Wire({ x: 5, y: 0 }, { x: 5, y: 0 }));  // bridge analog out / R1 A
-    circuit.addWire(new Wire({ x: 10, y: 0 }, { x: 10, y: 0 })); // R1 B / Ground
-
-    const unified = compileUnified(circuit, registry);
+    const unified = compileUnified(circuit, realRegistry);
 
     expect(unified.bridges.length).toBeGreaterThan(0);
     // Each bridge must have valid domain IDs

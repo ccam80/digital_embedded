@@ -1,347 +1,94 @@
-﻿/**
- * Headless tests for the digitalPinLoading circuit metadata field.
+/**
+ * Headless tests for the digitalPinLoading circuit metadata field, on the real
+ * production registry (createDefaultRegistry). The per-pin boundary synthesis
+ * expands real adapter composites, so these build real mixed circuits and read
+ * the compiled bridge descriptors / per-pin adapter map.
  *
- * Verifies that setting digitalPinLoading to "cross-domain", "all", or "none"
- * produces the expected per-net bridge counts:
- *   all  > cross-domain >= none  (in terms of bridge group count)
- *
- * Components never change partition based on loading mode. The bridge count
- * reflects per-net bridges (one BridgeAdapter per boundary group), not per-
- * component routing.
- *
- * These tests exercise the compile pipeline directly without any UI.
+ * Ordering invariant: all > cross-domain >= none (per crossing-pin count).
+ * Components never change partition based on loading mode.
  */
 
 import { describe, it, expect } from 'vitest';
 import { compileUnified } from '../compile.js';
-import { Circuit, Wire } from '../../core/circuit.js';
-import type { Pin, PinDeclaration } from '../../core/pin.js';
-import { PinDirection } from '../../core/pin.js';
-import type { RenderContext, Rect } from '../../core/renderer-interface.js';
-import { PropertyBag } from '../../core/properties.js';
-import type { PropertyBag as PropertyBagType, PropertyValue } from '../../core/properties.js';
-import { ComponentRegistry } from '../../core/registry.js';
-import type { ComponentModels } from '../../core/registry.js';
-import { ComponentCategory } from '../../core/registry.js';
-import type { SerializedElement, CircuitElement } from '../../core/element.js';
-import type { SparseSolverStamp as ComplexSparseSolver } from '../../solver/analog/sparse-solver.js';
-import { AnalogElement } from '../../solver/analog/element.js';
-import type { DeviceFamily } from '../../solver/analog/ngspice-load-order.js';
-import type { LoadContext } from '../../solver/analog/load-context.js';
-import type { SetupContext } from '../../solver/analog/setup-context.js';
-import { createTestElementFromDecls } from '../../test-fixtures/test-element.js';
-import { noopExecFn } from '../../test-fixtures/execute-stubs.js';
+import { createDefaultRegistry } from '../../components/register-all.js';
+import { DefaultSimulatorFacade } from '../../headless/default-facade.js';
 
-// ---------------------------------------------------------------------------
-// Local class-based analog element stub
-// ---------------------------------------------------------------------------
+const registry = createDefaultRegistry();
+const facade = new DefaultSimulatorFacade(registry);
 
-class PinLoadingMenuTestEl extends AnalogElement {
-  readonly ngspiceLoadOrder = 0;
-  readonly deviceFamily: DeviceFamily = "BEHAVIORAL";
-  setup(_ctx: SetupContext): void {}
-  load(_ctx: LoadContext): void { /* no-op for static test fixture */ }
-  stampAc(_s: ComplexSparseSolver, _omega: number, _ctx: LoadContext): void {}
-  getPinCurrents(_v: Float64Array): number[] { return [0, 0]; }
-  setParam(_key: string, _value: number): void {}
-}
-
-// ---------------------------------------------------------------------------
-// Minimal digital CircuitElement
-// ---------------------------------------------------------------------------
-
-// ---------------------------------------------------------------------------
-// Minimal analog flat element
-// ---------------------------------------------------------------------------
-
-function makeAnalogPin(x: number, y: number): Pin {
-  return {
-    position: { x, y },
-    label: '',
-    direction: PinDirection.BIDIRECTIONAL,
-    isNegated: false,
-    isClock: false,
-    kind: "signal",
-    bitWidth: 1,
-  };
-}
-
-function makeResistorElement(nodeA: number, nodeB: number): AnalogElement {
-  return new PinLoadingMenuTestEl(new Map([["a", nodeA], ["b", nodeB]]));
-}
-
-function makeAnalogElement(
-  typeId: string,
-  instanceId: string,
-  pinCoords: Array<{ x: number; y: number }>,
-): CircuitElement {
-  const resolvedPins = pinCoords.map((p) => makeAnalogPin(p.x, p.y));
-  const propsMap = new Map<string, unknown>();
-  const propertyBag: PropertyBagType = {
-    has(k: string) { return propsMap.has(k); },
-    get<T>(k: string): T { return propsMap.get(k) as T; },
-    set(k: string, v: unknown) { propsMap.set(k, v); },
-    delete(k: string) { propsMap.delete(k); },
-    keys() { return Array.from(propsMap.keys()); },
-    entries() { return Array.from(propsMap.entries()); },
-    clone() { return this; },
-    size: 0,
-    getModelParam<T>(_k: string): T { return undefined as unknown as T; },
-    setModelParam(_k: string, _v: unknown) { /* no-op */ },
-    hasModelParam(_k: string): boolean { return false; },
-    getModelParamKeys(): string[] { return []; },
-    replaceModelParams(_p: Record<string, number>) { /* no-op */ },
-    getOrDefault<T>(_k: string, d: T): T { return propsMap.has(_k) ? propsMap.get(_k) as T : d; },
-  } as unknown as PropertyBagType;
-
-  const serialized: SerializedElement = {
-    typeId,
-    instanceId,
-    position: { x: 0, y: 0 },
-    rotation: 0 as SerializedElement['rotation'],
-    mirror: false,
-    properties: {},
-  };
-
-  return {
-    typeId,
-    instanceId,
-    position: { x: 0, y: 0 },
-    rotation: 0 as CircuitElement['rotation'],
-    mirror: false,
-    getPins() { return resolvedPins; },
-    getProperties() { return propertyBag; },
-    getBoundingBox(): Rect { return { x: 0, y: 0, width: 10, height: 10 }; },
-    draw(_ctx: RenderContext) {},
-    serialize() { return serialized; },
-    getAttribute(k: string) { return propsMap.get(k) as PropertyValue | undefined; },
-    setAttribute(k: string, v: PropertyValue) { propsMap.set(k, v); },
-  };
-}
-
-// ---------------------------------------------------------------------------
-// Pin declaration helpers
-// ---------------------------------------------------------------------------
-
-function inputPin(x: number, y: number, label: string): PinDeclaration {
-  return { direction: PinDirection.INPUT, label, defaultBitWidth: 1, position: { x, y }, isNegatable: false, isClockCapable: false, kind: "signal" };
-}
-
-function outputPin(x: number, y: number, label: string): PinDeclaration {
-  return { direction: PinDirection.OUTPUT, label, defaultBitWidth: 1, position: { x, y }, isNegatable: false, isClockCapable: false, kind: "signal" };
-}
-
-// ---------------------------------------------------------------------------
-// Registry with digital, analog, and mixed-model (bridge) components
-// ---------------------------------------------------------------------------
-
-
-function buildMixedRegistry(): ComponentRegistry {
-  const r = new ComponentRegistry();
-
-  // Pure digital component
-  r.register({
-    name: 'And',
-    typeId: -1,
-    factory: (props: PropertyBagType) => createTestElementFromDecls('And', crypto.randomUUID(), [
-      inputPin(0, 0, 'a'), inputPin(0, 1, 'b'), outputPin(2, 0, 'out'),
-    ], props instanceof PropertyBag ? props : new PropertyBag()),
-    pinLayout: [inputPin(0, 0, 'a'), inputPin(0, 1, 'b'), outputPin(2, 0, 'out')],
-    propertyDefs: [],
-    attributeMap: [],
-    category: ComponentCategory.LOGIC,
-    helpText: '',
-    models: { digital: { executeFn: noopExecFn } } as ComponentModels,
+// In(A),In(B) → And(digital) → Resistor → Ground. And:out↔Resistor is the
+// real digital→analog boundary; "all" mode additionally loads the In→And nets.
+function buildMixed(mode?: 'cross-domain' | 'all' | 'none') {
+  const c = facade.build({
+    components: [
+      { id: 'A', type: 'In', props: { label: 'A', bitWidth: 1 } },
+      { id: 'B', type: 'In', props: { label: 'B', bitWidth: 1 } },
+      { id: 'g', type: 'And', props: { model: 'digital' } },
+      { id: 'r', type: 'Resistor', props: { label: 'R', resistance: 1000 } },
+      { id: 'gnd', type: 'Ground' },
+    ],
+    connections: [
+      ['A:out', 'g:In_1'],
+      ['B:out', 'g:In_2'],
+      ['g:out', 'r:pos'],
+      ['r:neg', 'gnd:out'],
+    ],
   });
-
-  // Pure analog component
-  r.register({
-    name: 'AnalogR',
-    typeId: -1,
-    factory: () => { throw new Error('not used'); },
-    pinLayout: [],
-    propertyDefs: [],
-    attributeMap: [],
-    category: ComponentCategory.MISC,
-    helpText: '',
-    models: {},
-    modelRegistry: {
-      behavioral: { kind: 'inline' as const, branchCount: 0, factory: (pinNodes: ReadonlyMap<string, number>) => {
-        const [n0, n1] = [...pinNodes.values()];
-        return makeResistorElement(n0 ?? 0, n1 ?? 0);
-      }, paramDefs: [], params: {} },
-    },
-  });
-
-  // Ground (neutral)
-  r.register({
-    name: 'Ground',
-    typeId: -1,
-    factory: () => { throw new Error('not used'); },
-    pinLayout: [],
-    propertyDefs: [],
-    attributeMap: [],
-    category: ComponentCategory.MISC,
-    helpText: '',
-    models: {},
-    modelRegistry: { behavioral: { kind: 'inline' as const, factory: () => { throw new Error('not used'); }, paramDefs: [], params: {} } },
-  });
-
-  // Mixed-model component: digital model + MNA model
-  r.register({
-    name: 'DABridge',
-    typeId: -1,
-    factory: (props: PropertyBagType) => createTestElementFromDecls(
-      'DABridge',
-      crypto.randomUUID(),
-      [inputPin(0, 0, 'din'), outputPin(1, 0, 'aout')],
-      props instanceof PropertyBag ? props : new PropertyBag(),
-    ),
-    pinLayout: [inputPin(0, 0, 'din'), outputPin(1, 0, 'aout')],
-    propertyDefs: [],
-    attributeMap: [],
-    category: ComponentCategory.MISC,
-    helpText: '',
-    models: {
-      digital: { executeFn: noopExecFn },
-    },
-    modelRegistry: {
-      behavioral: { kind: 'inline' as const, branchCount: 0, factory: (pinNodes: ReadonlyMap<string, number>) => {
-        const [n0, n1] = [...pinNodes.values()];
-        return makeResistorElement(n0 ?? 0, n1 ?? 0);
-      }, paramDefs: [], params: {} },
-    },
-  });
-
-  return r;
+  if (mode) c.metadata.digitalPinLoading = mode;
+  return c;
 }
-
-// ---------------------------------------------------------------------------
-// Circuit builder: digital (And) → DABridge → analog (R → Ground)
-// Pins at integer coords so connectivity groups form correctly.
-// ---------------------------------------------------------------------------
-//
-// Layout (world coords, all elements at position (0,0)):
-//   And: a=(-2,0), b=(-2,1), out=(0,0)
-//   DABridge: din=(0,0), aout=(1,0)
-//   AnalogR: A=(1,0), B=(3,0)
-//   Ground: pin=(3,0)
-//
-// Connectivity:
-//   And.out(0,0) ↔ DABridge.din(0,0)   - shared position → digital group
-//   DABridge.aout(1,0) ↔ AnalogR.A(1,0)- shared position → boundary group (digital+analog)
-//   AnalogR.B(3,0) ↔ Ground(3,0)       - shared position → analog group
-
-function buildMixedCircuit(): { circuit: Circuit; registry: ComponentRegistry } {
-  const registry = buildMixedRegistry();
-  // DABridge pins: din at (0,0), aout at (1,0)- element at default position (0,0)
-  // so world positions are din=(0,0), aout=(1,0).
-  // AnalogR pins at world (1,0) and (3,0) so AnalogR.A touches DABridge.aout.
-  const bridgePins = [inputPin(0, 0, 'din'), outputPin(1, 0, 'aout')];
-  const andPins = [inputPin(-2, 0, 'a'), inputPin(-2, 1, 'b'), outputPin(0, 0, 'out')];
-
-  const circuit = new Circuit();
-  circuit.addElement(createTestElementFromDecls('And', 'and-1', andPins));
-  circuit.addElement(createTestElementFromDecls('DABridge', 'bridge-1', bridgePins));
-  circuit.addElement(makeAnalogElement('AnalogR', 'r1', [{ x: 1, y: 0 }, { x: 3, y: 0 }]));
-  circuit.addElement(makeAnalogElement('Ground', 'gnd1', [{ x: 3, y: 0 }]));
-
-  // And.out(0,0) → DABridge.din(0,0): same position, no wire needed but add one
-  circuit.addWire(new Wire({ x: -2, y: 0 }, { x: -2, y: 0 }));  // And.a stub
-  circuit.addWire(new Wire({ x: -2, y: 1 }, { x: -2, y: 1 }));  // And.b stub
-  circuit.addWire(new Wire({ x: 1, y: 0 }, { x: 1, y: 0 }));    // DABridge.aout ↔ AnalogR.A
-  circuit.addWire(new Wire({ x: 3, y: 0 }, { x: 3, y: 0 }));    // AnalogR.B ↔ Ground
-
-  return { circuit, registry };
-}
-
-// ---------------------------------------------------------------------------
-// Tests
-// ---------------------------------------------------------------------------
 
 describe('digitalPinLoading- circuit metadata controls bridge adapter synthesis', () => {
   it('default (absent) is equivalent to cross-domain mode', () => {
-    const { circuit, registry } = buildMixedCircuit();
-
-    // No metadata set- should behave the same as explicit "cross-domain"
-    const resultDefault = compileUnified(circuit, registry);
-
-    circuit.metadata.digitalPinLoading = 'cross-domain';
-    const resultExplicit = compileUnified(circuit, registry);
-
+    const resultDefault = compileUnified(buildMixed(), registry);
+    const resultExplicit = compileUnified(buildMixed('cross-domain'), registry);
     expect(resultDefault.bridges.length).toBe(resultExplicit.bridges.length);
   });
 
-  it('cross-domain mode produces exactly one bridge for the DABridge element', () => {
-    const { circuit, registry } = buildMixedCircuit();
-    circuit.metadata.digitalPinLoading = 'cross-domain';
-
-    const result = compileUnified(circuit, registry);
-
+  it('cross-domain mode produces exactly one bridge for the real boundary', () => {
+    const result = compileUnified(buildMixed('cross-domain'), registry);
     expect(result.bridges).toHaveLength(1);
   });
 
   it('all mode produces more bridges than cross-domain for the same circuit', () => {
-    const { circuit, registry } = buildMixedCircuit();
-
-    circuit.metadata.digitalPinLoading = 'cross-domain';
-    const crossResult = compileUnified(circuit, registry);
-
-    circuit.metadata.digitalPinLoading = 'all';
-    const allResult = compileUnified(circuit, registry);
-
-    // "all" injects "analog" into every digital-only net, so more boundary
-    // groups are created. Cross-domain only bridges real boundaries.
+    const crossResult = compileUnified(buildMixed('cross-domain'), registry);
+    const allResult = compileUnified(buildMixed('all'), registry);
     expect(allResult.bridges.length).toBeGreaterThan(crossResult.bridges.length);
   });
 
   it('all mode: bridge count is at least as large as cross-domain bridge count', () => {
-    const { circuit, registry } = buildMixedCircuit();
-
-    circuit.metadata.digitalPinLoading = 'cross-domain';
-    const crossDomain = compileUnified(circuit, registry);
-
-    circuit.metadata.digitalPinLoading = 'all';
-    const all = compileUnified(circuit, registry);
-
-    // Per-net ordering invariant: all >= cross-domain in bridge group count.
+    const crossDomain = compileUnified(buildMixed('cross-domain'), registry);
+    const all = compileUnified(buildMixed('all'), registry);
     expect(all.bridges.length).toBeGreaterThanOrEqual(crossDomain.bridges.length);
   });
 
-  it('none mode produces zero bridges for a circuit with only digital-model pins at the boundary', () => {
-    const { registry } = buildMixedCircuit();
-
-    // Build a purely digital circuit- no analog components at all
-    const andPins = [inputPin(0, 0, 'a'), inputPin(0, 1, 'b'), outputPin(2, 0, 'out')];
-    const circuit = new Circuit();
-    circuit.addElement(createTestElementFromDecls('And', 'and-1', andPins));
+  it('none mode produces zero bridges for a purely digital circuit', () => {
+    const circuit = facade.build({
+      components: [
+        { id: 'A', type: 'In', props: { label: 'A', bitWidth: 1 } },
+        { id: 'B', type: 'In', props: { label: 'B', bitWidth: 1 } },
+        { id: 'g', type: 'And' },
+        { id: 'Y', type: 'Out', props: { label: 'Y', bitWidth: 1 } },
+      ],
+      connections: [
+        ['A:out', 'g:In_1'],
+        ['B:out', 'g:In_2'],
+        ['g:out', 'Y:in'],
+      ],
+    });
     circuit.metadata.digitalPinLoading = 'none';
-
     const result = compileUnified(circuit, registry);
-
     expect(result.bridges).toHaveLength(0);
   });
 
   it('changing digitalPinLoading from cross-domain to all increases bridge count', () => {
-    const { circuit, registry } = buildMixedCircuit();
-
-    circuit.metadata.digitalPinLoading = 'cross-domain';
-    const crossResult = compileUnified(circuit, registry);
-
-    circuit.metadata.digitalPinLoading = 'all';
-    const allResult = compileUnified(circuit, registry);
-
-    // "all" injects "analog" into all digital-only nets, producing more bridges.
+    const crossResult = compileUnified(buildMixed('cross-domain'), registry);
+    const allResult = compileUnified(buildMixed('all'), registry);
     expect(allResult.bridges.length).toBeGreaterThan(crossResult.bridges.length);
   });
 
   it('none mode on mixed circuit preserves the analog partition', () => {
-    const { circuit, registry } = buildMixedCircuit();
-    circuit.metadata.digitalPinLoading = 'none';
-
-    const result = compileUnified(circuit, registry);
-
-    // The analog partition must exist (contains AnalogR + Ground elements).
+    const result = compileUnified(buildMixed('none'), registry);
     expect(result.analog).not.toBeNull();
   });
 });

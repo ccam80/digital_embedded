@@ -36,8 +36,7 @@ import type {
   SignalValue,
 } from '../compile/types.js';
 import type { ConcreteCompiledAnalogCircuit } from './analog/compiled-analog-circuit.js';
-import type { BridgeOutputDriverElement } from './analog/behavioral-drivers/bridge-output-driver.js';
-import type { BridgeInputDriverElement } from './analog/behavioral-drivers/bridge-input-driver.js';
+import type { BridgePinAdapterHandle } from './analog/compiler.js';
 import type { ComponentRegistry } from '../core/registry.js';
 import { PropertyType } from '../core/properties.js';
 
@@ -62,6 +61,10 @@ const ANALOG_PROPERTY_UNITS: Record<string, string> = {
 interface TopLevelBridgeState {
   prevBit: number;
   prevDaHigh: boolean;
+  /** Previous enable state fed to an output adapter (true = driven, false =
+   *  Hi-Z released). A driven→Hi-Z release at the same logic level still posts
+   *  an analog breakpoint, so the timestep controller lands on the release. */
+  prevDaEn: boolean;
 }
 
 export class DefaultSimulationCoordinator implements SimulationCoordinator {
@@ -70,8 +73,9 @@ export class DefaultSimulationCoordinator implements SimulationCoordinator {
   private readonly _analog: AnalogEngine | null;
   private readonly _bridges: BridgeAdapter[];
   private readonly _topLevelBridgeStates: TopLevelBridgeState[];
-  /** Resolved MNA bridge adapters parallel to _bridges. Index i → adapters for _bridges[i]. */
-  private readonly _resolvedBridgeAdapters: Array<Array<BridgeOutputDriverElement | BridgeInputDriverElement>>;
+  /** Resolved per-pin boundary adapter handle parallel to _bridges. Index i →
+   *  the handle for _bridges[i] (one crossing pin), or null if unresolved. */
+  private readonly _resolvedBridgeAdapters: Array<BridgePinAdapterHandle | null>;
   private readonly _clockManager: ClockManager | null;
   private _diagnostics: DiagnosticCollector | null = null;
   private readonly _observers: Set<MeasurementObserver> = new Set();
@@ -97,18 +101,18 @@ export class DefaultSimulationCoordinator implements SimulationCoordinator {
     this._registry = registry ?? null;
     this._compiled = compiled;
     this._bridges = compiled.bridges;
-    this._topLevelBridgeStates = compiled.bridges.map(() => ({ prevBit: 0, prevDaHigh: false }));
+    this._topLevelBridgeStates = compiled.bridges.map(() => ({ prevBit: 0, prevDaHigh: false, prevDaEn: true }));
 
-    // Resolve MNA bridge adapters from the compiled analog circuit.
-    // Each BridgeAdapter descriptor maps to the adapters registered under its
-    // boundaryGroupId in bridgeAdaptersByGroupId.
+    // Resolve one per-pin boundary adapter handle per bridge (each bridge is a
+    // single crossing pin) from bridgeAdaptersByPinKey. No .find() scan: the
+    // map is keyed by the same pinKey the BridgeAdapter carries.
     if (compiled.analog !== null) {
       const compiledAnalog = compiled.analog as ConcreteCompiledAnalogCircuit;
-      this._resolvedBridgeAdapters = compiled.bridges.map(bridge =>
-        compiledAnalog.bridgeAdaptersByGroupId.get(bridge.boundaryGroupId) ?? [],
+      this._resolvedBridgeAdapters = compiled.bridges.map(
+        (bridge) => compiledAnalog.bridgeAdaptersByPinKey.get(bridge.pinKey) ?? null,
       );
     } else {
-      this._resolvedBridgeAdapters = compiled.bridges.map(() => []);
+      this._resolvedBridgeAdapters = compiled.bridges.map(() => null);
     }
 
     if (compiled.digital !== null) {
@@ -274,30 +278,31 @@ export class DefaultSimulationCoordinator implements SimulationCoordinator {
       return;
     }
 
+    const digitalEngine = digital as DigitalEngine;
+
+    // A2D: for each crossing INPUT pin, read its adapter's result-node voltage
+    // and threshold to a bit. The inner DigitalInputPin emits {0,0.5,1}; the
+    // coordinator maps 0.5 → hold-last-bit (preserving today's hysteresis).
     for (let i = 0; i < this._bridges.length; i++) {
       const bridge = this._bridges[i]!;
-      if (bridge.direction !== 'analog-to-digital') continue;
-      const voltage = analog.getNodeVoltage(bridge.analogNodeId);
-      const adapters = this._resolvedBridgeAdapters[i]!;
-      let bit: number;
-      const inputAdapter = adapters.find(
-        (a): a is BridgeInputDriverElement => 'readLogicLevel' in a,
-      );
-      if (inputAdapter === undefined) {
+      if (bridge.role !== 'input') continue;
+      const handle = this._resolvedBridgeAdapters[i];
+      if (handle === null || handle.resultNodeId < 0) {
         this._diagnostics?.emit({
           code: 'bridge-missing-inner-pin',
           severity: 'error',
-          message: `No BridgeInputDriverElement for boundary group ${bridge.boundaryGroupId}`,
-          explanation: 'An analog-to-digital bridge has no registered BridgeInputDriverElement. This indicates a compilation error- the bridge was not fully assembled.',
+          message: `No input boundary adapter for crossing pin ${bridge.pinKey}`,
+          explanation: 'An analog→digital crossing pin has no resolved boundary adapter result node. This indicates a compilation error- the adapter was not fully assembled.',
           suggestions: [],
         });
         continue;
       }
-      const level = inputAdapter.readLogicLevel(voltage);
-      if (level === true) {
+      const result = analog.getNodeVoltage(handle.resultNodeId);
+      let bit: number;
+      if (result > 0.5) {
         bit = 1;
         this._topLevelBridgeStates[i]!.prevBit = 1;
-      } else if (level === false) {
+      } else if (result < 0.5) {
         bit = 0;
         this._topLevelBridgeStates[i]!.prevBit = 0;
       } else {
@@ -306,36 +311,85 @@ export class DefaultSimulationCoordinator implements SimulationCoordinator {
       digital.setSignalValue(bridge.digitalNetId, BitVector.fromNumber(bit, bridge.bitWidth));
     }
 
-    digital.step();
-
+    // Pre-clear each crossing OUTPUT pin's net to "driven" (Hi-Z flag = 0)
+    // BEFORE evaluating the digital engine. Net Hi-Z slots default to the
+    // UNDEFINED sentinel (0xFFFFFFFF) and plain gates never touch them, so
+    // without this a gate-driven boundary net reads as Hi-Z and the adapter
+    // wrongly releases the hub. A tri-state Driver re-asserts Hi-Z during
+    // digital.step() when sel deselects it, so genuine releases still register.
     for (let i = 0; i < this._bridges.length; i++) {
       const bridge = this._bridges[i]!;
-      if (bridge.direction !== 'digital-to-analog') continue;
+      if (bridge.role !== 'output') continue;
+      digitalEngine.markNetDriven(bridge.digitalNetId);
+    }
+
+    digital.step();
+
+    // D2A: for each crossing OUTPUT pin, drive ctrl from the digital level and
+    // en from the net's Hi-Z flag. en=0 releases the hub through rHiZ; only a
+    // tri-state driver (e.g. Driver with sel=0) re-asserts Hi-Z after the
+    // pre-clear above, so a plain gate keeps en=1 (sEn closed).
+    for (let i = 0; i < this._bridges.length; i++) {
+      const bridge = this._bridges[i]!;
+      if (bridge.role !== 'output') continue;
       const raw = digital.getSignalRaw(bridge.digitalNetId);
+      const hiZ = digitalEngine.getSignalHighZ(bridge.digitalNetId) !== 0;
       const high = raw !== 0;
+      const en = !hiZ;
       const state = this._topLevelBridgeStates[i]!;
-      // On a logic-level transition, post an analog breakpoint at the
-      // current analog simTime. The next getClampedDt sees almostEqualUlps
-      // and applies the at-breakpoint clamp (CKTorder = 1, dt clamped via
-      // saveDelta), so the analog engine takes a clean order-1 small-dt
-      // step across the discontinuity instead of trapezoidal-integrating
-      // through a jump in the bridge stamp's target voltage. Mirrors the
-      // CKTsetBreak pattern used by every analog source (pulse, clock,
-      // pwl)- bridges were the missing case.
-      if (high !== state.prevDaHigh) {
+      // On a logic-level OR enable transition, post an analog breakpoint at the
+      // current analog simTime. The next getClampedDt sees almostEqualUlps and
+      // applies the at-breakpoint clamp (CKTorder = 1, dt clamped via
+      // saveDelta), so the analog engine takes a clean order-1 small-dt step
+      // across the discontinuity instead of trapezoidal-integrating through a
+      // jump in the adapter's drive/Hi-Z. Mirrors the CKTsetBreak pattern used
+      // by every analog source (pulse, clock, pwl). A driven→Hi-Z release at
+      // the same logic level still posts a breakpoint via the en transition.
+      if (high !== state.prevDaHigh || en !== state.prevDaEn) {
         analog.addBreakpoint(analog.simTime);
         state.prevDaHigh = high;
+        state.prevDaEn = en;
       }
-      const adapters = this._resolvedBridgeAdapters[i]!;
-      const outputAdapter = adapters.find(
-        (a): a is BridgeOutputDriverElement => 'setLogicLevel' in a,
-      );
-      if (outputAdapter !== undefined) {
-        outputAdapter.setLogicLevel(high);
+      const handle = this._resolvedBridgeAdapters[i];
+      if (handle !== null) {
+        // ctrl: normalized logic level {0,1}; en: 1=driven, 0=Hi-Z.
+        handle.wrapper.setParam('ctrl', high ? 1 : 0);
+        handle.wrapper.setParam('en', en ? 1 : 0);
       }
     }
 
     analog.step();
+  }
+
+  /**
+   * One-step digital warmup for standalone DC-op. Evaluates the digital engine
+   * and pushes each crossing OUTPUT pin's logic level (ctrl) and Hi-Z (en) onto
+   * its boundary adapter, so the analog operating point reflects real drive vs
+   * release instead of the adapter's drive-low defaults. Mirrors the output half
+   * of _stepMixed's D2A sync (no breakpoints- there is no transient timeline at
+   * a bias point). Input bridges need no warmup: their adapters are passive in
+   * the analog solve, which resolves the result node from the hub voltage.
+   */
+  private _digitalWarmupForDcOp(): void {
+    if (this._digital === null || this._bridges.length === 0) return;
+    const digital = this._digital;
+    const digitalEngine = digital as DigitalEngine;
+    for (let i = 0; i < this._bridges.length; i++) {
+      const bridge = this._bridges[i]!;
+      if (bridge.role !== 'output') continue;
+      digitalEngine.markNetDriven(bridge.digitalNetId);
+    }
+    digital.step();
+    for (let i = 0; i < this._bridges.length; i++) {
+      const bridge = this._bridges[i]!;
+      if (bridge.role !== 'output') continue;
+      const handle = this._resolvedBridgeAdapters[i];
+      if (handle === null) continue;
+      const high = digital.getSignalRaw(bridge.digitalNetId) !== 0;
+      const en = digitalEngine.getSignalHighZ(bridge.digitalNetId) === 0;
+      handle.wrapper.setParam('ctrl', high ? 1 : 0);
+      handle.wrapper.setParam('en', en ? 1 : 0);
+    }
   }
 
   readSignal(addr: SignalAddress): SignalValue {
@@ -442,6 +496,12 @@ export class DefaultSimulationCoordinator implements SimulationCoordinator {
   dcOperatingPoint(): DcOpResult | null {
     if (this._analog === null) return null;
     this._analysisPhase = "dcop";
+    // One-step digital warmup: a standalone .op has not run the transient mixed
+    // step, so without this the boundary OUTPUT adapters sit at their drive-low
+    // defaults and corrupt the bias point (e.g. a Const-disabled Driver would
+    // still pin the hub). Evaluate the digital engine once and push each
+    // crossing output pin's level/Hi-Z onto its adapter before the analog solve.
+    this._digitalWarmupForDcOp();
     return (this._analog as MNAEngine).dcOperatingPoint();
   }
 
@@ -883,34 +943,11 @@ export class DefaultSimulationCoordinator implements SimulationCoordinator {
       if (elementIndex !== -1) {
         const compiledAnalog = this._compiled.analog as ConcreteCompiledAnalogCircuit;
 
-        // Composite pin-param key (e.g. "A.rOut") → route to bridge adapters via
-        // bridgeAdaptersByGroupId. We find adapters whose label ends with the pin
-        // label suffix so that "A.rOut" routes to the adapter for pin "A".
-        const dotIdx = key.indexOf('.');
-        if (dotIdx !== -1) {
-          const pinLabel = key.slice(0, dotIdx);
-          const paramName = key.slice(dotIdx + 1);
-          let bridgeHandled = false;
-          for (const adapters of compiledAnalog.bridgeAdaptersByGroupId.values()) {
-            for (const adapter of adapters) {
-              if (adapter.label?.endsWith(`:${pinLabel}`)) {
-                adapter.setParam(paramName, value);
-                bridgeHandled = true;
-              }
-            }
-          }
-          if (!bridgeHandled) {
-            // No bridge adapter matched- the element may hold pin models
-            // internally (e.g. behavioral analog models). Forward the full
-            // composite key so the element can route it via delegatePinSetParam.
-            const el = compiledAnalog.elements[elementIndex];
-            if (el !== undefined && el.setParam) {
-              el.setParam(key, value);
-            }
-          }
-          this._analog.configure({});
-          handled = true;
-        }
+        // Composite pin-param key (e.g. "A.rOut"): boundary adapters are now
+        // full composites whose wrapper.setParam routes pin params, and other
+        // composite elements route dotted keys via their own setParam, so the
+        // generic element setParam fall-through below handles them uniformly.
+        // No special bridge dispatch is needed here.
 
         const el = compiledAnalog.elements[elementIndex];
         if (el !== undefined && el.setParam) {

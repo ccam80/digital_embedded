@@ -1192,7 +1192,7 @@ export class ComparisonSession {
     this._comparisons = null;
     this._structuralFindings = [];
 
-    // ngspice CKTstep â†" our outputStep, ngspice CKTmaxStep â†" our maxTimeStep.
+    // ngspice CKTstep → our outputStep, ngspice CKTmaxStep → our maxTimeStep.
     // The two are independent ngspice .tran fields (TSTEP and TMAX) and govern
     // different things  see ngspice-bridge.ts runTran() for the cite. Earlier
     // versions of this harness sent `maxStep` as TSTEP and `tStop/100` as the
@@ -1446,7 +1446,7 @@ export class ComparisonSession {
     }
     const presence = this._stepPresence(stepIndex);
 
-    // Accepted attempt final iteration (spec Âss9.3)
+    // Accepted attempt final iteration (spec §9.3)
     const ourAccIdx = ourStep.acceptedAttemptIndex >= 0 && ourStep.acceptedAttemptIndex < ourStep.attempts.length
       ? ourStep.acceptedAttemptIndex
       : ourStep.attempts.length - 1;
@@ -1531,7 +1531,7 @@ export class ComparisonSession {
   }
 
   /**
-   * Per-iteration data for a step  uses accepted attempt iterations (spec Âss9.2).
+   * Per-iteration data for a step  uses accepted attempt iterations (spec §9.2).
    */
   getIterations(stepIndex: number): IterationReport[] {
     this._ensureRun();

@@ -6,8 +6,8 @@
  * through the coil), the contact closes. When de-energised, it opens.
  *
  * normallyClosedRelay property inverts this logic:
- *   false (normally open, default): coil energised â†’ contact CLOSED
- *   true  (normally closed):        coil energised â†’ contact OPEN
+ *   false (normally open, default): coil energised → contact CLOSED
+ *   true  (normally closed):        coil energised → contact OPEN
  *
  * If either coil terminal is floating (high-Z in Digital's model), the coil
  * is treated as de-energised (contact reverts to its rest state).
@@ -139,22 +139,22 @@ export class RelayElement extends AbstractCircuitElement {
     ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
 
-    // Contact arm: (0,0) â†’ (1.8,-0.5)- switch arm angled upward from pin
+    // Contact arm: (0,0) → (1.8,-0.5)- switch arm angled upward from pin
     ctx.drawLine(0, 0, 1.8, -0.5);
 
     // Zero-length segment at B1 pin (2,0) so pin proximity check passes
     ctx.drawLine(2, 0, 2, 0);
 
-    // Dashed linkage: (1,-0.5) â†’ (1,-0.95)
+    // Dashed linkage: (1,-0.5) → (1,-0.95)
     ctx.drawLine(1, -0.5, 1, -0.95);
 
     // Coil rectangle: x 0.5..1.5, y -1..-3
     ctx.drawRect(0.5, -3, 1, 2, false);
 
-    // Coil diagonal: (0.5,-1.5) â†’ (1.5,-2.5)
+    // Coil diagonal: (0.5,-1.5) → (1.5,-2.5)
     ctx.drawLine(0.5, -1.5, 1.5, -2.5);
 
-    // Coil terminal leads: (0.5,-2)â†’(0,-2) and (1.5,-2)â†’(2,-2)
+    // Coil terminal leads: (0.5,-2)→(0,-2) and (1.5,-2)→(2,-2)
     ctx.drawLine(0.5, -2, 0, -2);
     ctx.drawLine(1.5, -2, 2, -2);
 

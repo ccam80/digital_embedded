@@ -80,8 +80,8 @@ export class ButtonLEDElement extends AbstractCircuitElement {
 
   getBoundingBox(): Rect {
     // Drawn geometry: outer polygon x:[-1.9,-0.05], y:[-1.1,0.75]
-    // Line (-0.4,0.4)â†’(-0.1,0.7): inside polygon bounds
-    // Circle at cx=-1.15,r=0.5 â†’ x:[-1.65,-0.65], y:[-0.85,0.15]: inside polygon
+    // Line (-0.4,0.4)→(-0.1,0.7): inside polygon bounds
+    // Circle at cx=-1.15,r=0.5 → x:[-1.65,-0.65], y:[-0.85,0.15]: inside polygon
     return {
       x: this.position.x - 1.9,
       y: this.position.y - 1.1,
@@ -102,7 +102,7 @@ export class ButtonLEDElement extends AbstractCircuitElement {
     ctx.setLineWidth(1);
 
     // Outer 3D button polygon (body to left of pin at x=0):
-    // (-1.9,-1.1) â†’ (-0.4,-1.1) â†’ (-0.05,-0.75) â†’ (-0.05,0.75) â†’ (-1.55,0.75) â†’ (-1.9,0.4)
+    // (-1.9,-1.1) → (-0.4,-1.1) → (-0.05,-0.75) → (-0.05,0.75) → (-1.55,0.75) → (-1.9,0.4)
     ctx.drawPolygon(
       [
         { x: -1.9, y: -1.1 },
@@ -115,7 +115,7 @@ export class ButtonLEDElement extends AbstractCircuitElement {
       true,
     );
 
-    // Inner button face open path: (-0.4,-1.05) â†’ (-0.4,0.4) â†’ (-1.85,0.4)
+    // Inner button face open path: (-0.4,-1.05) → (-0.4,0.4) → (-1.85,0.4)
     ctx.drawPath({
       operations: [
         { op: "moveTo", x: -0.4,  y: -1.05 },

@@ -52,7 +52,7 @@ export class InternalCccsElement extends AnalogElement {
   private _senseBranch = -1;
   private readonly _props: PropertyBag;
 
-  // Cached matrix-entry handles â€” ccssetup.c TSTALLOC at (pos, b_sense)
+  // Cached matrix-entry handles — ccssetup.c TSTALLOC at (pos, b_sense)
   // and (neg, b_sense).
   private _hPosSense = -1;
   private _hNegSense = -1;
@@ -90,14 +90,14 @@ export class InternalCccsElement extends AnalogElement {
     }
     const b = this._senseBranch;
 
-    // ccssetup.c â€” TSTALLOC at (pos, b_sense) and (neg, b_sense).
+    // ccssetup.c — TSTALLOC at (pos, b_sense) and (neg, b_sense).
     this._hPosSense = solver.allocElement(posNode, b);
     this._hNegSense = solver.allocElement(negNode, b);
   }
 
   load(ctx: LoadContext): void {
     const solver = ctx.solver;
-    // ccsload.c â€” stamp gain and -gain on the sense-branch column.
+    // ccsload.c — stamp gain and -gain on the sense-branch column.
     solver.stampElement(this._hPosSense, this._gain);
     solver.stampElement(this._hNegSense, -this._gain);
   }

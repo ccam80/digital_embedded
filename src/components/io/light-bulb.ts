@@ -3,7 +3,7 @@
  *
  * Rendered as a circle with filament cross lines.
  * Brightness is conceptually proportional to input value; visually it is
- * either off (input=0) or on (inputâ‰ 0) since the canvas renderer is binary.
+ * either off (input=0) or on (input≠0) since the canvas renderer is binary.
  * 1-bit input.
  */
 

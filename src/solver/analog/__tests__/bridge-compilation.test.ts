@@ -1,81 +1,120 @@
-﻿/**
- * Tests for bridge MNA element integration in compileAnalogPartition.
+/**
+ * Per-pin boundary-adapter compilation tests.
  *
- * Task 1.6: Verifies that bridge stubs produce BridgeOutputDriverElement /
- * BridgeInputDriverElement MNA elements, keyed by group ID in
- * bridgeAdaptersByGroupId, and that loading flags honour digitalPinLoading.
+ * Verifies that the unified compiler synthesizes one finite-impedance
+ * boundary-adapter composite per crossing digital pin, exposes it via
+ * `bridgeAdaptersByPinKey` (keyed by the crossing pin's stable pinKey), and
+ * that the expanded composite wrapper participates in the analog elements
+ * array. Uses real compiled circuits (the synthesis binds each adapter's
+ * `node` port to the shared analog hub by world-position, so synthetic
+ * empty-pin partitions are not a valid construction path anymore).
  */
 
 import { describe, it, expect } from 'vitest';
-import { compileAnalogPartition } from '../compiler.js';
-import type {
-  SolverPartition,
-  ConnectivityGroup,
-  BridgeStub,
-  BridgeDescriptor,
-} from '../../../compile/types.js';
-import type { BridgeOutputDriverElement } from '../behavioral-drivers/bridge-output-driver.js';
-import { ComponentRegistry } from '../../../core/registry.js';
+import { buildFixture } from './fixtures/build-fixture.js';
+import type { Fixture } from './fixtures/build-fixture.js';
 
-const CMOS_3V3 = { rOut: 50, cOut: 5e-12, rIn: 1e7, cIn: 5e-12, vOH: 3.3, vOL: 0.0, vIH: 2.0, vIL: 0.8, rHiZ: 1e7 };
-
-function makeBoundaryGroup(groupId: number): ConnectivityGroup {
-  return { groupId, pins: [], wires: [], domains: new Set(['digital', 'analog']), bitWidth: 1 };
+// In(A):out ──► Rload ──► Rpull ──► gnd.  One digital OUTPUT crossing.
+function buildOutput(): Fixture {
+  return buildFixture({
+    build: (_r, facade) => facade.build({
+      components: [
+        { id: 'A', type: 'In', props: { label: 'A', bitWidth: 1 } },
+        { id: 'Rload', type: 'Resistor', props: { label: 'Rload', resistance: 50 } },
+        { id: 'Rpull', type: 'Resistor', props: { label: 'Rpull', resistance: 1e6 } },
+        { id: 'gnd', type: 'Ground' },
+      ],
+      connections: [
+        ['A:out', 'Rload:pos'],
+        ['Rload:neg', 'Rpull:pos'],
+        ['Rpull:neg', 'gnd:out'],
+      ],
+    }),
+  });
 }
 
-function makeStub(group: ConnectivityGroup, direction: 'digital-to-analog' | 'analog-to-digital'): BridgeStub {
-  const descriptor: BridgeDescriptor = { boundaryGroup: group, direction, bitWidth: 1, electricalSpec: CMOS_3V3 };
-  return { boundaryGroupId: group.groupId, descriptor };
+// vs ──► r ──► Out(Y):in.  One analog→digital (INPUT) crossing.
+function buildInput(): Fixture {
+  return buildFixture({
+    build: (_r, facade) => facade.build({
+      components: [
+        { id: 'vs', type: 'DcVoltageSource', props: { label: 'VS', voltage: 3.3 } },
+        { id: 'r', type: 'Resistor', props: { label: 'R', resistance: 1000 } },
+        { id: 'Y', type: 'Out', props: { label: 'Y', bitWidth: 1 } },
+        { id: 'gnd', type: 'Ground' },
+      ],
+      connections: [
+        ['vs:pos', 'r:pos'],
+        ['r:neg', 'Y:in'],
+        ['vs:neg', 'gnd:out'],
+      ],
+    }),
+  });
 }
 
-function makePartition(stubs: BridgeStub[], groups: ConnectivityGroup[]): SolverPartition {
-  return { components: [], groups, bridgeStubs: stubs };
+// A(In):out AND Y(Out):in BOTH on one analog net (R:pos). Two crossing digital
+// pins on one hub → two per-pin adapters (the old per-net bridge produced one).
+function buildTwoPin(): Fixture {
+  return buildFixture({
+    build: (_r, facade) => facade.build({
+      components: [
+        { id: 'A', type: 'In', props: { label: 'A', bitWidth: 1 } },
+        { id: 'Y', type: 'Out', props: { label: 'Y', bitWidth: 1 } },
+        { id: 'R', type: 'Resistor', props: { label: 'R', resistance: 1e3 } },
+        { id: 'gnd', type: 'Ground' },
+      ],
+      connections: [
+        ['A:out', 'R:pos'],
+        ['Y:in', 'R:pos'],
+        ['R:neg', 'gnd:out'],
+      ],
+    }),
+  });
 }
 
-describe('bridge-compilation: boundary group adapter creation', () => {
-  it('boundary group produces output adapter for digital-to-analog direction', () => {
-    const group = makeBoundaryGroup(1);
-    const stub = makeStub(group, 'digital-to-analog');
-    const partition = makePartition([stub], [group]);
-    const compiled = compileAnalogPartition(partition, new ComponentRegistry(), undefined, undefined, undefined, 'cross-domain');
-    expect(compiled.bridgeAdaptersByGroupId.has(1)).toBe(true);
-    const adapters = compiled.bridgeAdaptersByGroupId.get(1)!;
-    expect(adapters).toHaveLength(1);
-    expect(adapters[0]).toHaveProperty('setLogicLevel');
+describe('bridge-compilation: per-pin boundary adapters', () => {
+  it('a digital OUTPUT crossing yields an output adapter handle keyed by pinKey', () => {
+    const fix = buildOutput();
+    const compiled = fix.coordinator.compiled;
+    const bridge = compiled.bridges.find((b) => b.role === 'output');
+    expect(bridge).toBeDefined();
+    const handle = compiled.analog!.bridgeAdaptersByPinKey.get(bridge!.pinKey);
+    expect(handle).toBeDefined();
+    expect(handle!.role).toBe('output');
+    // The expanded composite wrapper participates in the analog elements array.
+    expect(compiled.analog!.elements).toContain(handle!.wrapper);
+    fix.coordinator.dispose();
   });
 
-  it('boundary group produces input adapter for analog-to-digital direction', () => {
-    const group = makeBoundaryGroup(2);
-    const stub = makeStub(group, 'analog-to-digital');
-    const partition = makePartition([stub], [group]);
-    const compiled = compileAnalogPartition(partition, new ComponentRegistry(), undefined, undefined, undefined, 'cross-domain');
-    expect(compiled.bridgeAdaptersByGroupId.has(2)).toBe(true);
-    const adapters = compiled.bridgeAdaptersByGroupId.get(2)!;
-    expect(adapters).toHaveLength(1);
-    expect(adapters[0]).toHaveProperty('readLogicLevel');
+  it('an analog→digital crossing yields an input adapter handle with a result node', () => {
+    const fix = buildInput();
+    const compiled = fix.coordinator.compiled;
+    const bridge = compiled.bridges.find((b) => b.role === 'input');
+    expect(bridge).toBeDefined();
+    const handle = compiled.analog!.bridgeAdaptersByPinKey.get(bridge!.pinKey);
+    expect(handle).toBeDefined();
+    expect(handle!.role).toBe('input');
+    // nResult is a real composite-internal MNA node the coordinator reads.
+    expect(handle!.resultNodeId).toBeGreaterThan(0);
+    fix.coordinator.dispose();
+  });
+
+  it('produces ONE adapter per crossing pin (two digital pins on one hub → two adapters)', () => {
+    const fix = buildTwoPin();
+    const compiled = fix.coordinator.compiled;
+    const crossing = compiled.bridges;
+    // One output (A:out) + one input (Y:in) crossing on the same analog hub.
+    expect(crossing.filter((b) => b.role === 'output')).toHaveLength(1);
+    expect(crossing.filter((b) => b.role === 'input')).toHaveLength(1);
+    // Distinct pinKeys, each with its own resolved adapter handle.
+    const keys = new Set(crossing.map((b) => b.pinKey));
+    expect(keys.size).toBe(2);
+    for (const b of crossing) {
+      expect(compiled.analog!.bridgeAdaptersByPinKey.get(b.pinKey)).toBeDefined();
+    }
+    // All crossings share the same analog hub node.
+    const nodes = new Set(crossing.map((b) => b.analogNodeId));
+    expect(nodes.size).toBe(1);
+    fix.coordinator.dispose();
   });
 });
-
-describe('bridge-compilation: bridge output adapter branch index', () => {
-  it('bridge output adapter defers branch allocation to setup()', () => {
-    const group = makeBoundaryGroup(1);
-    const stub = makeStub(group, 'digital-to-analog');
-    const partition = makePartition([stub], [group]);
-    const compiled = compileAnalogPartition(partition, new ComponentRegistry(), undefined, undefined, undefined, 'cross-domain');
-    const adapter = compiled.bridgeAdaptersByGroupId.get(1)![0] as BridgeOutputDriverElement;
-    expect(adapter.branchIndex).toBe(-1);
-  });
-});
-
-describe('bridge-compilation: bridge adapters appear in elements array', () => {
-  it('bridge adapters participate in analog elements array', () => {
-    const group = makeBoundaryGroup(1);
-    const stub = makeStub(group, 'digital-to-analog');
-    const partition = makePartition([stub], [group]);
-    const compiled = compileAnalogPartition(partition, new ComponentRegistry(), undefined, undefined, undefined, 'cross-domain');
-    expect(compiled.elements.length).toBeGreaterThan(0);
-    const adapter = compiled.bridgeAdaptersByGroupId.get(1)![0];
-    expect(compiled.elements).toContain(adapter);
-  });
-});
-

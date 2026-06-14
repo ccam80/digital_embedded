@@ -46,7 +46,7 @@ import { defineModelParams } from "../../core/model-params.js";
 export const { paramDefs: POLARIZED_CAP_PARAM_DEFS, defaults: POLARIZED_CAP_MODEL_DEFAULTS } = defineModelParams({
   primary: {
     capacitance:    { default: 100e-6, unit: "F", description: "Capacitance in farads", min: 1e-12 },
-    esr:            { default: 0.1,    unit: "Î", description: "Equivalent series resistance in ohms", min: 0 },
+    esr:            { default: 0.1,    unit: "Ω", description: "Equivalent series resistance in ohms", min: 0 },
   },
   secondary: {
     leakageCurrent: { default: 1e-6,  unit: "A", description: "DC leakage current at rated voltage", min: 0 },

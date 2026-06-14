@@ -43,7 +43,7 @@ const COMP_WIDTH = 3;
 // Pin layout helper
 // ---------------------------------------------------------------------------
 
-// GenericShape formula: 1 output â†’ symmetric=true
+// GenericShape formula: 1 output → symmetric=true
 // even = inputCount % 2 === 0; offs = floor(inputCount/2)
 // Input i: y = i + (symmetric && even && i >= floor(inputCount/2) ? 1 : 0)
 // Output:  y = offs = floor(inputCount/2)

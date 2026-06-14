@@ -10,7 +10,7 @@ export type {
   ResolvedGroupPin,
   ConnectivityGroup,
   PartitionedComponent,
-  BridgeDescriptor,
+  BridgePinDescriptor,
   BridgeStub,
   SolverPartition,
   BridgeAdapter,

@@ -79,9 +79,9 @@ function componentHeight(outputCount: number): number {
 //   sel (input[0]), outputs, then in (input[1]).
 //
 // Java positions (in SIZE=20px = 1 grid unit):
-//   sel: (SIZE, flip ? 0 : height) â†’ (1, flip ? 0 : h)
-//   out_i: (SIZE*2, i*SIZE) â†’ (2, i)  [special case for 2 outputs: y=0 and y=2]
-//   in: (0, (outputCount/2)*SIZE) â†’ (0, floor(outputCount/2))
+//   sel: (SIZE, flip ? 0 : height) → (1, flip ? 0 : h)
+//   out_i: (SIZE*2, i*SIZE) → (2, i)  [special case for 2 outputs: y=0 and y=2]
+//   in: (0, (outputCount/2)*SIZE) → (0, floor(outputCount/2))
 // ---------------------------------------------------------------------------
 
 export function buildDemuxPinDeclarations(
@@ -190,7 +190,7 @@ export class DemuxElement extends AbstractCircuitElement {
     const selectorBits = this._properties.getOrDefault<number>("selectorBits", 1);
     const outputCount = 1 << selectorBits;
     // Java DemuxerShape uses same trapezoid as DecoderShape: narrower left, wider right.
-    // Reference (2 outputs / selectorBits=1): (0.05,0.25)â†’(1.95,-0.2)â†’(1.95,2.2)â†’(0.05,1.75)
+    // Reference (2 outputs / selectorBits=1): (0.05,0.25)→(1.95,-0.2)→(1.95,2.2)→(0.05,1.75)
     const h = outputCount; // right-edge total height in grid units
     const leftInset = 0.25;
     const rightOver = 0.2;
@@ -210,7 +210,7 @@ export class DemuxElement extends AbstractCircuitElement {
     ctx.setLineWidth(1);
     ctx.drawPolygon(poly, false);
 
-    // First output label "0" near top-right, RIGHTTOP anchor â†’ (1.85, 0.1)
+    // First output label "0" near top-right, RIGHTTOP anchor → (1.85, 0.1)
     ctx.setColor("TEXT");
     ctx.setFont({ family: "sans-serif", size: 0.75, weight: "normal" });
     ctx.drawText("0", 1.85, 0.1, { horizontal: "right", vertical: "top" });

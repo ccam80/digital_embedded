@@ -138,7 +138,7 @@ describe("BusNet", () => {
   });
 
   // -------------------------------------------------------------------------
-  // pullUpResolvesFloating- all drivers high-Z with pull-up â†’ all 1s
+  // pullUpResolvesFloating- all drivers high-Z with pull-up → all 1s
   // -------------------------------------------------------------------------
   it("pullUpResolvesFloating", () => {
     const { state, highZ } = makeState(2);
@@ -154,7 +154,7 @@ describe("BusNet", () => {
   });
 
   // -------------------------------------------------------------------------
-  // pullDownResolvesFloating- all drivers high-Z with pull-down â†’ all 0s
+  // pullDownResolvesFloating- all drivers high-Z with pull-down → all 0s
   // -------------------------------------------------------------------------
   it("pullDownResolvesFloating", () => {
     const { state, highZ } = makeState(2);
@@ -170,7 +170,7 @@ describe("BusNet", () => {
   });
 
   // -------------------------------------------------------------------------
-  // noDriversFullHighZ- empty driver list â†’ full high-Z output
+  // noDriversFullHighZ- empty driver list → full high-Z output
   // -------------------------------------------------------------------------
   it("noDriversFullHighZ", () => {
     const { state, highZ } = makeState(1);
@@ -206,7 +206,7 @@ describe("BusNet", () => {
   it("partialConflict", () => {
     // Driver A: bits[7:4]=defined-high(0xF0), bits[3:0]=defined-low
     // Driver B: bits[7:4]=defined-low, bits[3:0]=defined-high(0x0F)
-    // All bits driven by both drivers but to different values â†’ burn
+    // All bits driven by both drivers but to different values → burn
     const { state, highZ } = makeState(3);
     setDefined(state, highZ, 0, 0xf0);
     setDefined(state, highZ, 1, 0x0f);
@@ -253,7 +253,7 @@ describe("BusResolver", () => {
   });
 
   // -------------------------------------------------------------------------
-  // persistentBurnDetected- conflict that does not resolve â†’ BurnException
+  // persistentBurnDetected- conflict that does not resolve → BurnException
   // -------------------------------------------------------------------------
   it("persistentBurnDetected", () => {
     const { state, highZ } = makeState(3);
@@ -295,7 +295,7 @@ describe("BusResolver", () => {
     resolver.onNetChanged(1, state, highZ);
 
     // With the switch closed, driver 0 (0xAA) now also contributes to bus at output 3.
-    // Both drivers drive different values â†’ burn expected on merged nets.
+    // Both drivers drive different values → burn expected on merged nets.
     const burns = resolver.checkAllBurns();
     // At least one burn should be detected (drivers disagree)
     expect(burns.length).toBeGreaterThan(0);
@@ -392,7 +392,7 @@ describe("BusResolver", () => {
     resolver.onNetChanged(1, state, highZ);
 
     // Exactly one merge should have occurred (not doubled)
-    // Both drivers conflict â†’ exactly 1 BurnException per output net (not 2)
+    // Both drivers conflict → exactly 1 BurnException per output net (not 2)
     const burns = resolver.checkAllBurns();
     // Should be 2 burn exceptions (one per output net), not 4
     expect(burns.length).toBeLessThanOrEqual(2);

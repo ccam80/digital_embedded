@@ -7,19 +7,19 @@
  *   - Shunt conductance G_seg (dielectric loss)
  *   - Shunt capacitance C_seg (electric storage)
  *
- * High-level user parameters (Zâ‚€, Ï„, loss per metre, length, segment count N)
+ * High-level user parameters (Z₀, τ, loss per metre, length, segment count N)
  * are converted to per-segment RLCG values at instantiation.
  *
  * Internal topology for N segments (segments 0..N-2 have a mid-node):
  *
- *   Port1 â”€Râ”€Lâ”€ junction[0] â”€Râ”€Lâ”€ junction[1] â”€ ... â”€Râ”€Lâ”€ Port2
+ *   Port1 ─R─L─ junction[0] ─R─L─ junction[1] ─ ... ─R─L─ Port2
  *                   |                  |
  *                  G,C                G,C
  *                   |                  |
  *                  GND               GND
  *
- * Segments 0..N-2: inputNode â”€ R â”€ rlMid[k] â”€ L â”€ junction[k], shunt G+C at junction[k]
- * Segment N-1 (last): junction[N-2] â”€ CombinedRL â”€ Port2 (no shunt at Port2)
+ * Segments 0..N-2: inputNode ─ R ─ rlMid[k] ─ L ─ junction[k], shunt G+C at junction[k]
+ * Segment N-1 (last): junction[N-2] ─ CombinedRL ─ Port2 (no shunt at Port2)
  *
  * Branch variables: N consecutive indices (one per segment inductor/CombinedRL).
  *
@@ -52,7 +52,7 @@ import { createTransmissionLineElement } from "./transmission-line-element.js";
 
 export const { paramDefs: TRANSMISSION_LINE_PARAM_DEFS, defaults: TRANSMISSION_LINE_DEFAULTS } = defineModelParams({
   primary: {
-    impedance:    { default: 50,    description: "Characteristic impedance Zâ‚€ in ohms", min: 1 },
+    impedance:    { default: 50,    description: "Characteristic impedance Z₀ in ohms", min: 1 },
     delay:        { default: 1e-9,  unit: "s", description: "Total one-way propagation delay in seconds", min: 1e-15 },
   },
   secondary: {
@@ -279,7 +279,7 @@ export const TransmissionLineDefinition: StandaloneComponentDefinition = {
   helpText:
     "Lossy Transmission Line  lumped RLCG model.\n" +
     "N cascaded segments with series RL and shunt GC. " +
-    "Parameterised by Zâ‚€, propagation delay, loss, and segment count.",
+    "Parameterised by Z₀, propagation delay, loss, and segment count.",
   models: {},
   modelRegistry: {
     "default": {

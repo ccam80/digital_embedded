@@ -208,6 +208,19 @@ export function compileUnified(
     }
   }
 
+  // Map crossing-pin pinKey → its private digital group's id. The partition
+  // minted one singleton digital group per crossing pin (its only pin's key
+  // identifies it). Used below to resolve each per-pin adapter's digitalNetId.
+  const pinKeyToPrivateGroupId = new Map<string, number>();
+  for (const g of digitalPartition.groups) {
+    if (g.domains.size !== 1 || !g.domains.has("digital")) continue;
+    if (g.pins.length !== 1) continue;
+    const p = g.pins[0]!;
+    const el = circuit.elements[p.elementIndex];
+    const instanceId = el?.instanceId ?? `el${p.elementIndex}`;
+    pinKeyToPrivateGroupId.set(`${instanceId}:${p.pinLabel}`, g.groupId);
+  }
+
   // Map groupId → analog nodeId via the analog compiler's groupToNodeId.
   // This is authoritative- it handles zero-wire groups (direct pin overlap)
   // that the old wire-based lookup missed.
@@ -248,13 +261,17 @@ export function compileUnified(
     const isAnalog = group.domains.has("analog");
 
     let addr: SignalAddress | undefined;
-    if (isDigital) {
+    // A boundary group (both domains) has a real analog hub node but, after the
+    // per-pin split, no single shared digital net- so prefer the analog address
+    // for boundary and pure-analog groups. Pure-digital groups use the digital
+    // net. (Reading the analog hub voltage is what a boundary pin/wire shows.)
+    if (isAnalog) {
+      const nodeId = groupIdToAnalogNodeId.get(group.groupId) ?? 0;
+      addr = { domain: "analog", nodeId };
+    } else if (isDigital) {
       const netId = groupIdToDigitalNetId.get(group.groupId) ?? 0;
       const bitWidth = group.bitWidth ?? 1;
       addr = { domain: "digital", netId, bitWidth, direction: PinDirection.BIDIRECTIONAL };
-    } else if (isAnalog) {
-      const nodeId = groupIdToAnalogNodeId.get(group.groupId) ?? 0;
-      addr = { domain: "analog", nodeId };
     }
 
     if (addr !== undefined) {
@@ -451,15 +468,19 @@ export function compileUnified(
   const bridges: BridgeAdapter[] = [];
 
   for (const bd of bridgeDescriptors) {
-    const boundaryGroupId = bd.boundaryGroup.groupId;
-    const digitalNetId = groupIdToDigitalNetId.get(boundaryGroupId) ?? 0;
-    const analogNodeId = groupIdToAnalogNodeId.get(boundaryGroupId) ?? 0;
+    const privateGroupId = pinKeyToPrivateGroupId.get(bd.pinKey);
+    const digitalNetId = privateGroupId !== undefined
+      ? (groupIdToDigitalNetId.get(privateGroupId) ?? 0)
+      : 0;
+    const analogNodeId = groupIdToAnalogNodeId.get(bd.analogGroupId) ?? 0;
 
     bridges.push({
-      boundaryGroupId,
+      pinKey: bd.pinKey,
+      analogGroupId: bd.analogGroupId,
       digitalNetId,
       analogNodeId,
-      direction: bd.direction,
+      role: bd.role,
+      isTriState: bd.isTriState,
       bitWidth: bd.bitWidth,
       electricalSpec: bd.electricalSpec,
     });

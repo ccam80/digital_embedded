@@ -101,7 +101,7 @@ export class DipSwitchElement extends AbstractCircuitElement {
     componentWidth(bitCount);
 
     // Java DipSwitchShape: body is LEFT of pin at (0,0).
-    // Outer rect: (-0.05, 0.5) â†’ (-w-0.05, 0.5) â†’ (-w-0.05, -0.5) â†’ (-0.05, -0.5)
+    // Outer rect: (-0.05, 0.5) → (-w-0.05, 0.5) → (-w-0.05, -0.5) → (-0.05, -0.5)
     // i.e. x from -(w+0.05) to -0.05, y from -0.5 to 0.5 (height=1)
     const bodyRight = -0.05;
     // Compute bodyLeft via integer arithmetic to avoid float error in -(w + 0.05).
@@ -123,7 +123,7 @@ export class DipSwitchElement extends AbstractCircuitElement {
     ctx.setLineWidth(1);
     ctx.drawPolygon(outerCorners, false);
 
-    // Switch slider: Java fixture shows (-2.75,0.3) â†’ (-1.5,0.3) â†’ (-1.5,-0.3) â†’ (-2.75,-0.3)
+    // Switch slider: Java fixture shows (-2.75,0.3) → (-1.5,0.3) → (-1.5,-0.3) → (-2.75,-0.3)
     // Slider width = 1.25, height = 0.6 (y from -0.3 to 0.3)
     // OFF: slider at left end of body (bodyLeft+0.2)
     // ON:  slider at right end of body (bodyRight-0.2-1.25)

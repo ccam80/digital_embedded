@@ -107,7 +107,10 @@ export function registerSimulationTools(
         clockAdvance: z
           .boolean()
           .optional()
-          .describe("Whether to advance clock signals before each step (default: true)"),
+          .describe(
+            "Whether to advance clock signals before each step (default: true). " +
+              "A no-op for circuits with no Clock elements; for pure analog " +
+              "time-domain work prefer circuit_sample_at_times."),
       },
     },
     wrapTool<{ handle: string; steps?: number; clockAdvance?: boolean }>(

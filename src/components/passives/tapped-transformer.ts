@@ -150,7 +150,7 @@ export class TappedTransformerElement extends AbstractCircuitElement {
     ctx.drawLine(4, 2, 2.75, 2);      // CT lead
     ctx.drawLine(4, 4, 2.75, 4);      // S2 lead
 
-    // Primary coil: 6 right-facing arcs at x=1.25 (3Ï€/2 to 5Ï€/2) with vertical connectors
+    // Primary coil: 6 right-facing arcs at x=1.25 (3π/2 to 5π/2) with vertical connectors
     const arcR = 5.333 / 16;
     for (let i = 0; i < 6; i++) {
       const cy = (i * 2 + 1) * arcR;
@@ -158,7 +158,7 @@ export class TappedTransformerElement extends AbstractCircuitElement {
       ctx.drawLine(1.25, i * 2 * arcR, 1.25, (i + 1) * 2 * arcR);
     }
 
-    // Secondary coil: 6 right-facing arcs at x=2.75 (3Ï€/2 to 5Ï€/2) with vertical connectors
+    // Secondary coil: 6 right-facing arcs at x=2.75 (3π/2 to 5π/2) with vertical connectors
     for (let i = 0; i < 6; i++) {
       const cy = (i * 2 + 1) * arcR;
       ctx.drawArc(2.75, cy, arcR, 3 * Math.PI / 2, 5 * Math.PI / 2);
@@ -359,7 +359,7 @@ export const TappedTransformerDefinition: StandaloneComponentDefinition = {
   attributeMap: TAPPED_TRANSFORMER_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.PASSIVES,
   helpText:
-    "Center-tapped three-winding transformer using 3Ã—3 coupled inductor companion model.\n" +
+    "Center-tapped three-winding transformer using 3×3 coupled inductor companion model.\n" +
     "Specify total turns ratio N, primary inductance, coupling coefficient k, and winding resistances.",
   models: {},
   modelRegistry: {

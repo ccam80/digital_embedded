@@ -29,7 +29,7 @@ import type { SparseSolverStamp } from "../../solver/analog/sparse-solver.js";
 import { defineModelParams, kelvinToCelsius } from "../../core/model-params.js";
 
 // ---------------------------------------------------------------------------
-// Minimum resistance clamp  prevents G  âˆž for degenerate values
+// Minimum resistance clamp  prevents G  ∞ for degenerate values
 // ---------------------------------------------------------------------------
 
 const MIN_RESISTANCE = 1e-9;
@@ -40,7 +40,7 @@ const MIN_RESISTANCE = 1e-9;
 
 export const { paramDefs: RESISTOR_PARAM_DEFS, defaults: RESISTOR_DEFAULTS } = defineModelParams({
   primary: {
-    resistance: { default: 1000, unit: "Î", description: "Resistance in ohms. Minimum clamped to 1e-9 Î.", min: 1e-9 },
+    resistance: { default: 1000, unit: "Ω", description: "Resistance in ohms. Minimum clamped to 1e-9 Ω.", min: 1e-9 },
   },
   secondary: {
     // Model-card geometry / temperature parameters — ngspice RESmodel fields.
@@ -171,7 +171,7 @@ export class ResistorElement extends AbstractCircuitElement {
     }
 
     // Value label below body
-    const displayLabel = label.length > 0 ? label : (this._shouldShowValue() ? formatSI(resistance, "Î") : "");
+    const displayLabel = label.length > 0 ? label : (this._shouldShowValue() ? formatSI(resistance, "Ω") : "");
     ctx.setColor("TEXT");
     ctx.setFont({ family: "sans-serif", size: 0.8 });
     ctx.drawText(displayLabel, 2, 0.75, { horizontal: "center", vertical: "top" });
@@ -693,7 +693,7 @@ export const ResistorDefinition: StandaloneComponentDefinition = {
   category: ComponentCategory.PASSIVES,
   helpText:
     "Resistor  stamps conductance G=1/R into the MNA matrix.\n" +
-    "Minimum resistance is clamped to 1e-9 Î.",
+    "Minimum resistance is clamped to 1e-9 Ω.",
   models: {},
   modelRegistry: {
     "behavioral": {

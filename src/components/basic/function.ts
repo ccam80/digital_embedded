@@ -5,16 +5,16 @@
  * table. The truth table maps each combination of input values to an output value.
  *
  * Properties:
- *   inputCount - number of input variables (1â€“8). There are 2^inputCount rows.
- *   outputCount- number of output bits per row (1â€“32, default 1).
+ *   inputCount - number of input variables (1–8). There are 2^inputCount rows.
+ *   outputCount- number of output bits per row (1–32, default 1).
  *   truthTable - array of 2^inputCount output values (number[]).
  *                 Each entry is the output for the corresponding input combination.
  *                 Entries of -1 represent don't-care (X): output is 0 for don't-care.
  *   label      - optional label shown above the component.
  *
  * Pin layout:
- *   Inputs:  in0, in1, â€¦ inN-1 on the west face (N = inputCount, each 1-bit)
- *   Outputs: out0, out1, â€¦ outM-1 on the east face (M = outputCount, each 1-bit)
+ *   Inputs:  in0, in1, … inN-1 on the west face (N = inputCount, each 1-bit)
+ *   Outputs: out0, out1, … outM-1 on the east face (M = outputCount, each 1-bit)
  *            When outputCount=1, the single output is labeled "out".
  *
  * ExecuteFn:
@@ -146,7 +146,7 @@ function buildFunctionPinDeclarations(inputCount: number, outputCount: number): 
 export function evaluateTruthTable(table: readonly number[], inputIndex: number, outputBit: number): number {
   if (inputIndex < 0 || inputIndex >= table.length) return 0;
   const row = table[inputIndex];
-  if (row === -1) return 0; // don't-care â†’ 0
+  if (row === -1) return 0; // don't-care → 0
   return (row >>> outputBit) & 1;
 }
 
@@ -218,7 +218,7 @@ export class BooleanFunctionElement extends AbstractCircuitElement {
   getBoundingBox(): Rect {
     const h = componentHeight(this._inputCount, this._outputCount);
     // Draw path spans x: 0.05..2.95, y: -0.5..h-0.5
-    // Use exact right edge (2.95) to avoid floating-point: 0.05+2.9 â‰  2.95
+    // Use exact right edge (2.95) to avoid floating-point: 0.05+2.9 ≠ 2.95
     return {
       x: this.position.x + 0.05,
       y: this.position.y - 0.5,
@@ -380,7 +380,7 @@ const BOOLEAN_FUNCTION_PROPERTY_DEFS: PropertyDefinition[] = [
     defaultValue: 2,
     min: 1,
     max: 8,
-    description: "Number of input variables (1â€“8). Truth table has 2^n rows.",
+    description: "Number of input variables (1–8). Truth table has 2^n rows.",
     structural: true,
   },
   {
@@ -421,7 +421,7 @@ export const BooleanFunctionDefinition: StandaloneComponentDefinition = {
   category: ComponentCategory.LOGIC,
   helpText:
     "Boolean Function- a user-defined combinational function expressed as a truth table.\n" +
-    "inputCount sets the number of input variables (1â€“8).\n" +
+    "inputCount sets the number of input variables (1–8).\n" +
     "outputCount sets the number of output bits.\n" +
     "Don't-care entries (-1) output 0 at simulation time.",
   models: {

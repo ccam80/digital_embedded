@@ -460,7 +460,7 @@ describe("ComponentRegistry", () => {
 
     it("without the alias, get(Diode) returns the semiconductor Diode", () => {
       registry.register(makeDefinition("PldDiode"));
-      // No alias "Diode" â†’ "PldDiode"
+      // No alias "Diode" → "PldDiode"
       const diode = makeDefinition("Diode");
       registry.register(diode);
 

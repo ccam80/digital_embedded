@@ -1,5 +1,5 @@
 ﻿/**
- * DACDriver â€” internal-only hybrid pin+stamp+state driver leaf for the N-bit
+ * DACDriver — internal-only hybrid pin+stamp+state driver leaf for the N-bit
  * DAC composite.
  *
  * Emitted by the `DAC` parent's `buildDacNetlist`
@@ -19,8 +19,8 @@
  *   [0] VREF, [1] OUT, [2] GND, [3..N+2] D0..D(N-1)
  *
  * Branch stamp: VSRC TSTALLOC shape (vsrcsetup.c):
- *   +1 at (OUT, br), -1 at (GND, br)   â€” KCL rows
- *   +1 at (br, OUT), -1 at (br, GND)   â€” KVL row (V_OUT - V_GND = target)
+ *   +1 at (OUT, br), -1 at (GND, br)   — KCL rows
+ *   +1 at (br, OUT), -1 at (br, GND)   — KVL row (V_OUT - V_GND = target)
  * load() writes rhs[br] += target.
  */
 
@@ -42,8 +42,8 @@ import { PinDirection, type PinDeclaration } from "../../core/pin.js";
 // ---------------------------------------------------------------------------
 //
 // Slot layout for N bits:
-//   [0 .. N-1]   LATCHED_BIT_0 .. LATCHED_BIT_(N-1)   â€” per-bit latch state
-//   [N]          OUTPUT_TARGET_V                        â€” stamped target voltage
+//   [0 .. N-1]   LATCHED_BIT_0 .. LATCHED_BIT_(N-1)   — per-bit latch state
+//   [N]          OUTPUT_TARGET_V                        — stamped target voltage
 
 const DAC_SCHEMAS = new Map<number, StateSchema>();
 
@@ -69,7 +69,7 @@ function getDacSchema(bits: number): StateSchema {
 }
 
 // ---------------------------------------------------------------------------
-// Pin layout â€” fixed, mirrors parent buildDacNetlist drvPins [0,1,2,3..N+2]
+// Pin layout — fixed, mirrors parent buildDacNetlist drvPins [0,1,2,3..N+2]
 // Positions are placeholders; the driver is internal-only (no canvas render).
 // ---------------------------------------------------------------------------
 

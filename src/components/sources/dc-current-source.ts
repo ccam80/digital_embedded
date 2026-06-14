@@ -28,6 +28,7 @@ import { AnalogElement } from "../../solver/analog/element.js";
 import { NGSPICE_LOAD_ORDER, type DeviceFamily } from "../../solver/analog/ngspice-load-order.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
 import { stampRHS } from "../../solver/analog/stamp-helpers.js";
+import { MODEDCOP, MODEDCTRANCURVE, MODETRANOP } from "../../solver/analog/ckt-mode.js";
 import { defineModelParams } from "../../core/model-params.js";
 
 // ---------------------------------------------------------------------------
@@ -201,9 +202,17 @@ class DcCurrentSourceAnalogImpl extends AnalogElement {
     this._lastSrcFact = ctx.srcFact;
     const nodePos = this.pinNodes.get("pos")!;
     const nodeNeg = this.pinNodes.get("neg")!;
-    const I = this._p.current * ctx.srcFact;
-    // isrcload.c:387-388 — the parallel multiplier scales the RHS stamp; the
-    // ramped current is multiplied by m (isrcload.c:45, m = ISRCmValue).
+    // isrcload.c:54/69 — the pure-DC value is source-stepped by srcFact across the
+    // DC-analysis modes (MODEDC = MODEDCOP|MODEDCTRANCURVE|MODETRANOP); the MODEDC
+    // default case (isrcload.c:69) scales the constant value, unlike vsrcload.c:93
+    // which leaves it unramped. isrcload.c:382-383 then applies srcFact a second
+    // time during the transient OP (MODETRANOP supply ramp), so a DC current source
+    // ramps as srcFact² in MODETRANOP while a voltage source ramps as srcFact.
+    let I = (ctx.cktMode & (MODEDCOP | MODEDCTRANCURVE | MODETRANOP))
+      ? this._p.current * ctx.srcFact
+      : this._p.current;
+    if (ctx.cktMode & MODETRANOP) I *= ctx.srcFact;
+    // isrcload.c:387-388/45 — the RHS stamp is scaled by the m parallel multiplier.
     stampRHS(ctx.rhs, nodePos,  this._p.m * I);
     stampRHS(ctx.rhs, nodeNeg, -this._p.m * I);
   }

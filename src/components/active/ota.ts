@@ -45,7 +45,7 @@
  * all currents into the node  but that requires KCL bookkeeping.
  *
  * Simpler and correct approach: model Iabc as a voltage node representing
- * the bias current magnitude, with 1 Î shunt to ground (so V(Iabc) = I_bias
+ * the bias current magnitude, with 1 Ω shunt to ground (so V(Iabc) = I_bias
  * when a current source drives it). This is the standard VCA/OTA test setup.
  * The OTA element reads V(Iabc) directly as I_bias.
  *

@@ -38,7 +38,7 @@ import { buildBehavioralGateNetlist } from "./gate-shared.js";
 
 /**
  * Gate width matching Java GenericShape auto-width:
- * 1-in/1-out with no pin labels â†’ width=1 (narrow) or 2 (wide).
+ * 1-in/1-out with no pin labels → width=1 (narrow) or 2 (wide).
  * Java: `inputs.size()==1 && outputs.size()==1 && !showPinLabels ? 1 : 3`
  * Then .setWide(ws) adds 1 if wideShape.
  */
@@ -107,7 +107,7 @@ export class NotElement extends AbstractCircuitElement {
   getBoundingBox(): Rect {
     const wide = this._properties.getOrDefault<boolean>("wideShape", false);
     // Triangle starts at x=0.05; bubble extends to bubbleCX + BUBBLE_RADIUS.
-    // Narrow: bubbleCX=1.5, r=0.45 â†’ maxX=1.95. Wide: bubbleCX=2.5, r=0.45 â†’ maxX=2.95.
+    // Narrow: bubbleCX=1.5, r=0.45 → maxX=1.95. Wide: bubbleCX=2.5, r=0.45 → maxX=2.95.
     // triY: narrow=0.6, wide=1.1.
     const triY = wide ? 1.1 : 0.6;
     return {
@@ -129,8 +129,8 @@ export class NotElement extends AbstractCircuitElement {
   /**
    * IEEE/US shape: triangle pointing right, with inversion bubble at output.
    * Coordinates from Java IEEENotShape.
-   * Narrow: triangle (0.05,-0.6)â†’(0.95,0)â†’(0.05,0.6), bubble at (1.5,0) r=0.45.
-   * Wide: triangle (0.05,-1.1)â†’(1.95,0)â†’(0.05,1.1), bubble at (2.5,0) r=0.45.
+   * Narrow: triangle (0.05,-0.6)→(0.95,0)→(0.05,0.6), bubble at (1.5,0) r=0.45.
+   * Wide: triangle (0.05,-1.1)→(1.95,0)→(0.05,1.1), bubble at (2.5,0) r=0.45.
    */
   private _drawIEEE(ctx: RenderContext, wide: boolean): void {
     const BUBBLE_RADIUS = 0.45;
@@ -311,7 +311,7 @@ export const NotDefinition: StandaloneComponentDefinition = {
   category: ComponentCategory.LOGIC,
   helpText:
     "Not gate- performs bitwise NOT (inversion) of the input.\n" +
-    "Single input, configurable bit width (1â€“32).\n" +
+    "Single input, configurable bit width (1–32).\n" +
     "Both IEEE/US (triangle with bubble) and IEC/DIN (rectangular with 1) shapes are supported.",
   modelRegistry: {
     behavioral: {

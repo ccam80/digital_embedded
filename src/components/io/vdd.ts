@@ -74,7 +74,7 @@ export class VddElement extends AbstractCircuitElement {
     ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
 
-    // Upward-pointing triangle (open path, not closed): (-0.5,0.2) â†’ (0,-0.45) â†’ (0.5,0.2)
+    // Upward-pointing triangle (open path, not closed): (-0.5,0.2) → (0,-0.45) → (0.5,0.2)
     // Java fixture: closed=false, style=NORMAL
     ctx.drawPath({
       operations: [
