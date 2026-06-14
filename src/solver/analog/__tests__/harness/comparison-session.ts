@@ -2860,6 +2860,30 @@ export class ComparisonSession {
   // Matrix and coefficient helpers
   // ---------------------------------------------------------------------------
 
+  /**
+   * Resolve a 1-based external matrix row/col index to a human label.
+   *
+   * `matrix` entries carry 1-based external (MNA) indices (getCSCNonZeros /
+   * the ngspice IntToExt capture), but `matrixRowLabels`/`matrixColLabels` are
+   * keyed 0-based (`set(nodeId-1, ...)` / `set(branchIndex-1, ...)` in
+   * capture.ts). `nodeLabels` is keyed 1-based and takes precedence so node
+   * rows read as their net label; branch rows fall through to the 0-based
+   * matrix label map at `id-1`. This mirrors the voltage first-divergence walk
+   * (which already resolves `nodeLabels.get(i) ?? matrixRowLabels.get(i-1)`),
+   * so matrix-cell labels and voltage labels name the same row identically.
+   */
+  private _matrixRowLabel(id: number): string {
+    return this._ourTopology.nodeLabels.get(id)
+      ?? this._ourTopology.matrixRowLabels.get(id - 1)
+      ?? `row${id}`;
+  }
+
+  private _matrixColLabel(id: number): string {
+    return this._ourTopology.nodeLabels.get(id)
+      ?? this._ourTopology.matrixColLabels.get(id - 1)
+      ?? `col${id}`;
+  }
+
   getMatrixLabeled(stepIndex: number, iterationIndex: number): LabeledMatrix {
     this._ensureRun();
     const ourStep = this._ourSession!.steps[stepIndex];
@@ -2904,8 +2928,8 @@ export class ComparisonSession {
 
     if (ourIter) {
       for (const e of ourIter.matrix) {
-        const rowLabel = this._ourTopology.matrixRowLabels.get(e.row) ?? `row${e.row}`;
-        const colLabel = this._ourTopology.matrixColLabels.get(e.col) ?? `col${e.col}`;
+        const rowLabel = this._matrixRowLabel(e.row);
+        const colLabel = this._matrixColLabel(e.col);
 
         const ngRow = ourToNgRow.get(e.row);
         const ngCol = ourToNgCol.get(e.col);
@@ -2952,11 +2976,11 @@ export class ComparisonSession {
 
         const rowLabel = this._ngspiceOnlyRowLabels.get(ngEntry.row)
           ?? (this._ngMatrixRowMap.has(ngEntry.row)
-            ? (this._ourTopology.matrixRowLabels.get(this._ngMatrixRowMap.get(ngEntry.row)!) ?? `row${ngEntry.row}`)
+            ? this._matrixRowLabel(this._ngMatrixRowMap.get(ngEntry.row)!)
             : `ngspice_row${ngEntry.row}`);
         const colLabel = this._ngspiceOnlyRowLabels.get(ngEntry.col)
           ?? (this._ngMatrixColMap.has(ngEntry.col)
-            ? (this._ourTopology.matrixColLabels.get(this._ngMatrixColMap.get(ngEntry.col)!) ?? `col${ngEntry.col}`)
+            ? this._matrixColLabel(this._ngMatrixColMap.get(ngEntry.col)!)
             : `ngspice_col${ngEntry.col}`);
 
         entries.push({
