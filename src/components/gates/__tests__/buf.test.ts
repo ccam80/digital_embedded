@@ -1,164 +1,133 @@
 import { describe, it, expect } from "vitest";
-import { buildFixture } from "../../../solver/analog/__tests__/fixtures/build-fixture.js";
-import type { Fixture } from "../../../solver/analog/__tests__/fixtures/build-fixture.js";
-import type { Circuit } from "../../../core/circuit.js";
-import type { DefaultSimulatorFacade } from "../../../headless/default-facade.js";
+import { DefaultSimulatorFacade } from "../../../headless/default-facade.js";
+import { createDefaultRegistry } from "../../../components/register-all.js";
+
+const registry = createDefaultRegistry();
 
 // ---------------------------------------------------------------------------
-// Programmatic fixture builder (T1) - Cat 9
+// Category 9 — Bridge / digital interaction (T1)
 //
-// Topology:
-//   In(A) --out--> Buf(U1).In_1
-//   Buf(U1).out --> Out(Y)
-//   Buf(U1).out --> Rload --> Ground   (gives buildFixture an analog domain
-//                                       via the digital->analog boundary)
+// BufDefinition has `models.digital.executeFn = executeBuf` and no analog
+// state on its element class. The component's primary observable is
+// digital-input -> digital-output (identity pass-through) through the
+// registered executeFn. Categories 1-8 (analog state-pool / MNA / DCOP /
+// transient / stamp / limiting / LTE / breakpoints) do not apply.
 //
-// The Buf gate's applicable canon category is Cat 9 (Bridge / digital
-// interaction): models.digital.executeFn = executeBuf. The In->Buf->Out wire
-// chain stays in the digital domain end-to-end; the Rload->GND tap on Buf.out
-// crosses the domain boundary so the unified compiler emits a bridge adapter
-// and the analog engine is non-null.
+// Canonical Cat 9 mechanic for a purely-digital gate: drive the input via
+// facade.setSignal, advance one step via facade.step, read the labelled "out"
+// pin via facade.readSignal. setSignal / step / readSignal are thin wrappers
+// over coordinator.writeSignal / step() / readSignal — the sanctioned
+// simulator surface for a digital-only component (no analog domain, so
+// buildFixture does not apply).
 // ---------------------------------------------------------------------------
 
-interface BufCircuitParams {
-  bitWidth?: number;
-}
-
-function buildBufCircuit(
-  facade: DefaultSimulatorFacade,
-  p: BufCircuitParams = {},
-): Circuit {
-  const bitWidth = p.bitWidth ?? 1;
-  return facade.build({
-    components: [
-      { id: "A",     type: "In",       props: { label: "A", bitWidth } },
-      { id: "U1",    type: "Buf",      props: { label: "U1", bitWidth } },
-      { id: "Y",     type: "Out",      props: { label: "Y", bitWidth } },
-      { id: "Rload", type: "Resistor", props: { label: "Rload", resistance: 1e6 } },
-      { id: "gnd",   type: "Ground",   props: { label: "gnd" } },
-    ],
-    connections: [
-      ["A:out",     "U1:In_1"],
-      ["U1:out",    "Y:in"],
-      ["U1:out",    "Rload:pos"],
-      ["Rload:neg", "gnd:out"],
-    ],
-  });
-}
-
-function readDigital(fix: Fixture, label: string): number {
-  const sv = fix.coordinator.readByLabel(label);
-  if (sv.type !== "digital") {
-    throw new Error(`readDigital: label '${label}' is not digital (got ${sv.type})`);
+describe("Buf bitWidth=1 (Cat 9)", () => {
+  function build1(facade: DefaultSimulatorFacade) {
+    return facade.build({
+      components: [
+        { id: "a",   type: "In",  props: { label: "A", bitWidth: 1 } },
+        { id: "g",   type: "Buf", props: { label: "U1", bitWidth: 1 } },
+        { id: "out", type: "Out", props: { label: "Y", bitWidth: 1 } },
+      ],
+      connections: [
+        ["a:out", "g:In_1"],
+        ["g:out", "out:in"],
+      ],
+    });
   }
-  return sv.value;
-}
 
-function writeDigital(fix: Fixture, label: string, value: number): void {
-  fix.coordinator.writeByLabel(label, { type: "digital", value });
-}
-
-// ---------------------------------------------------------------------------
-// Buf gate Cat 9 - digital input drives digital output through the gate (T1)
-// ---------------------------------------------------------------------------
-
-describe("Buf gate Cat 9 - digital interaction (T1)", () => {
-  it("digital_input_high_drives_output_high_1bit", () => {
-    // Cat 9 (single-bit): A=1 => Y = 1 (pass-through).
-    const fix = buildFixture({
-      build: (_r, facade) => buildBufCircuit(facade, { bitWidth: 1 }),
-    });
-    writeDigital(fix, "A", 1);
-    fix.coordinator.step();
-    expect(readDigital(fix, "Y")).toBe(1);
-    fix.coordinator.dispose();
+  it("BUF 1 = 1", () => {
+    const facade = new DefaultSimulatorFacade(registry);
+    const coord = facade.compile(build1(facade));
+    facade.setSignal(coord, "A", 1);
+    facade.step(coord);
+    expect(facade.readSignal(coord, "Y")).toBe(1);
   });
 
-  it("digital_input_low_drives_output_low_1bit", () => {
-    // Cat 9 (single-bit): A=0 => Y = 0 (pass-through).
-    const fix = buildFixture({
-      build: (_r, facade) => buildBufCircuit(facade, { bitWidth: 1 }),
-    });
-    writeDigital(fix, "A", 0);
-    fix.coordinator.step();
-    expect(readDigital(fix, "Y")).toBe(0);
-    fix.coordinator.dispose();
+  it("BUF 0 = 0", () => {
+    const facade = new DefaultSimulatorFacade(registry);
+    const coord = facade.compile(build1(facade));
+    facade.setSignal(coord, "A", 0);
+    facade.step(coord);
+    expect(facade.readSignal(coord, "Y")).toBe(0);
   });
 
-  it("digital_input_toggle_drives_output_same_1bit", () => {
-    // Cat 9: contrast assertion - flipping A flips Y to the same value (identity).
-    const fix = buildFixture({
-      build: (_r, facade) => buildBufCircuit(facade, { bitWidth: 1 }),
-    });
+  it("toggling A drives Y to the same value (identity)", () => {
+    const facade = new DefaultSimulatorFacade(registry);
+    const coord = facade.compile(build1(facade));
 
-    writeDigital(fix, "A", 1);
-    fix.coordinator.step();
-    const yWhenAHigh = readDigital(fix, "Y");
+    facade.setSignal(coord, "A", 1);
+    facade.step(coord);
+    const yWhenAHigh = facade.readSignal(coord, "Y");
 
-    writeDigital(fix, "A", 0);
-    fix.coordinator.step();
-    const yWhenALow = readDigital(fix, "Y");
+    facade.setSignal(coord, "A", 0);
+    facade.step(coord);
+    const yWhenALow = facade.readSignal(coord, "Y");
 
     expect(yWhenAHigh).toBe(1);
     expect(yWhenALow).toBe(0);
     expect(yWhenAHigh).not.toBe(yWhenALow);
-    fix.coordinator.dispose();
+  });
+});
+
+// ===========================================================================
+// Multi-bit Buf — full bus passes through unchanged
+// ===========================================================================
+
+describe("Buf bitWidth=8 (Cat 9 multi-bit)", () => {
+  function build8(facade: DefaultSimulatorFacade) {
+    return facade.build({
+      components: [
+        { id: "a",   type: "In",  props: { label: "A", bitWidth: 8 } },
+        { id: "g",   type: "Buf", props: { label: "U1", bitWidth: 8 } },
+        { id: "out", type: "Out", props: { label: "Y", bitWidth: 8 } },
+      ],
+      connections: [
+        ["a:out", "g:In_1"],
+        ["g:out", "out:in"],
+      ],
+    });
+  }
+
+  it("0x0F passes through unchanged", () => {
+    const facade = new DefaultSimulatorFacade(registry);
+    const coord = facade.compile(build8(facade));
+    facade.setSignal(coord, "A", 0x0F);
+    facade.step(coord);
+    expect(facade.readSignal(coord, "Y")).toBe(0x0F);
   });
 
-  it("digital_8bit_input_passes_through_unchanged", () => {
-    // Cat 9 (multi-bit): A=0x0F over 8-bit port => Y = 0x0F (identity).
-    const fix = buildFixture({
-      build: (_r, facade) => buildBufCircuit(facade, { bitWidth: 8 }),
-    });
-    writeDigital(fix, "A", 0x0F);
-    fix.coordinator.step();
-    expect(readDigital(fix, "Y")).toBe(0x0F);
-    fix.coordinator.dispose();
+  it("0xAA passes through unchanged (alternating pattern)", () => {
+    const facade = new DefaultSimulatorFacade(registry);
+    const coord = facade.compile(build8(facade));
+    facade.setSignal(coord, "A", 0xAA);
+    facade.step(coord);
+    expect(facade.readSignal(coord, "Y")).toBe(0xAA);
   });
 
-  it("digital_8bit_alternating_pattern_passes_through", () => {
-    // Cat 9 (multi-bit): A=0xAA over 8-bit port => Y = 0xAA (identity).
-    const fix = buildFixture({
-      build: (_r, facade) => buildBufCircuit(facade, { bitWidth: 8 }),
-    });
-    writeDigital(fix, "A", 0xAA);
-    fix.coordinator.step();
-    expect(readDigital(fix, "Y")).toBe(0xAA);
-    fix.coordinator.dispose();
+  it("0xFF passes through unchanged (all-ones bus)", () => {
+    const facade = new DefaultSimulatorFacade(registry);
+    const coord = facade.compile(build8(facade));
+    facade.setSignal(coord, "A", 0xFF);
+    facade.step(coord);
+    expect(facade.readSignal(coord, "Y")).toBe(0xFF);
   });
 
-  it("digital_8bit_all_ones_passes_through", () => {
-    // Cat 9 (multi-bit): A=0xFF over 8-bit port => Y = 0xFF (identity).
-    const fix = buildFixture({
-      build: (_r, facade) => buildBufCircuit(facade, { bitWidth: 8 }),
-    });
-    writeDigital(fix, "A", 0xFF);
-    fix.coordinator.step();
-    expect(readDigital(fix, "Y")).toBe(0xFF);
-    fix.coordinator.dispose();
+  it("0x00 passes through unchanged (all-zero bus)", () => {
+    const facade = new DefaultSimulatorFacade(registry);
+    const coord = facade.compile(build8(facade));
+    facade.setSignal(coord, "A", 0x00);
+    facade.step(coord);
+    expect(facade.readSignal(coord, "Y")).toBe(0x00);
   });
 
-  it("digital_8bit_zero_passes_through", () => {
-    // Cat 9 (multi-bit): A=0x00 over 8-bit port => Y = 0x00 (identity).
-    const fix = buildFixture({
-      build: (_r, facade) => buildBufCircuit(facade, { bitWidth: 8 }),
-    });
-    writeDigital(fix, "A", 0x00);
-    fix.coordinator.step();
-    expect(readDigital(fix, "Y")).toBe(0x00);
-    fix.coordinator.dispose();
-  });
-
-  it("digital_double_buffer_is_identity", () => {
-    // Cat 9: buf(x) = x. Drive A with a value; the output matches A exactly.
-    const fix = buildFixture({
-      build: (_r, facade) => buildBufCircuit(facade, { bitWidth: 8 }),
-    });
+  it("buf(x) = x", () => {
+    const facade = new DefaultSimulatorFacade(registry);
+    const coord = facade.compile(build8(facade));
 
     const original = 0x5A;
-    writeDigital(fix, "A", original);
-    fix.coordinator.step();
-    expect(readDigital(fix, "Y")).toBe(original);
-    fix.coordinator.dispose();
+    facade.setSignal(coord, "A", original);
+    facade.step(coord);
+    expect(facade.readSignal(coord, "Y")).toBe(original);
   });
 });
