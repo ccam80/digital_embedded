@@ -8,6 +8,7 @@ import {
   describeIfDll,
 } from "../../../solver/analog/__tests__/ngspice-parity/parity-helpers.js";
 import { DIODE_SCHEMA } from "../diode.js";
+import { CONSTKoverQ } from "../../../core/constants.js";
 
 import type { DefaultSimulatorFacade } from "../../../headless/default-facade.js";
 import type { Circuit } from "../../../core/circuit.js";
@@ -173,17 +174,22 @@ describe("Diode parameter hot-load (T1)", () => {
   });
 
   it("hotload_RS_changes_vd", () => {
-    const fix = build5V1k();
+    // RS is observable only when the internal series-resistance node exists,
+    // which setup() allocates iff RS != 0 — and the diode RS defaults to 0. Build
+    // with RS != 0 so the node is present; hot-loading RS upward then adds series
+    // drop at the external anode (= junction + Id·RS), which rises observably.
+    const fix = buildFixture({
+      build: (_r, f) => buildDiodeRc(f, { vSource: 5, rValue: 1000, diodeProps: { RS: 10 } }),
+    });
     const ce = fix.element("d1");
     const vAnodeNode = fix.circuit.labelToNodeId.get("d1:A")!;
+    fix.coordinator.dcOperatingPoint();
     const before = fix.engine.getNodeVoltage(vAnodeNode);
-    // Series resistance RS adds a drop V_RS = Id*RS in series with the
-    // junction. At 100Ω and Id≈4mA, V_RS ≈ 0.4V — Vd at the junction must
-    // change observably (the anode pin sees the junction-plus-RS sum).
     fix.coordinator.setComponentProperty(ce, "RS", 100);
     fix.coordinator.dcOperatingPoint();
     const after = fix.engine.getNodeVoltage(vAnodeNode);
     expect(after).not.toBeCloseTo(before, 3);
+    expect(after).toBeGreaterThan(before);
   });
 
   it("hotload_AREA_changes_vd", () => {
@@ -251,12 +257,75 @@ describe("Diode parameter hot-load (T1)", () => {
       }),
     });
     const ce = fix.element("d1");
-    const vCathodeNode = fix.circuit.labelToNodeId.get("d1:K")!;
-    const before = fix.engine.getNodeVoltage(vCathodeNode);
+    // The cathode is wired directly to the 10 V source (pinned), so breakdown
+    // manifests on the ANODE: with BV=Inf (default) the diode blocks and the
+    // anode sits ≈0; a finite BV=5 drives reverse breakdown, clamping V_AK ≈ -BV
+    // so the anode rises to ≈ V_K - BV.
+    const vAnodeNode = fix.circuit.labelToNodeId.get("d1:A")!;
+    fix.coordinator.dcOperatingPoint();
+    const before = fix.engine.getNodeVoltage(vAnodeNode);
     fix.coordinator.setComponentProperty(ce, "BV", 5);
     fix.coordinator.dcOperatingPoint();
-    const after = fix.engine.getNodeVoltage(vCathodeNode);
-    expect(after).not.toBe(before);
+    const after = fix.engine.getNodeVoltage(vAnodeNode);
+    expect(after).not.toBeCloseTo(before, 3);
+    expect(after).toBeGreaterThan(before);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Category 2 — Temperature pass, analytical (T1, non-harness)
+//
+// Validates the diode temperature pass against the closed-form forward voltage
+// at a *forced* current, independent of ngspice. Driving the junction with a DC
+// current source fixes Id, so V(anode) = Vf is the pure junction drop (RS=0
+// default → no series term). The temperature-scaled saturation current and
+// thermal voltage (diotemp.c bottom tSatCur, EG/XTI exp + vt) give the exact
+//   Vf(T) = N·Vt·ln(I/tIS + 1),   tIS = IS·exp((T/Tnom−1)·EG/(N·Vt) + (XTI/N)·ln(T/Tnom))
+// so a TEMP hot-load must move Vf by precisely the analytical amount.
+// ---------------------------------------------------------------------------
+
+describe("Diode temperature pass — analytical (T1)", () => {
+  // Default L0 diode params used by the closed form (DIODE_PARAM_DEFAULTS).
+  const P = { IS: 1e-14, N: 1, EG: 1.11, XTI: 3, TNOM: 300.15 };
+  const vfClosedForm = (I: number, T: number): number => {
+    const vt = CONSTKoverQ * T;
+    const vte = P.N * vt;
+    const tIS = P.IS * Math.exp((T / P.TNOM - 1) * P.EG / vte + (P.XTI / P.N) * Math.log(T / P.TNOM));
+    return P.N * vt * Math.log(I / tIS + 1);
+  };
+
+  function buildForcedDiode(facade: DefaultSimulatorFacade, I: number): Circuit {
+    return facade.build({
+      components: [
+        { id: "isrc", type: "DcCurrentSource", props: { label: "isrc", current: I } },
+        { id: "d1", type: "Diode", props: { label: "d1" } },
+        { id: "gnd", type: "Ground" },
+      ],
+      connections: [["isrc:pos", "d1:A"], ["d1:K", "gnd:out"], ["isrc:neg", "gnd:out"]],
+    });
+  }
+
+  it("hotload_TEMP_shifts_Vf_by_analytical_amount", () => {
+    const I = 1e-3; // 1 mA forced through the junction
+    const fix = buildFixture({ build: (_r, f) => buildForcedDiode(f, I) });
+    const ce = fix.element("d1");
+    const vAnode = fix.circuit.labelToNodeId.get("d1:A")!;
+
+    // Reference temperature (300.15 K): identity tIS scaling.
+    fix.coordinator.dcOperatingPoint();
+    const vf300 = fix.engine.getNodeVoltage(vAnode);
+    expect(vf300).toBeCloseTo(vfClosedForm(I, 300.15), 9);
+
+    // Hot-load to 400 K: tIS rises (∝ exp), Vf drops by the closed-form amount.
+    fix.coordinator.setComponentProperty(ce, "TEMP", 400);
+    fix.coordinator.dcOperatingPoint();
+    const vf400 = fix.engine.getNodeVoltage(vAnode);
+    expect(vf400).toBeCloseTo(vfClosedForm(I, 400), 9);
+
+    // The change itself matches the analytical delta (≈ −181 mV), not merely the
+    // endpoints — a stale temperature pass would leave ΔVf at zero.
+    expect(vf400).toBeLessThan(vf300);
+    expect(vf400 - vf300).toBeCloseTo(vfClosedForm(I, 400) - vfClosedForm(I, 300.15), 9);
   });
 });
 

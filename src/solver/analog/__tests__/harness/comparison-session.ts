@@ -3087,8 +3087,21 @@ export class ComparisonSession {
 
     const ourEvents = (ourIter?.limitingEvents ?? []).filter(
       e => e.label.toUpperCase() === upperLabel);
+
+    // ngspice infers device class from the instance-name's first letter, so the
+    // deck generator prefix-canonicalises any label that doesn't already start
+    // with its SPICE prefix (a varactor labelled "VD" is emitted as the diode
+    // "DVD"). Match ngspice limiting events against that same canonicalised name
+    // — mirrors the element-state matching above — or the read-back is dropped
+    // and limitingDiff degrades to NaN against a phantom-absent event.
+    const topoEl = this._ourTopology.elements.find(
+      el => el.label.toUpperCase() === upperLabel);
+    const prefix = topoEl?.typeId ? ELEMENT_SPECS[topoEl.typeId]?.prefix : undefined;
+    const ngMatchLabel = (prefix ? canonicalizeSpiceLabel(label, prefix) : label).toUpperCase();
     const ngEvents = (ngIter?.limitingEvents ?? []).filter(
-      e => (e as any).label?.toUpperCase() === upperLabel || (e as any).deviceName?.toUpperCase() === upperLabel);
+      e => (e as any).label?.toUpperCase() === ngMatchLabel
+        || (e as any).label?.toUpperCase() === upperLabel
+        || (e as any).deviceName?.toUpperCase() === upperLabel);
 
     if (ourEvents.length === 0 && ngEvents.length === 0) {
       return { label: upperLabel, noEvents: true, junctions: [] };

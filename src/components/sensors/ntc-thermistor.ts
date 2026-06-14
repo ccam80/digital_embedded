@@ -294,9 +294,14 @@ export class NTCThermistorElement extends PoolBackedAnalogElement {
     const nNeg = this.pinNodes.get("neg")!;
     const vPos = rhs[nPos];
     const vNeg = rhs[nNeg];
-    // Pre-first-load probes have no pool history; use the boot constant.
-    const tOld = this._seeded
-      ? this._pool.states[1][this._stateBase + SLOT_TEMPERATURE]
+    // Mirror load()'s temperature source: in fixed (non-self-heating) mode the
+    // operating temperature is the live ambient field, so setParam("temperature")
+    // is reflected immediately; only self-heating mode reads the evolved pool
+    // slot (states[1], last-accepted), falling back to ambient pre-first-load.
+    const tOld = this._selfHeating
+      ? (this._seeded
+          ? this._pool.states[1][this._stateBase + SLOT_TEMPERATURE]
+          : this._tAmbient)
       : this._tAmbient;
     const G = 1 / this.computeRFromT(tOld);
     const I = G * (vPos - vNeg);

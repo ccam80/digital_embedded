@@ -39,13 +39,10 @@ import {
 import { stampRHS } from "../../solver/analog/stamp-helpers.js";
 import { pnjlim } from "../../solver/analog/newton-raphson.js";
 import { defineModelParams, kelvinToCelsius } from "../../core/model-params.js";
-import { createDiodeElement } from "./diode.js";
+import { createDiodeElement, dioTemp } from "./diode.js";
+import type { DioTempInput, DioGeom } from "./diode.js";
 import { defineStateSchema } from "../../solver/analog/state-schema.js";
 import type { TempContext } from "../../solver/analog/temp-context.js";
-import {
-  CONSTKoverQ,
-  REFTEMP,
-} from "../../core/constants.js";
 
 // ---------------------------------------------------------------------------
 // Physical constants
@@ -115,53 +112,18 @@ const ZENER_STATE_SCHEMA = defineStateSchema("ZenerElement", [
 ]);
 
 // ---------------------------------------------------------------------------
-// Temperature scaling  tBV derivation (cite: diotemp.c:206-244)
+// Temperature scaling
+//
+// ngspice has no separate zener device — a Zener is the standard DIO model with
+// reverse-breakdown parameters (BV/IBV/NBV/TCV). The temperature-scaled
+// saturation current (DIOtSatCur), Vcrit (DIOtVcrit) and breakdown voltage
+// (DIOtBrkdwnV) are therefore sourced from the shared dioTemp() port
+// (diotemp.c:18-247) rather than a partial local copy, so the DIO temperature
+// physics has a single source of truth.
 // ---------------------------------------------------------------------------
 
-/**
- * Compute the temperature-scaled breakdown voltage (DIOtBrkdwnV) from BV and IBV.
- *
- * cite: diotemp.c:208-244  temperature-adjusts BV using DIOtcv (tlev==0 path),
- * then iterates xbv to find the intersection of the forward and reverse diode
- * characteristics at the breakdown current cbv.
- *
- * @param BV    Room-temperature breakdown voltage
- * @param IBV   Breakdown current (DIObreakdownCurrent)
- * @param NBV   Breakdown emission coefficient (DIObrkdEmissionCoeff)
- * @param IS    Temperature-scaled saturation current (DIOtSatCur)
- * @param vt    Thermal voltage at circuit temperature
- * @param TCV   Voltage temperature coefficient (DIOtcv), default 0
- * @param dt    Temperature deviation from TNOM in °C (T - TNOM)
- */
-function computeTBV(
-  BV: number,
-  IBV: number,
-  NBV: number,
-  IS: number,
-  vt: number,
-  TCV: number,
-  dt: number,
-): number {
-  if (!isFinite(BV) || BV >= 1e99) return Infinity;
-
-  const tBreakdownVoltage = BV - TCV * dt;
-  let cbv = IBV;
-  let xbv: number;
-
-  if (cbv < IS * tBreakdownVoltage / vt) {
-    cbv = IS * tBreakdownVoltage / vt;
-    xbv = tBreakdownVoltage;
-  } else {
-    const tol = 1e-3 * cbv;
-    xbv = tBreakdownVoltage - NBV * vt * Math.log(1 + cbv / IS);
-    for (let iter = 0; iter < 25; iter++) {
-      xbv = tBreakdownVoltage - NBV * vt * Math.log(cbv / IS + 1 - xbv / vt);
-      const xcbv = IS * (Math.exp((tBreakdownVoltage - xbv) / (NBV * vt)) - 1 + xbv / vt);
-      if (Math.abs(xcbv - cbv) <= tol) break;
-    }
-  }
-  return xbv;
-}
+/** Geometry fed to dioTemp: the simplified zener carries no area/perimeter. */
+const ZENER_GEOM: DioGeom = { area: 1, pj: 0, m: 1 };
 
 // ---------------------------------------------------------------------------
 // createZenerElement  AnalogElement factory
@@ -178,6 +140,8 @@ interface ZenerTp {
   tVcrit: number;
   vcritBrk: number;
   tBV: number;
+  /** Temperature-scaled saturation current (DIOtSatCur) — diotemp.c:116. */
+  tIS: number;
 }
 
 class ZenerAnalogElement extends PoolBackedAnalogElement {
@@ -193,6 +157,11 @@ class ZenerAnalogElement extends PoolBackedAnalogElement {
   // cite: diotemp.c:84-85 — DIOtempGiven mirrors PropertyBag givenness for TEMP.
   // When false, computeTemperature(ctx) uses ctx.cktTemp.
   private _tempGiven: boolean;
+
+  // CKTreltol fed to dioTemp's breakdown-voltage match (diotemp.c:208). Seeded
+  // with the field default until the engine temperature pass supplies the live
+  // CKTreltol via computeTemperature(ctx); mirrors diode.ts:773-776.
+  private _reltol = 1e-3;
 
   // Ephemeral per-iteration pnjlim limiting flag (ngspice Check / DIOload  CKTnoncon++)
   private _pnjlimLimited = false;
@@ -229,23 +198,47 @@ class ZenerAnalogElement extends PoolBackedAnalogElement {
 
   private _computeZenerTp(): ZenerTp {
     const params = this._params;
-    // cite: dioload.c / diotemp.c  per-instance TEMP (maps to ngspice DIOtemp)
+    // cite: dioload.c / diotemp.c — per-instance TEMP (maps to ngspice DIOtemp).
     const circuitTemp = params.TEMP;
-    const dt = circuitTemp - (isFinite(params.TNOM) ? params.TNOM : REFTEMP);
-    const vt = CONSTKoverQ * circuitTemp;
+    // Source the temperature-scaled saturation current, Vcrit and breakdown
+    // voltage from the shared DIO temperature port. At T == TNOM the saturation
+    // current is unchanged (tIS == IS), so nominal-temperature behaviour is
+    // bit-identical to the prior local derivation.
+    const tp = dioTemp(this._dioTempInput(), circuitTemp, ZENER_GEOM, this._reltol);
+    const vt = tp.vt;
     const nVt = params.N * vt;
     const nbvVt = params.NBV * vt;
-    // tVcrit: DIOtVcrit = vt * ln(vt / (IS * sqrt(2)))  cite: diotemp.c
-    const tVcrit = nVt * Math.log(nVt / (params.IS * Math.SQRT2));
-    // vcritBrk: pnjlim vcrit for breakdown domain using nbvVt  cite: dioload.c:189-190
-    const vcritBrk = nbvVt * Math.log(nbvVt / (params.IS * Math.SQRT2));
-    // tBV: temperature-scaled breakdown voltage  cite: diotemp.c:208-244
-    const tBV = computeTBV(
-      params.BV, params.IBV, params.NBV, params.IS, vt,
-      isFinite(params.TCV) ? params.TCV : 0,
-      dt,
-    );
-    return { vt, nVt, nbvVt, tVcrit, vcritBrk, tBV };
+    // vcritBrk: pnjlim vcrit for the breakdown domain, using nbvVt and the
+    // temperature-scaled saturation current  cite: dioload.c:189-190.
+    const vcritBrk = nbvVt * Math.log(nbvVt / (tp.tIS * Math.SQRT2));
+    return { vt, nVt, nbvVt, tVcrit: tp.tVcrit, vcritBrk, tBV: tp.tBV, tIS: tp.tIS };
+  }
+
+  /**
+   * Build the dioTemp model-parameter input. The simplified zener models only
+   * IS/N/BV/NBV/IBV/TCV/TNOM (+ EG/XTI on the SPICE-L1 superset); the remaining
+   * DIO fields take ngspice model defaults and feed only outputs the zener load()
+   * ignores (sidewall / tunnel / recombination / junction-cap quantities). The
+   * fields that DO reach the zener — vt, tIS, tVcrit, tBV — depend solely on
+   * IS, N, BV, NBV, IBV, TCV, TNOM, EG, XTI and the LEVEL==1 breakdown-current
+   * selection (cbv = m*IBV, matching the prior local computeTBV).
+   */
+  private _dioTempInput(): DioTempInput {
+    const p = this._params;
+    return {
+      IS: p.IS, N: p.N, BV: p.BV, IBV: p.IBV, NBV: p.NBV, TNOM: p.TNOM,
+      TCV: isFinite(p.TCV) ? p.TCV : 0,
+      EG: isFinite(p.EG) ? p.EG : 1.11,   // diodefs.h DIOeg default
+      XTI: isFinite(p.XTI) ? p.XTI : 3.0, // diodefs.h DIOxti default
+      LEVEL: 1,                           // diotemp.c:523 — cbv = m*IBV
+      VJ: 1, CJO: 0, M: 0.5,
+      ISW: 0, NSW: 1, FC: 0.5, FCS: 0.5,
+      CJSW: 0, VJSW: 1, MJSW: 0.33,
+      TLEV: 0, TLEVC: 0, TM1: 0, TM2: 0, TTT1: 0, TTT2: 0,
+      TRS: 0, TRS2: 0, CTA: 0, CTP: 0, TPB: 0, TPHP: 0,
+      JTUN: 0, JTUNSW: 0, NTUN: 1, XTITUN: 3, KEG: 1,
+      ISR: 0, NR: 1, TT: 0, RS: 0,
+    };
   }
 
   setup(ctx: import("../../solver/analog/setup-context.js").SetupContext): void {
@@ -306,16 +299,16 @@ class ZenerAnalogElement extends PoolBackedAnalogElement {
       if (vdOp >= -3 * tp.nVt) {
         // forward
         const evd = Math.exp(vdOp / tp.nVt);
-        gdOp = params.IS * evd / tp.nVt;
+        gdOp = tp.tIS * evd / tp.nVt;
       } else if (!isFinite(tp.tBV) || vdOp >= -tp.tBV) {
         // reverse-cubic  cite: dioload.c:251-257
         const arg = 3 * tp.nVt / (vdOp * CONSTe);
         const arg3 = arg * arg * arg;
-        gdOp = params.IS * 3 * arg3 / (-vdOp);
+        gdOp = tp.tIS * 3 * arg3 / (-vdOp);
       } else {
         // breakdown  cite: dioload.c:261-263
         const evrev = Math.exp(-(tp.tBV + vdOp) / tp.nbvVt);
-        gdOp = params.IS * evrev / tp.nbvVt;
+        gdOp = tp.tIS * evrev / tp.nbvVt;
       }
       // store capd (small-signal conductance)  dioload.c:363 stores capd here;
       // for a resistive zener (no cap), we store gd for any bypass/convergence use.
@@ -409,21 +402,21 @@ class ZenerAnalogElement extends PoolBackedAnalogElement {
     if (vdLimited >= -3 * tp.nVt) {
       // Forward region  cite: dioload.c:245-249
       const evd = Math.exp(vdLimited / tp.nVt);
-      cdb = params.IS * (evd - 1);
-      gdb = params.IS * evd / tp.nVt;
+      cdb = tp.tIS * (evd - 1);
+      gdb = tp.tIS * evd / tp.nVt;
     } else if (!isFinite(tp.tBV) || vdLimited >= -tp.tBV) {
       // Reverse-cubic region  cite: dioload.c:251-258
       // arg = 3*vte / (vd * CONSTe); cdb = -IS*(1+arg^3); gdb = IS*3*arg^3/(-vd)
       const arg = 3 * tp.nVt / (vdLimited * CONSTe);
       const arg3 = arg * arg * arg;
-      cdb = -params.IS * (1 + arg3);
-      gdb = params.IS * 3 * arg3 / (-vdLimited);
+      cdb = -tp.tIS * (1 + arg3);
+      gdb = tp.tIS * 3 * arg3 / (-vdLimited);
     } else {
       // Breakdown region  cite: dioload.c:259-264
       // cdb = -IS * exp(-(tBV+vd)/vtebrk); gdb = IS * exp(...)/vtebrk
       const evrev = Math.exp(-(tp.tBV + vdLimited) / tp.nbvVt);
-      cdb = -params.IS * evrev;
-      gdb = params.IS * evrev / tp.nbvVt;
+      cdb = -tp.tIS * evrev;
+      gdb = tp.tIS * evrev / tp.nbvVt;
     }
 
     // cd / gd = intrinsic junction values (no sidewall/tunnel for simplified model)
@@ -523,7 +516,11 @@ class ZenerAnalogElement extends PoolBackedAnalogElement {
    * When _tempGiven==true (user called setParam("TEMP", v)), the override is preserved.
    */
   computeTemperature(ctx: TempContext): void {
-    // cite: diotemp.c:84-85 — per-instance TEMP takes precedence over circuit ambient
+    // Adopt the live CKTreltol for the breakdown-voltage match (diotemp.c:208).
+    this._reltol = ctx.reltol;
+    // cite: diotemp.c:84-85 — per-instance TEMP takes precedence over circuit
+    // ambient. With an override active (_tempGiven) the operating temperature is
+    // owned by setParam("TEMP"); the ambient pass leaves it untouched.
     if (!this._tempGiven) {
       this._params["TEMP"] = ctx.cktTemp;
       this._tp = this._computeZenerTp();

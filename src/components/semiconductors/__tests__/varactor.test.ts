@@ -204,17 +204,37 @@ describe("Varactor parameter hot-load (T1)", () => {
     expect(after).not.toBe(before);
   });
 
-  it("hotload_RS_changes_anode_voltage_forward", () => {
-    const fix = buildFixture({ build: (_r, f) => buildVaractorForward(f) });
+  it("hotload_RS_lowers_cathode_voltage_forward", () => {
+    // RS is observable only when (a) the internal series-resistance node exists
+    // — allocated at setup() iff RS != 0 — and (b) the device conducts enough
+    // current for the IR drop to register. Build with RS != 0 under a 2 V forward
+    // drive (~4 mA), then hot-load RS upward: the added series drop lowers the
+    // current, observable as a drop in the cathode node V_K. The anode is pinned
+    // by the source, so the effect appears on the cathode.
+    const fix = buildFixture({
+      build: (_r, facade) =>
+        facade.build({
+          components: [
+            { id: "v1", type: "DcVoltageSource", props: { label: "V1", voltage: 2 } },
+            { id: "d1", type: "VaractorDiode", props: { label: "D1", RS: 10 } },
+            { id: "r1", type: "Resistor", props: { label: "R1", resistance: 300 } },
+            { id: "gnd", type: "Ground", props: { label: "GND" } },
+          ],
+          connections: [
+            ["v1:pos", "d1:A"], ["d1:K", "r1:pos"], ["r1:neg", "gnd:out"], ["v1:neg", "gnd:out"],
+          ],
+        }),
+    });
     const ce = fix.element("D1");
-    const vAnode = fix.circuit.labelToNodeId.get("D1:A")!;
-    const before = fix.engine.getNodeVoltage(vAnode);
-    fix.coordinator.setComponentProperty(ce, "RS", 50);
-    fix.coordinator.step();
-    const after = fix.engine.getNodeVoltage(vAnode);
-    // Larger RS → additional series voltage drop across the device →
-    // anode-side node voltage shifts observably.
+    const vCath = fix.circuit.labelToNodeId.get("D1:K")!;
+    fix.coordinator.dcOperatingPoint();
+    const before = fix.engine.getNodeVoltage(vCath);
+    fix.coordinator.setComponentProperty(ce, "RS", 200);
+    fix.coordinator.dcOperatingPoint();
+    const after = fix.engine.getNodeVoltage(vCath);
+    // More series resistance → less current → lower cathode voltage.
     expect(after).not.toBeCloseTo(before, 6);
+    expect(after).toBeLessThan(before);
   });
 
   it("hotload_TEMP_changes_vf_forward", () => {

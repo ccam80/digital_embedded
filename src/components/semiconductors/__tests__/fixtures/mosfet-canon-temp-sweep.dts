@@ -1,132 +1,124 @@
 {
   "circuit": {
-    "description": "NMOS common-source temperature sweep: VDD=5V, VGS=1.5V (above VTO=1.0V, saturation), RD=1kΩ drain resistor, NMOS M1 (default L1 params: VTO=1.0, KP=2e-5, UO=600, LAMBDA=0) to ground. Used at T in {300.15K,350K,400K} to exercise mosfet temperature pass; compareAllAttempts() per temperature.",
+    "description": "NMOS common-source temperature sweep: VDD=5V -> 1kΩ RD -> M1.D; VGS=1.5V -> M1.G; M1.S -> GND. NMOS M1 (spice-l1: VTO=1.0, KP=2e-5, UO=600, LAMBDA=0, W=L=1e-6, TNOM=300.15). Exercises mosfet temperature pass under temperature-matched ngspice parity.",
     "elements": [
       {
-        "id": "c2d3e4f5-a6b7-8901-cdef-012345678901",
-        "position": { "x": 0, "y": 1 },
+        "id": "VDD",
+        "position": {
+          "x": 0,
+          "y": 3
+        },
         "properties": {
-          "_modelParams": { "voltage": 5 },
+          "_modelParams": {
+            "voltage": 5
+          },
           "label": "VDD",
-          "position": [0, 0],
+          "position": [
+            0,
+            0
+          ],
           "voltage": 5
         },
         "rotation": 0,
         "type": "DcVoltageSource"
       },
       {
-        "id": "c2d3e4f5-a6b7-8901-cdef-012345678902",
-        "position": { "x": 0, "y": 7 },
+        "id": "VGS",
+        "position": {
+          "x": 0,
+          "y": 8
+        },
         "properties": {
-          "_modelParams": { "voltage": 1.5 },
+          "_modelParams": {
+            "voltage": 1.5
+          },
           "label": "VGS",
-          "position": [0, 8],
+          "position": [
+            0,
+            8
+          ],
           "voltage": 1.5
         },
         "rotation": 0,
         "type": "DcVoltageSource"
       },
       {
-        "id": "c2d3e4f5-a6b7-8901-cdef-012345678903",
-        "position": { "x": 12, "y": 0 },
+        "id": "RD",
+        "position": {
+          "x": 12,
+          "y": 0
+        },
         "properties": {
-          "_modelParams": { "resistance": 1000 },
+          "_modelParams": {
+            "resistance": 1000
+          },
           "label": "RD",
-          "position": [0, 16],
+          "position": [
+            0,
+            16
+          ],
           "resistance": 1000
         },
         "rotation": 0,
         "type": "Resistor"
       },
       {
-        "id": "c2d3e4f5-a6b7-8901-cdef-012345678904",
-        "position": { "x": 24, "y": 2 },
+        "id": "M1",
+        "position": {
+          "x": 24,
+          "y": 1
+        },
         "properties": {
-          "AF": 1,
-          "CBD": 0,
-          "CBS": 0,
-          "CGBO": 0,
-          "CGDO": 0,
-          "CGSO": 0,
-          "CJ": 0,
-          "CJSW": 0,
-          "FC": 0.5,
           "GAMMA": 0,
           "IS": 1e-14,
-          "JS": 0,
-          "KF": 0,
           "KP": 0.00002,
           "L": 0.000001,
           "LAMBDA": 0,
-          "LD": 0,
-          "MJ": 0.5,
-          "MJSW": 0.5,
           "PB": 0.8,
           "PHI": 0.6,
-          "RD": 0,
-          "RS": 0,
-          "RSH": 0,
+          "TNOM": 300.15,
           "TOX": 1e-7,
           "TPG": 1,
           "UO": 600,
-          "VTO": 1.0,
+          "VTO": 1,
           "W": 0.000001,
           "_modelParams": {
-            "AD": 0,
-            "AF": 1,
-            "AS": 0,
-            "CBD": 0,
-            "CBS": 0,
-            "CGBO": 0,
-            "CGDO": 0,
-            "CGSO": 0,
-            "CJ": 0,
-            "CJSW": 0,
-            "FC": 0.5,
             "GAMMA": 0,
-            "ICVBS": 0,
-            "ICVDS": 0,
-            "ICVGS": 0,
             "IS": 1e-14,
-            "JS": 0,
-            "KF": 0,
             "KP": 0.00002,
             "L": 0.000001,
             "LAMBDA": 0,
-            "LD": 0,
-            "M": 1,
-            "MJ": 0.5,
-            "MJSW": 0.5,
-            "OFF": 0,
             "PB": 0.8,
-            "PD": 0,
             "PHI": 0.6,
-            "PS": 0,
-            "RD": 0,
-            "RS": 0,
-            "RSH": 0,
             "TNOM": 300.15,
             "TOX": 1e-7,
             "TPG": 1,
             "UO": 600,
-            "VTO": 1.0,
-            "W": 0.000001,
-            "drainSquares": 1,
-            "sourceSquares": 1
+            "VTO": 1,
+            "W": 0.000001
           },
           "label": "M1",
           "model": "spice-l1",
-          "position": [0, 24]
+          "position": [
+            0,
+            24
+          ]
         },
         "rotation": 0,
         "type": "NMOS"
       },
       {
-        "id": "c2d3e4f5-a6b7-8901-cdef-012345678905",
-        "position": { "x": 36, "y": 4 },
+        "id": "GND",
+        "position": {
+          "x": 36,
+          "y": 6
+        },
         "properties": {
           "label": "GND",
-          "position": [0, 32]
+          "position": [
+            0,
+            32
+          ]
         },
         "rotation": 0,
         "type": "Ground"
@@ -134,32 +126,522 @@
     ],
     "name": "mosfet-canon-temp-sweep",
     "wires": [
-      { "points": [ { "x": 4, "y": 1 }, { "x": 5, "y": 1 } ] },
-      { "points": [ { "x": 5, "y": 1 }, { "x": 8, "y": 1 } ] },
-      { "points": [ { "x": 8, "y": 1 }, { "x": 8, "y": 0 } ] },
-      { "points": [ { "x": 8, "y": 0 }, { "x": 12, "y": 0 } ] },
-      { "points": [ { "x": 16, "y": 0 }, { "x": 17, "y": 0 } ] },
-      { "points": [ { "x": 17, "y": 0 }, { "x": 24, "y": 0 } ] },
-      { "points": [ { "x": 24, "y": 0 }, { "x": 24, "y": 1 } ] },
-      { "points": [ { "x": 28, "y": 2 }, { "x": 29, "y": 2 } ] },
-      { "points": [ { "x": 29, "y": 2 }, { "x": 33, "y": 2 } ] },
-      { "points": [ { "x": 33, "y": 2 }, { "x": 33, "y": 4 } ] },
-      { "points": [ { "x": 33, "y": 4 }, { "x": 36, "y": 4 } ] },
-      { "points": [ { "x": 24, "y": 3 }, { "x": 24, "y": 4 } ] },
-      { "points": [ { "x": 24, "y": 4 }, { "x": 36, "y": 4 } ] },
-      { "points": [ { "x": 4, "y": 7 }, { "x": 5, "y": 7 } ] },
-      { "points": [ { "x": 5, "y": 7 }, { "x": 8, "y": 7 } ] },
-      { "points": [ { "x": 8, "y": 7 }, { "x": 8, "y": 2 } ] },
-      { "points": [ { "x": 8, "y": 2 }, { "x": 24, "y": 2 } ] },
-      { "points": [ { "x": 0, "y": 1 }, { "x": -1, "y": 1 } ] },
-      { "points": [ { "x": -1, "y": 1 }, { "x": -2, "y": 1 } ] },
-      { "points": [ { "x": -2, "y": 1 }, { "x": -2, "y": 4 } ] },
-      { "points": [ { "x": -2, "y": 4 }, { "x": 36, "y": 4 } ] },
-      { "points": [ { "x": 0, "y": 7 }, { "x": -1, "y": 7 } ] },
-      { "points": [ { "x": -1, "y": 7 }, { "x": -2, "y": 7 } ] },
-      { "points": [ { "x": -2, "y": 7 }, { "x": -2, "y": 10 } ] },
-      { "points": [ { "x": -2, "y": 10 }, { "x": 36, "y": 10 } ] },
-      { "points": [ { "x": 36, "y": 10 }, { "x": 36, "y": 4 } ] }
+      {
+        "points": [
+          {
+            "x": 4,
+            "y": 3
+          },
+          {
+            "x": 5,
+            "y": 3
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 12,
+            "y": 0
+          },
+          {
+            "x": 11,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 5,
+            "y": 3
+          },
+          {
+            "x": 8,
+            "y": 3
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 8,
+            "y": 3
+          },
+          {
+            "x": 8,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 8,
+            "y": 0
+          },
+          {
+            "x": 11,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 16,
+            "y": 0
+          },
+          {
+            "x": 17,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 28,
+            "y": 0
+          },
+          {
+            "x": 29,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 17,
+            "y": 0
+          },
+          {
+            "x": 29,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 4,
+            "y": 8
+          },
+          {
+            "x": 5,
+            "y": 8
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 24,
+            "y": 1
+          },
+          {
+            "x": 23,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 5,
+            "y": 8
+          },
+          {
+            "x": 9,
+            "y": 8
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 9,
+            "y": 8
+          },
+          {
+            "x": 9,
+            "y": 4
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 9,
+            "y": 4
+          },
+          {
+            "x": 12,
+            "y": 4
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 12,
+            "y": 4
+          },
+          {
+            "x": 18,
+            "y": 4
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 18,
+            "y": 4
+          },
+          {
+            "x": 18,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 18,
+            "y": 1
+          },
+          {
+            "x": 23,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 28,
+            "y": 2
+          },
+          {
+            "x": 29,
+            "y": 2
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 36,
+            "y": 6
+          },
+          {
+            "x": 36,
+            "y": 5
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 29,
+            "y": 2
+          },
+          {
+            "x": 33,
+            "y": 2
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 33,
+            "y": 2
+          },
+          {
+            "x": 33,
+            "y": 5
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 33,
+            "y": 5
+          },
+          {
+            "x": 36,
+            "y": 5
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 0,
+            "y": 3
+          },
+          {
+            "x": -1,
+            "y": 3
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 36,
+            "y": 6
+          },
+          {
+            "x": 36,
+            "y": 4
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": -1,
+            "y": 3
+          },
+          {
+            "x": 6,
+            "y": 3
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 6,
+            "y": 3
+          },
+          {
+            "x": 6,
+            "y": 8
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 6,
+            "y": 8
+          },
+          {
+            "x": 12,
+            "y": 8
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 12,
+            "y": 8
+          },
+          {
+            "x": 18,
+            "y": 8
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 18,
+            "y": 8
+          },
+          {
+            "x": 18,
+            "y": 7
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 18,
+            "y": 7
+          },
+          {
+            "x": 24,
+            "y": 7
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 24,
+            "y": 7
+          },
+          {
+            "x": 30,
+            "y": 7
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 30,
+            "y": 7
+          },
+          {
+            "x": 30,
+            "y": 4
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 30,
+            "y": 4
+          },
+          {
+            "x": 36,
+            "y": 4
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 0,
+            "y": 8
+          },
+          {
+            "x": -1,
+            "y": 8
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 36,
+            "y": 6
+          },
+          {
+            "x": 36,
+            "y": 3
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": -1,
+            "y": 8
+          },
+          {
+            "x": -2,
+            "y": 8
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": -2,
+            "y": 8
+          },
+          {
+            "x": -2,
+            "y": 12
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": -2,
+            "y": 12
+          },
+          {
+            "x": 12,
+            "y": 12
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 12,
+            "y": 12
+          },
+          {
+            "x": 18,
+            "y": 12
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 18,
+            "y": 12
+          },
+          {
+            "x": 18,
+            "y": 11
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 18,
+            "y": 11
+          },
+          {
+            "x": 24,
+            "y": 11
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 24,
+            "y": 11
+          },
+          {
+            "x": 31,
+            "y": 11
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 31,
+            "y": 11
+          },
+          {
+            "x": 31,
+            "y": 3
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 31,
+            "y": 3
+          },
+          {
+            "x": 36,
+            "y": 3
+          }
+        ]
+      }
     ]
   },
   "format": "dts",

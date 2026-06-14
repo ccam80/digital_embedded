@@ -131,37 +131,44 @@ describe("Schottky parameter hot-load (T1)", () => {
     expect(after).toBeGreaterThan(before);
   });
 
-  it("hotload_RS_changes_anode_voltage", () => {
+  it("hotload_RS_lowers_cathode_voltage", () => {
+    // The anode is pinned by the 0.5 V source, so RS cannot move it. RS (the
+    // internal series resistance) adds an IR drop that lowers the device current,
+    // observable as a drop in the cathode node V_K = I·R1.
     const fix = buildFixture({ build: (_r, f) => buildSchottkyForward(f) });
     const ce = fix.element("D1");
-    const vAnode = fix.circuit.labelToNodeId.get("D1:A")!;
-    const before = fix.engine.getNodeVoltage(vAnode);
+    const vCath = fix.circuit.labelToNodeId.get("D1:K")!;
+    fix.coordinator.dcOperatingPoint();
+    const before = fix.engine.getNodeVoltage(vCath);
     fix.coordinator.setComponentProperty(ce, "RS", 50);
-    fix.coordinator.step();
-    const after = fix.engine.getNodeVoltage(vAnode);
-    // Larger RS → additional series voltage drop appears across the device →
-    // anode-side node voltage shifts observably.
+    fix.coordinator.dcOperatingPoint();
+    const after = fix.engine.getNodeVoltage(vCath);
+    // More series resistance → less current → lower cathode voltage.
     expect(after).not.toBeCloseTo(before, 6);
+    expect(after).toBeLessThan(before);
   });
 
   it("hotload_CJO_changes_dynamic_response", () => {
-    // CJO is a depletion-cap parameter; at DCOP it is dormant (capGate is
-    // false outside MODETRAN/MODEAC/MODEINITSMSIG). Drive a transient step
-    // before and after to expose the cap path's recompute.
-    const fix = buildFixture({
-      build: (_r, f) => buildSchottkyForward(f),
-      params: { tStop: 1e-6, maxTimeStep: 1e-8 },
-    });
-    const ce = fix.element("D1");
-    const vAnode = fix.circuit.labelToNodeId.get("D1:A")!;
-    fix.coordinator.step();
-    const before = fix.engine.getNodeVoltage(vAnode);
-    fix.coordinator.setComponentProperty(ce, "CJO", 100e-12);
-    fix.coordinator.step();
-    const after = fix.engine.getNodeVoltage(vAnode);
-    // Larger CJO loads the junction more heavily under transient excitation.
-    // The cap-block stamp scales with Ctotal; observable shifts at the anode.
-    expect(after).not.toBe(before);
+    // CJO is a depletion-cap parameter — dormant at DCOP, active only under
+    // transient excitation. The anode is source-pinned, so its effect appears on
+    // the cathode. Compare a control (default CJO) against a fixture whose CJO is
+    // hot-loaded mid-transient; stepped identically, the larger junction cap
+    // holds the cathode node up, so V_K diverges observably from the control.
+    const mk = (): ReturnType<typeof buildFixture> =>
+      buildFixture({ build: (_r, f) => buildSchottkyForward(f), params: { tStop: 1e-6, maxTimeStep: 1e-8 } });
+    const vK = (fix: ReturnType<typeof buildFixture>): number =>
+      fix.engine.getNodeVoltage(fix.circuit.labelToNodeId.get("D1:K")!);
+
+    const ctrl = mk();
+    const test = mk();
+    ctrl.coordinator.step();
+    test.coordinator.step();
+    // Hot-load CJO on the test fixture only.
+    test.coordinator.setComponentProperty(test.element("D1"), "CJO", 1e-9);
+    ctrl.coordinator.step();
+    test.coordinator.step();
+    // The CJO hot-load diverges the cathode trajectory from the control.
+    expect(vK(test)).not.toBeCloseTo(vK(ctrl), 6);
   });
 
   it("hotload_TEMP_changes_vf", () => {
@@ -217,10 +224,17 @@ describe("Schottky computeTemperature engine-driven path (T1)", () => {
     expect(vfHot).toBeLessThan(vfCold);
   });
 
-  it("computeTemperature_per_instance_override_wins_over_ambient", () => {
+  it("computeTemperature_per_instance_override_wins_over_ambient", async () => {
     // Per-instance TEMP set via setParam must not be overwritten by the
     // engine-driven computeTemperature pass (diotemp.c:84 DIOtempGiven guard).
-    const fix = buildFixture({ build: (_r, f) => buildSchottkyForward(f) });
+    // Unlike the (capacitor-free) zener, the Schottky carries a junction
+    // capacitance, so the transient must run at an accurate timestep: at a coarse
+    // dt the trapezoidal rule rings on the junction cap (~1.5 µV peak), which
+    // would mask the steady state. maxTimeStep 1 ns collapses that ring to ~5e-11.
+    const fix = buildFixture({
+      build: (_r, f) => buildSchottkyForward(f),
+      params: { tStop: 1e-7, maxTimeStep: 1e-9 },
+    });
     const ce = fix.element("D1");
 
     // Set per-instance TEMP override to 450 K.
@@ -230,15 +244,19 @@ describe("Schottky computeTemperature engine-driven path (T1)", () => {
       fix.engine.getNodeVoltage(fix.circuit.labelToNodeId.get("D1:A")!) -
       fix.engine.getNodeVoltage(fix.circuit.labelToNodeId.get("D1:K")!);
 
-    // Now set ambient back to default. The override must win.
+    // Now set ambient back to default. The device stays at 450 K (override), so
+    // once the transient settles V_f must return to the 450 K operating point and
+    // not the ambient (300.15 K) one. Run the transient to a settle time and read
+    // the steady state — the genuine steady-state override check, not a single
+    // unsettled step.
     fix.facade.setCircuitTemp(300.15);
-    fix.coordinator.step();
+    await fix.coordinator.stepToTime(1e-7);
     const vfAfter =
       fix.engine.getNodeVoltage(fix.circuit.labelToNodeId.get("D1:A")!) -
       fix.engine.getNodeVoltage(fix.circuit.labelToNodeId.get("D1:K")!);
 
-    // Vf must remain at the 450 K operating point to NR convergence tolerance.
-    // It should not change when ambient is reset (override holds).
+    // The settled V_f must equal the 450 K DC operating point: the override holds
+    // and the ambient change does not move it.
     expect(vfAfter).toBeCloseTo(vfOverride, 6);
   });
 });

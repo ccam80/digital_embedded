@@ -245,29 +245,13 @@ describe("MOSFET parameter hot-load (T1)", () => {
     expect(after).not.toBeCloseTo(before, 6);
   });
 
-  it("hotload_PHI_changes_vd", () => {
-    const fix = buildCs();
-    const ce = fix.element("M1");
-    const vdNode = fix.circuit.labelToNodeId.get("M1:D")!;
-    const before = fix.engine.getNodeVoltage(vdNode);
-    fix.coordinator.setComponentProperty(ce, "PHI", 0.8);
-    fix.coordinator.step();
-    const after = fix.engine.getNodeVoltage(vdNode);
-    expect(Number.isFinite(after)).toBe(true);
-    expect(after).not.toBe(before);
-  });
-
-  it("hotload_GAMMA_changes_vd", () => {
-    const fix = buildCs();
-    const ce = fix.element("M1");
-    const vdNode = fix.circuit.labelToNodeId.get("M1:D")!;
-    const before = fix.engine.getNodeVoltage(vdNode);
-    fix.coordinator.setComponentProperty(ce, "GAMMA", 0.5);
-    fix.coordinator.step();
-    const after = fix.engine.getNodeVoltage(vdNode);
-    expect(Number.isFinite(after)).toBe(true);
-    expect(after).not.toBe(before);
-  });
+  // PHI (surface potential) and GAMMA (body-effect coefficient) are not tested
+  // for an observable drain shift: this MOSFET is a 3-terminal device (pins G/S/D
+  // only; bulk tied to source), so Vbs ≡ 0. At Vbs=0 the body-effect terms cancel
+  // in the threshold — von = tVbi + GAMMA·√(PHI) with tVbi = VTO − GAMMA·√(PHI) at
+  // nominal T, so von = VTO independent of GAMMA, and PHI enters only through the
+  // (zero-at-nominal-T) temperature shift. Neither moves the operating point in
+  // any reachable circuit for this part, so there is no observable to assert.
 });
 
 // ---------------------------------------------------------------------------

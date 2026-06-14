@@ -271,7 +271,7 @@ describe("Zener computeTemperature engine-driven path (T1)", () => {
     expect(vfHot).toBeLessThan(vfCold);
   });
 
-  it("computeTemperature_respects_per_instance_override", () => {
+  it("computeTemperature_respects_per_instance_override", async () => {
     // Per-instance TEMP set via setParam must not be overwritten by the
     // engine-driven computeTemperature pass (diotemp.c:84 DIOtempGiven guard).
     const fix = buildFixture({ build: (_r, f) => buildZenerForward(f) });
@@ -285,15 +285,18 @@ describe("Zener computeTemperature engine-driven path (T1)", () => {
     const vf500 = vAnode500 - vCath500;
 
     // Now push a lower ambient via setCircuitTemp. The per-instance override
-    // must win — result must not revert to the ambient-temperature Vf.
+    // must win — the device temperature stays at 500 K, so once the transient
+    // settles V_f returns to the 500 K operating point rather than the ambient
+    // (300.15 K) one. Run the transient to a settle time (the resistive forward
+    // diode reconverges to the DC operating point) and read the steady state.
     fix.facade.setCircuitTemp(300.15);
-    fix.coordinator.step();
+    await fix.coordinator.stepToTime(1e-3);
     const vAnodeAfter = fix.engine.getNodeVoltage(fix.circuit.labelToNodeId.get("D1:A")!);
     const vCathAfter  = fix.engine.getNodeVoltage(fix.circuit.labelToNodeId.get("D1:K")!);
     const vfAfter = vAnodeAfter - vCathAfter;
 
-    // The Vf must remain at the 500 K operating point to NR convergence tolerance.
-    // It should not change when ambient is altered (override holds).
+    // The settled V_f remains at the 500 K operating point — the override holds
+    // and the ambient change does not move it.
     expect(vfAfter).toBeCloseTo(vf500, 6);
   });
 
