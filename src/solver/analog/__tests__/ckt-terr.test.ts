@@ -230,7 +230,7 @@ describe("cktTerrVoltage", () => {
     d0 = (d0 - d1) / dt0;
     const ddiff = Math.abs(d0);
     const tol = lteAbstol + lteReltol * Math.max(Math.abs(vNow), Math.abs(v1));
-    const factor = 2 / 9; // GEAR_LTE_FACTORS[1]
+    const factor = GEAR_LTE_FACTORS[1]; // ngspice cktterr.c:25 gearCoeff[1] = .2222222222
     const denom = Math.max(lteAbstol, factor * ddiff);
     // deltaOld=[dt,dt], order=2 -> sum i=0..2 but deltaOld.length=2 so only i=0,1
     const delsum = dt + dt;
@@ -290,7 +290,7 @@ describe("cktTerrVoltage", () => {
     const NGSPICE_REF_TRAP = Math.abs(d0old * trtol * tol * 3 * (d0old + d1old) / diffSigned);
 
     // NGSPICE_REF_GEAR2: ngspice ckttrunc.c NEWTRUNC GEAR order 2.
-    const factor = 2 / 9; // GEAR_LTE_FACTORS[1]
+    const factor = GEAR_LTE_FACTORS[1]; // ngspice cktterr.c:25 gearCoeff[1] = .2222222222
     const denom = Math.max(lteAbstol, factor * ddiff);
     const delsum = dt + dt; // deltaOld=[dt,dt], order=2 but deltaOld.length=2
     const tmp = (tol * trtol * delsum) / (denom * dt);
@@ -428,9 +428,11 @@ describe("chargetol_formula", () => {
 
 describe("gear_lte_factor_selection", () => {
   it("gear_lte_factor_order_3", () => {
-    // GEAR order 3 must use factor 3/22, not 2/9 (the old order-2 factor)
-    // GEAR_LTE_FACTORS[2] = 3/22
-    expect(GEAR_LTE_FACTORS[2]).toBe(3 / 22);
+    // GEAR order 3 must select gearCoeff[2] (slot index 2), not gearCoeff[1]
+    // (the order-2 factor). ngspice cktterr.c:26 ships the truncated literal
+    // .1363636364, NOT the rational 3/22.
+    expect(GEAR_LTE_FACTORS[2]).toBe(0.1363636364);
+    expect(GEAR_LTE_FACTORS[2]).not.toBe(GEAR_LTE_FACTORS[1]); // distinct slot
 
     // Verify by comparing outputs: order 3 with factor 3/22 vs the old factor 2/9
     // With nonlinear charges, larger factor → smaller del → smaller result
@@ -457,7 +459,7 @@ describe("gear_lte_factor_selection", () => {
     const chargetolRaw = 1e-3 * Math.max(Math.max(q0, q1), 1e-14);
     const chargetol = chargetolRaw / dt;
     const tol = Math.max(volttol, chargetol);
-    const factor = 3 / 22; // correct GEAR order 3 factor
+    const factor = GEAR_LTE_FACTORS[2]; // ngspice cktterr.c:26 gearCoeff[2] = .1363636364
     const denom = Math.max(1e-12, factor * ddiff);
     const del = 7 * tol / denom;
     const expectedOrder3 = Math.exp(Math.log(del) / 3); // cktterr.c:69-74: root index = order
@@ -465,9 +467,9 @@ describe("gear_lte_factor_selection", () => {
   });
 
   it("gear_lte_factor_order_5", () => {
-    // GEAR order 5 must use factor 10/137 (ngspice cktterr.c gearCoeff[4])
-    // Repo cross-reference: spec/state-machines/ngspice-cktterr-vs-ckt-terr.md row 47
-    expect(GEAR_LTE_FACTORS[4]).toBe(10 / 137);
+    // GEAR order 5 must select gearCoeff[4]. ngspice cktterr.c:29 ships the
+    // truncated decimal literal .07299270073, NOT the rational 10/137.
+    expect(GEAR_LTE_FACTORS[4]).toBe(0.07299270073);
 
     const dt = 1e-6;
     const q0 = 27e-12, q1 = 8e-12, q2 = 1e-12, q3 = 0;
@@ -491,7 +493,7 @@ describe("gear_lte_factor_selection", () => {
     const chargetolRaw = 1e-3 * Math.max(Math.max(q0, q1), 1e-14);
     const chargetol = chargetolRaw / dt;
     const tol = Math.max(volttol, chargetol);
-    const factor = 10 / 137; // correct GEAR order 5 factor
+    const factor = GEAR_LTE_FACTORS[4]; // ngspice cktterr.c:29 gearCoeff[4] = .07299270073
     const denom = Math.max(1e-12, factor * ddiff);
     const del = 7 * tol / denom;
     const expectedOrder5 = Math.exp(Math.log(del) / 5); // cktterr.c:69-74: root index = order
@@ -502,8 +504,9 @@ describe("gear_lte_factor_selection", () => {
   });
 
   it("gear_lte_factor_order_6", () => {
-    // GEAR order 6 must use factor 20/343
-    expect(GEAR_LTE_FACTORS[5]).toBe(20 / 343);
+    // GEAR order 6 must select gearCoeff[5]. ngspice cktterr.c:30 ships the
+    // truncated decimal literal .05830903790, NOT the rational 20/343.
+    expect(GEAR_LTE_FACTORS[5]).toBe(0.05830903790);
 
     const dt = 1e-6;
     const q0 = 27e-12, q1 = 8e-12, q2 = 1e-12, q3 = 0;
@@ -526,7 +529,7 @@ describe("gear_lte_factor_selection", () => {
     const chargetolRaw = 1e-3 * Math.max(Math.max(q0, q1), 1e-14);
     const chargetol = chargetolRaw / dt;
     const tol = Math.max(volttol, chargetol);
-    const factor = 20 / 343;
+    const factor = GEAR_LTE_FACTORS[5]; // ngspice cktterr.c:30 gearCoeff[5] = .05830903790
     const denom = Math.max(1e-12, factor * ddiff);
     const del = 7 * tol / denom;
     const expectedOrder6 = Math.exp(Math.log(del) / 6); // cktterr.c:69-74: root index = order
@@ -626,8 +629,8 @@ describe("cktTerr_formula_fixes", () => {
     d0v = (d0v - d1v) / dt0v;
     const ddiffV = Math.abs(d0v);
     const tolV = lteAbstol + lteReltol * Math.max(Math.abs(vNow), Math.abs(v1));
-    // GEAR_LTE_FACTORS[1] = 2/9
-    const factorV = 2 / 9;
+    // ngspice cktterr.c:25 gearCoeff[1] = .2222222222 (truncated literal, not 2/9)
+    const factorV = GEAR_LTE_FACTORS[1];
     const delta = dt;
     let delsum = 0;
     for (let i = 0; i <= order && i < deltaOld.length; i++) delsum += deltaOld[i];
