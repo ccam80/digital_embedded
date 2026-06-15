@@ -19,7 +19,6 @@ import type {
   SubcircuitElement,
   SubcircuitElementParam,
 } from "../../../../core/mna-subcircuit-netlist.js";
-import { deckOrder } from "../../ngspice-load-order.js";
 import { buildBSourceTree } from "../../expression.js";
 import {
   enumWaveformCoeffs,
@@ -308,28 +307,17 @@ export function generateSpiceNetlist(
   // Collect model cards: modelName -> ".model <name> <type> (<params>)"
   const modelCards = new Map<string, string>();
 
-  // One element line per compiled element. The MNA node-map walk and this deck
-  // emitter MUST iterate device lines in the identical order (inppas2.c:76
-  // top-to-bottom card walk), or parse-time node integers desync from the
-  // emitted deck. Both consume the single shared `deckOrder` producer
-  // (ngspice-load-order.ts).
-  //
-  // `compiled.elements` is stored (ngspiceLoadOrder ASC, build-order DESC)-
-  // reverse-within-bucket, because cktcrte.c:62-64's LIFO instance prepend
-  // reverses the per-iteration load walk back. Node numbering, by contrast,
-  // is the forward parse order. To recover each element's forward build order,
-  // enumerate the array in reverse (ascending originalIndex tracks the original
-  // build order within each bucket), then `deckOrder` re-buckets into
-  // forward-within-bucket emission order. Sub-elements (no parent
-  // CircuitElement) are emitted via their parent's subcircuit recursion, so
-  // they are excluded from the top-level deck order here.
-  const emittable: { typeId: string; arrayIndex: number }[] = [];
-  for (let i = compiled.elements.length - 1; i >= 0; i--) {
-    const circuitEl = compiled.elementToCircuitElement.get(i);
-    if (!circuitEl) continue;
-    emittable.push({ typeId: circuitEl.typeId, arrayIndex: i });
-  }
-  const emitOrder = deckOrder(emittable).map(({ item }) => item.arrayIndex);
+  // One element line per compiled element, emitted in canonical deck order.
+  // `compiled.deckOrderByElementIndex` is the single shared ordering basis
+  // (compiler.ts) — the same sequence node numbering and the setup/load walk
+  // derive from. The emitter consumes it directly rather than re-deriving the
+  // order, so the deck ngspice parses (inppas2.c:76 top-to-bottom) cannot drift
+  // from our internal order. Sub-elements (no parent CircuitElement) are emitted
+  // via their parent's subcircuit recursion, so they are excluded here.
+  const emitOrder = compiled.elements
+    .map((_el, i) => i)
+    .filter((i) => compiled.elementToCircuitElement.get(i) !== undefined)
+    .sort((a, b) => compiled.deckOrderByElementIndex[a]! - compiled.deckOrderByElementIndex[b]!);
   // Emit-context: subcircuit recursion reuses compiler-assigned IDs for
   // composite-internal nets when present (so the deck names match digiTS
   // node IDs and the harness's nodeMap correlates them by stringified id).
@@ -911,9 +899,15 @@ function emitPrimitive(
     // ngspice CSW->digiTS mapping:
     //   CSWiThreshold  = (pullInI + dropOutI) / 2
     //   CSWiHysteresis = (pullInI - dropOutI) / 2
-    // NC switches additionally emit the `ON` keyword per cswparam.c:27-30
-    // (CSW_IC_ON case sets CSWzero_stateGiven), pinning the CSWITCH's
-    // initial state to closed and matching digiTS's `normallyClosed: true`.
+    // A normally-closed contact (digiTS `normallyClosed: true`,
+    // current-controlled-switch.ts:311) inverts the region->conductance mapping
+    // — open when energised — while leaving the CSW state machine unchanged.
+    // ngspice's CSW derives g_now from the region alone with no inversion param
+    // (cswload.c:136-138), so the inversion is realized by SWAPPING RON/ROFF in
+    // the .model card below: the energised (REALLY_ON) region then stamps 1/ROFF
+    // (open) and the rest (REALLY_OFF) region stamps 1/RON (closed). The `ON`
+    // keyword (cswparam.c:27-30, CSW_IC_ON) pins the cold-start region so both
+    // engines seed the same CSW state for the contact's `closed: true` rest.
     const a1Node = nodeAt(nodes, 0, rawLabel, "A1");
     const b1Node = nodeAt(nodes, 1, rawLabel, "B1");
     const ron  = requireParam(props, def, modelKey, "Ron",  rawLabel);
@@ -931,9 +925,18 @@ function emitPrimitive(
     const senseLabel = canonicalizeSpiceLabel(props.get<string>("ctrlBranch"), "V");
     const wLabel = canonicalizeSpiceLabel(rawLabel, "W");
     const modelName = `CSWMODEL_${wLabel}`;
-    const normallyClosed = props.has("normallyClosed") ? !!props.get<boolean>("normallyClosed") : false;
+    // normallyClosed may live in either partition: composite sub-elements route
+    // numeric params through setModelParam (model partition, resolveSubElementProps);
+    // a standalone placement sets it as a regular prop. Read both.
+    const normallyClosed =
+      (props.hasModelParam("normallyClosed") && !!props.getModelParam<number>("normallyClosed")) ||
+      (props.has("normallyClosed") && !!props.get<boolean>("normallyClosed"));
+    // Swap RON/ROFF for a normally-closed contact so the region->conductance
+    // mapping inverts (see above); normally-open uses them as-is.
+    const cardRon  = normallyClosed ? roff : ron;
+    const cardRoff = normallyClosed ? ron  : roff;
     if (!modelCards.has(modelName)) {
-      modelCards.set(modelName, `.model ${modelName} CSW (IT=${iThreshold} IH=${iHysteresis} RON=${ron} ROFF=${roff})`);
+      modelCards.set(modelName, `.model ${modelName} CSW (IT=${iThreshold} IH=${iHysteresis} RON=${cardRon} ROFF=${cardRoff})`);
     }
     const onKeyword = normallyClosed ? " ON" : "";
     return [
@@ -956,7 +959,12 @@ function emitPrimitive(
     // Model card constants VT=0 VH=0 verified per swsetup.c:28-33 and swload.c:108-116.
     const ctrlNet = allocateInternalNet(ctx);
     const closed = props.has("closed") ? !!props.get<boolean>("closed") : false;
-    const normallyClosed = props.has("normallyClosed") ? !!props.get<boolean>("normallyClosed") : false;
+    // normallyClosed may live in either partition: composite sub-elements route
+    // numeric params through setModelParam (model partition, resolveSubElementProps);
+    // a standalone placement sets it as a regular prop. Read both.
+    const normallyClosed =
+      (props.hasModelParam("normallyClosed") && !!props.getModelParam<number>("normallyClosed")) ||
+      (props.has("normallyClosed") && !!props.get<boolean>("normallyClosed"));
     const effectivelyClosed = normallyClosed ? !closed : closed;
     const ctrlV = effectivelyClosed ? 1 : 0;
     const modelName = `SWMODEL_${label}`;
@@ -982,7 +990,12 @@ function emitPrimitive(
     const c1Node = nodeAt(nodes, 2, rawLabel, "C1");
     const ctrlNet = allocateInternalNet(ctx);
     const closed = props.has("closed") ? !!props.get<boolean>("closed") : false;
-    const normallyClosed = props.has("normallyClosed") ? !!props.get<boolean>("normallyClosed") : false;
+    // normallyClosed may live in either partition: composite sub-elements route
+    // numeric params through setModelParam (model partition, resolveSubElementProps);
+    // a standalone placement sets it as a regular prop. Read both.
+    const normallyClosed =
+      (props.hasModelParam("normallyClosed") && !!props.getModelParam<number>("normallyClosed")) ||
+      (props.has("normallyClosed") && !!props.get<boolean>("normallyClosed"));
     const effectivelyClosed = normallyClosed ? !closed : closed;
     const ctrlV = effectivelyClosed ? 1 : 0;
     const ron  = requireParam(props, def, modelKey, "Ron",  rawLabel);

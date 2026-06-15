@@ -303,10 +303,11 @@ export class CurrentControlledSwitchAnalogElement extends PoolBackedAnalogElemen
     s0[base + SLOT_CSW_STATE] = current_state;
 
     // cswload.c:136-138 — g_now = (REALLY_ON || HYST_ON) ? onConduct : offConduct.
-    // The normallyClosed inversion has NO ngspice CSW counterpart (cswload.c has
-    // no such param); it is a digiTS relay-contact feature used by RelayDT's
-    // normally-closed contact (relay-dt.ts contactNC) to invert the energised
-    // mapping while reusing the CSW state machine.
+    // The normallyClosed inversion reuses the CSW state machine and flips only
+    // the region->conductance mapping (open when energised). cswload.c has no
+    // inversion param, so the harness reproduces it on the ngspice side by
+    // swapping RON/ROFF in the emitted .model card (netlist-generator.ts CSW
+    // branch). Used by RelayDT's normally-closed contact (relay-dt.ts contactNC).
     const energised = current_state === REALLY_ON || current_state === HYST_ON;
     const closed = this._normallyClosed ? !energised : energised;
 
