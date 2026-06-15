@@ -66,6 +66,13 @@ export class ConcreteCompiledAnalogCircuit implements CompiledAnalogCircuit {
    *  Built by the compiler after the ngspiceLoadOrder sort. */
   readonly elementsByFamily: ReadonlyMap<DeviceFamily, readonly AnalogElement[]>;
 
+  /** Per-element-index canonical deck position. `deckOrderByElementIndex[i]` is
+   *  the deck-sequence slot of `elements[i]` — the single ordering basis shared
+   *  by node numbering, the setup/load walk (used DESC within each device-type
+   *  bucket), and the harness deck emitter (used ASC to emit top-level lines).
+   *  Defaults to identity for non-compiler constructions (tests). */
+  readonly deckOrderByElementIndex: readonly number[];
+
   /** Maps component label strings to MNA node IDs (first-pin semantics-
    *  preserved for AC analysis, Monte Carlo, parameter sweep, etc.). */
   readonly labelToNodeId: Map<string, number>;
@@ -141,6 +148,7 @@ export class ConcreteCompiledAnalogCircuit implements CompiledAnalogCircuit {
     nodeCount: number;
     elements: AnalogElement[];
     elementsByFamily: ReadonlyMap<DeviceFamily, readonly AnalogElement[]>;
+    deckOrderByElementIndex?: readonly number[];
     labelToNodeId: Map<string, number>;
     labelPinNodes?: Map<string, Array<{ pinLabel: string; nodeId: number }>>;
     wireToNodeId: Map<Wire, number>;
@@ -160,6 +168,8 @@ export class ConcreteCompiledAnalogCircuit implements CompiledAnalogCircuit {
     this.nodeCount = params.nodeCount;
     this.elements = params.elements;
     this.elementsByFamily = params.elementsByFamily;
+    this.deckOrderByElementIndex =
+      params.deckOrderByElementIndex ?? params.elements.map((_el, i) => i);
     this.labelToNodeId = params.labelToNodeId;
     this.labelPinNodes = params.labelPinNodes ?? new Map();
     this.wireToNodeId = params.wireToNodeId;

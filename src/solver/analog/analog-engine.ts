@@ -1066,10 +1066,11 @@ export class MNAEngine implements AnalogEngine {
     // fall back to CKTstep / CKTfinalTime when a coefficient is absent or zero).
     ctx.loadCtx.cktStep = this._params.outputStep ?? 0;
     ctx.loadCtx.cktFinalTime = this._params.tStop ?? 0;
-    // CKTic (cktdojob.c:217-218): seed nodeset/IC into rhs + rhsOld after
-    // CKTsetup and before the transient-boot CKTop NR solve, so iteration 0
-    // starts from the constrained voltage (cktic.c:31,39 dual-write).
-    this._seedNodesetIcRhs();
+    // CKTic (cktdojob.c:217-218 dispatches it once before the transient-boot
+    // CKTop). Seeds nodeset/IC voltages and, under UIC, the per-device initial
+    // conditions, so the boot DCOP at solveDcOperatingPoint() below starts from
+    // the constrained state.
+    this._cktic(elements);
     ctx._onPhaseBegin = phaseHook ? (phase: string, param?: number) => phaseHook.onAttemptBegin(phase as DcOpNRPhase, param ?? 0) : null;
     ctx._onPhaseEnd = phaseHook ? (outcome: string, converged: boolean) => phaseHook.onAttemptEnd(outcome as DcOpNRAttemptOutcome, converged) : null;
     // cktop.c:104- OPtran fall-through, also reachable from the transient-boot
@@ -2232,17 +2233,14 @@ export class MNAEngine implements AnalogEngine {
    * (cktop.c:46, carried into NIiter untouched), so seeding it makes NR
    * iteration 0 of a .nodeset/.ic circuit start from the constrained voltage.
    *
-   * cktic.c:21-24 zeroes CKTrhs[0..size] first; here the analysis-entry buffer
-   * state is the freshly zeroed allocateRowBuffers() result, so the seed is a
-   * direct assignment with no prior zero pass. ctx.nodesets holds exactly the
-   * nsGiven nodes and ctx.ics exactly the icGiven nodes (CKTsetNodPm analogue),
-   * so iterating each map IS cktic.c's nsGiven / icGiven gate. The nodeset loop
-   * runs before the IC loop to match cktic.c:27-40, so a node carrying both
-   * lands on its IC value (cktic.c:39 overwrites cktic.c:31).
-   *
-   * cktic.c:43-50 (MODEUIC -> per-device DEVsetic) has no digiTS DEVsetic
-   * counterpart and is escalated as a separate item per the recon spec; it is
-   * not faked here.
+   * The CKTrhs zero pass (cktic.c:22-24) and the MODEUIC per-device DEVsetic
+   * dispatch (cktic.c:43-49) are performed by the caller `_cktic`, which wraps
+   * this seed between them; this method is only the nodeset/IC dual-write
+   * (cktic.c:26-41). ctx.nodesets holds exactly the nsGiven nodes and ctx.ics
+   * exactly the icGiven nodes (CKTsetNodPm analogue), so iterating each map IS
+   * cktic.c's nsGiven / icGiven gate. The nodeset loop runs before the IC loop
+   * to match cktic.c:27-40, so a node carrying both lands on its IC value
+   * (cktic.c:39 overwrites cktic.c:31).
    */
   private _seedNodesetIcRhs(): void {
     const ctx = this._ctx!;
@@ -2253,6 +2251,43 @@ export class MNAEngine implements AnalogEngine {
     }
     for (const [node, value] of ctx.ics) {
       rhsOld[node] = rhs[node] = value;
+    }
+  }
+
+  /**
+   * ngspice CKTic (cktic.c), dispatched once before the transient-boot CKTop
+   * (cktdojob.c:217-218). Three steps, in ngspice's order:
+   *   1. under UIC, zero CKTrhs (cktic.c:22-24) so the device pass in step 3
+   *      reads clean node voltages;
+   *   2. write node .nodeset/.ic values into CKTrhs and CKTrhsOld (cktic.c:26-41,
+   *      delegated to `_seedNodesetIcRhs`);
+   *   3. under UIC, run each device's DEVsetic / `*getic.c` (cktic.c:43-49) so an
+   *      un-given device initial condition is derived from the seeded CKTrhs node
+   *      voltages (e.g. DIOgetic, diogetic.c:28-31) rather than left at its
+   *      un-given sentinel.
+   * The boot CKTop reads CKTrhsOld as its NR guess (cktop.c:46, dc-operating-
+   * point.ts:358-360), which the zero never touches, so zeroing CKTrhs cannot
+   * perturb the boot DCOP. The zero is confined to the UIC path: the device pass
+   * it serves is UIC-only, and the non-UIC boot's rhs is already the fresh-zeroed
+   * analysis buffer, so non-UIC boots are left byte-identical to pre-CKTic
+   * behaviour. Devices ngspice gives no DEVsetic (ind, jfet, mos) do not
+   * implement `getInitialConditions` and keep their hardcoded default.
+   */
+  private _cktic(elements: readonly AnalogElement[]): void {
+    const ctx = this._ctx!;
+    const uic = ctx.cktMode & MODEUIC;
+    // cktic.c:22-24 — zero CKTrhs so the per-device DEVsetic below reads clean
+    // node voltages. ngspice runs CKTic only when the job needs IC handling
+    // (cktdojob.c:217, do_ic); the device DEVsetic pass it gates is UIC-only
+    // (cktic.c:43). On the non-UIC boot there is no DEVsetic to feed and the
+    // analysis-entry rhs is already the fresh-zeroed buffer, so the zero is
+    // confined to the UIC path — leaving the non-UIC boot's rhs untouched.
+    if (uic) ctx.rhs.fill(0);
+    this._seedNodesetIcRhs();                 // cktic.c:26-41
+    if (uic) {                                // cktic.c:43
+      for (const el of elements) {
+        el.getInitialConditions?.(ctx.rhs);   // cktic.c:46 — DEVsetic / *getic.c
+      }
     }
   }
 

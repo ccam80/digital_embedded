@@ -50,13 +50,12 @@
         },
         "properties": {
           "_modelParams": {
+            "BV": 25,
             "IC": 0,
-            "M": 1,
             "capacitance": 0.000001,
             "esr": 0.1,
             "leakageCurrent": 0.000001,
-            "reverseMax": 1,
-            "voltageRating": 25
+            "reverseMax": 1
           },
           "capacitance": 0.000001,
           "esr": 0.1,
@@ -67,7 +66,7 @@
             16
           ],
           "reverseMax": 1,
-          "voltageRating": 25
+          "BV": 25
         },
         "rotation": 0,
         "type": "PolarizedCap"

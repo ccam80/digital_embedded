@@ -103,6 +103,15 @@ export abstract class AnalogElement {
   /** Element-specific convergence check. Return true = converged; false = keep iterating. */
   checkConvergence?(ctx: LoadContext): boolean;
 
+  /** ngspice DEVsetic / CKTic (cktic.c:43-49): under UIC, derive any un-given
+   *  device initial condition from the seeded rhs node voltages. The engine
+   *  calls this once after IC/nodeset rhs seeding and before the transient-boot
+   *  DCOP, mirroring ngspice's per-device *getic.c. Only devices ngspice gives a
+   *  DEVsetic (cap, dio, bjt, …) implement it; devices without one (ind, jfet,
+   *  mos) use their hardcoded default and must NOT define this. Method-presence
+   *  opt-in. */
+  getInitialConditions?(rhs: Float64Array): void;
+
   /**
    * CKTterr-based LTE timestep proposal. Method-presence IS the reactivity
    * discriminant: `typeof el.getLteTimestep === "function"` is the sole gate.

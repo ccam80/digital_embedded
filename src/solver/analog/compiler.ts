@@ -1422,6 +1422,12 @@ export function compileAnalogPartition(
 
   // Build a minimal circuit-like wire lookup for resolveElementNodes.
   const analogElements: import("./element.js").AnalogElement[] = [];
+  // Canonical deck sequence accumulator. Per top-level component, the device-line
+  // elements it contributes in deck order (primitive => [itself]; composite =>
+  // [wrapper, ...leaves]). Ordered by `deckOrder` before the sort to assign each
+  // element a single `deckIndex` — the one ordering basis shared by node
+  // numbering, the deck emitter, and the setup/load walk.
+  const deckGroups: { typeId: string; elements: import("./element.js").AnalogElement[] }[] = [];
   const elementToCircuitElement = new Map<number, CircuitElement>();
   const elementPinVertices = new Map<number, Array<{ x: number; y: number } | null>>();
   const elementResolvedPins = new Map<number, ResolvedPin[]>();
@@ -1674,6 +1680,9 @@ export function compileAnalogPartition(
     for (const leaf of composedLeaves) {
       analogElements.push(leaf);
     }
+    // One deck group per top-level component, in construction (deck) order
+    // within the group: [primitive] or [wrapper, ...leaves].
+    deckGroups.push({ typeId: pc.element.typeId, elements: [element, ...composedLeaves] });
   }
 
   // Per-pin boundary adapters were synthesized into partition.components and
@@ -1709,29 +1718,40 @@ export function compileAnalogPartition(
     }
   }
 
-  // Architectural alignment A1: sort by ngspiceLoadOrder so that
-  // per-iteration cktLoad walks devices in the same per-type bucket order
-  // ngspice does (every R, every C, ..., every V, ...). Within each bucket,
-  // walk in REVERSE deck order: ngspice's `cktcrte.c:63-65` prepends every
-  // parsed instance to the model's GENinstances linked list, so when CKTsetup
-  // walks that list head→tail it visits instances in reverse-deck order. To
-  // mirror that, we sort by (ngspiceLoadOrder ASC, originalIndex DESC). The
-  // netlist generator emits the deck back in forward-within-bucket order
-  // (see netlist-generator.ts) so that ngspice's prepend re-reverses to
-  // match our walk. The sort must run before state-pool allocation and
-  // before the index maps are returned.
+  // Architectural alignment A1: sort by ngspiceLoadOrder so that per-iteration
+  // cktLoad walks devices in the same per-type bucket order ngspice does (every
+  // R, every C, ..., every V, ...). Within each bucket, walk in REVERSE deck
+  // order: ngspice's `cktcrte.c:62-64` prepends every parsed instance to the
+  // model's GENinstances list, so CKTsetup (cktsetup.c:104-110) and CKTload
+  // (cktload.c:62-64) walk that list head->tail = reverse of deck-parse order.
+  // The tie-break is `deckIndex` DESC — each element's slot in the single
+  // canonical deck sequence (assigned just below from `deckOrder`, the same
+  // basis node numbering and the deck emitter use). NOTE: build/insertion order
+  // is NOT deck order once a composite flattens its leaves into device-type
+  // buckets (e.g. a CAP composite's R-leaves sort ahead of a discrete R) — that
+  // mismatch was the bit-exact parity bug. The sort must run before state-pool
+  // allocation and before the index maps are returned.
   //
   // Re-key the three index maps and rewrite each element's elementIndex field
   // so post-sort indices stay consistent.
-  const oldIndexByEl = new Map<import("./element.js").AnalogElement, number>();
-  const oldIndexToElement = analogElements.map((el, i) => {
-    oldIndexByEl.set(el, i);
-    return { el, oldIndex: i };
-  });
+  //
+  // Assign each element its canonical deckIndex. `deckOrder` ranks the groups by
+  // (ngspiceLoadOrder ASC, build-order ASC) — identical to the top-level basis
+  // `componentsInDeckOrder` (node numbering) and the harness deck emitter use;
+  // within a group the contributed device lines keep construction (deck) order.
+  const deckIndexByEl = new Map<import("./element.js").AnalogElement, number>();
+  {
+    let deckCounter = 0;
+    for (const { item } of deckOrder(deckGroups)) {
+      for (const el of item.elements) deckIndexByEl.set(el, deckCounter++);
+    }
+  }
+  const oldIndexToElement = analogElements.map((el, i) => ({ el, oldIndex: i }));
   analogElements.sort((a, b) => {
     const orderDiff = a.ngspiceLoadOrder - b.ngspiceLoadOrder;
     if (orderDiff !== 0) return orderDiff;
-    return oldIndexByEl.get(b)! - oldIndexByEl.get(a)!;
+    // Reverse canonical deck order within a device-type bucket (ngspice LIFO).
+    return deckIndexByEl.get(b)! - deckIndexByEl.get(a)!;
   });
   const oldToNewIndex = new Map<number, number>();
   for (let newIndex = 0; newIndex < analogElements.length; newIndex++) {
@@ -1771,6 +1791,11 @@ export function compileAnalogPartition(
       el.elementIndex = i;
     }
   }
+
+  // Per-element-index canonical deck position, exposed on the compiled circuit.
+  // The harness deck emitter consumes this to emit device lines in deck order
+  // instead of re-deriving the sequence — closing the last parallel ordering path.
+  const deckOrderByElementIndex = analogElements.map((el) => deckIndexByEl.get(el) ?? -1);
 
   // Build per-family buckets. Preserves the relative order of the sorted
   // flat array so each bucket is in the same (ngspiceLoadOrder ASC,
@@ -1841,6 +1866,7 @@ export function compileAnalogPartition(
     nodeCount: totalNodeCount,
     elements: analogElements,
     elementsByFamily,
+    deckOrderByElementIndex,
     labelToNodeId,
     labelPinNodes,
     wireToNodeId,

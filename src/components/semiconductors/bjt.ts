@@ -826,6 +826,15 @@ function _createBjtElementWithPolarity(
   const l0IkfGiven = props.isModelParamGiven("IKF");
   const l0IkrGiven = props.isModelParamGiven("IKR");
 
+  // bjtgetic.c:35-44 BJTicVBEGiven / BJTicVCEGiven gate the BJTgetic capture.
+  // BJTicVBE / BJTicVCE are the UIC junction voltages the boot DCOP reads
+  // (bjtload.c:258-264); getInitialConditions() derives them from the CKTic-
+  // seeded rhs (V(base)−V(emit), V(col)−V(emit)) when the matching flag is unset.
+  const _icVBEGiven = props.isModelParamGiven("ICVBE");
+  const _icVCEGiven = props.isModelParamGiven("ICVCE");
+  let _uicICVBE = params.ICVBE;
+  let _uicICVCE = params.ICVCE;
+
   function computeL0Tp(T: number): BjtTempParams {
     return computeBjtTempParams({
       IS: params.IS, BF: params.BF, BR: params.BR,
@@ -900,6 +909,18 @@ function _createBjtElementWithPolarity(
 
     constructor(pn: ReadonlyMap<string, number>) { super(pn); }
 
+    /** ngspice BJTgetic (bjtgetic.c:35-44), dispatched by the engine's CKTic
+     *  step under UIC before the boot DCOP reads the IC (bjtload.c:258-264).
+     *  When ICVBE/ICVCE were not given, the UIC junction voltages are
+     *  V(base)−V(emit) and V(col)−V(emit) from the CKTic-seeded rhs. */
+    getInitialConditions(rhs: Float64Array): void {
+      const b = this.pinNodes.get("B")!;
+      const c = this.pinNodes.get("C")!;
+      const e = this.pinNodes.get("E")!;
+      if (!_icVBEGiven) _uicICVBE = rhs[b] - rhs[e];
+      if (!_icVCEGiven) _uicICVCE = rhs[c] - rhs[e];
+    }
+
     setup(ctx: SetupContext): void {
       const solver   = ctx.solver;
       const baseNode = this.pinNodes.get("B")!;
@@ -971,9 +992,11 @@ function _createBjtElementWithPolarity(
         s1[base + SLOT_VBE] = vbeRaw;
         s1[base + SLOT_VBC] = vbcRaw;
       } else if ((mode & MODEINITJCT) && (mode & MODETRANOP) && (mode & MODEUIC)) {
-        // cite: bjtload.c:258-264  MODEINITJCT+MODETRANOP+MODEUIC: seed from IC* params.
-        const vbe_ic = polarity * (isNaN(params.ICVBE) ? 0 : params.ICVBE);
-        const vce_ic = polarity * (isNaN(params.ICVCE) ? 0 : params.ICVCE);
+        // cite: bjtload.c:258-264  MODEINITJCT+MODETRANOP+MODEUIC: seed from
+        // BJTicVBE/BJTicVCE (getInitialConditions/bjtgetic.c — given IC, or the
+        // rhs node differences when un-given).
+        const vbe_ic = polarity * _uicICVBE;
+        const vce_ic = polarity * _uicICVCE;
         vbeRaw = vbe_ic;
         vbcRaw = vbe_ic - vce_ic;
       } else if ((mode & MODEINITJCT) && params.OFF === 0) {
@@ -1542,6 +1565,13 @@ export function createSpiceL1BjtElement(
   // BJTintCollResist; the value defaults to 0.01 always (the clamp at
   // bjtsetup.c:163-166), but this flag — distinct from the value — gates QS.
   const rcoGiven = props.isModelParamGiven("RCO");
+  // bjtgetic.c:35-44 BJTicVBEGiven / BJTicVCEGiven gate the BJTgetic capture.
+  // getInitialConditions() derives BJTicVBE / BJTicVCE from the CKTic-seeded rhs
+  // (V(base)−V(emit), V(col)−V(emit)) when the matching flag is unset.
+  const _icVBEGiven = props.isModelParamGiven("ICVBE");
+  const _icVCEGiven = props.isModelParamGiven("ICVCE");
+  let _uicICVBE = params.ICVBE;
+  let _uicICVCE = params.ICVCE;
   // cite: bjttemp.c:169-180 — both IBE and IBC given splits the BE/BC saturation
   // currents off IS (BJTBEsatCurGiven && BJTBCsatCurGiven).
   const ibeGiven = props.isModelParamGiven("IBE");
@@ -1710,6 +1740,18 @@ export function createSpiceL1BjtElement(
     private _hColPrimeCollCX = -1; private _hCollCXColPrime = -1;
 
     constructor(pn: ReadonlyMap<string, number>) { super(pn); }
+
+    /** ngspice BJTgetic (bjtgetic.c:35-44), dispatched by the engine's CKTic
+     *  step under UIC before the boot DCOP reads the IC (bjtload.c:248-255).
+     *  When ICVBE/ICVCE were not given, the UIC junction voltages are
+     *  V(base)−V(emit) and V(col)−V(emit) from the CKTic-seeded rhs. */
+    getInitialConditions(rhs: Float64Array): void {
+      const b = this.pinNodes.get("B")!;
+      const c = this.pinNodes.get("C")!;
+      const e = this.pinNodes.get("E")!;
+      if (!_icVBEGiven) _uicICVBE = rhs[b] - rhs[e];
+      if (!_icVCEGiven) _uicICVCE = rhs[c] - rhs[e];
+    }
 
     getInternalNodeLabels(): readonly string[] {
       return internalLabels;
@@ -1907,15 +1949,16 @@ export function createSpiceL1BjtElement(
         vbxRaw  = polarity * (vBe_ext - vCi);
         vsubRaw = polarity * subs * (0 - vSubCon);
         if ((mode & MODETRAN) && (mode & MODEUIC)) {
-          const vbe_ic = isNaN(params.ICVBE) ? 0 : params.ICVBE;
-          const vce_ic = isNaN(params.ICVCE) ? 0 : params.ICVCE;
+          const vbe_ic = _uicICVBE;
+          const vce_ic = _uicICVCE;
           vbxRaw  = polarity * (vbe_ic - vce_ic);
           vsubRaw = 0;
         }
       } else if ((mode & MODEINITJCT) && (mode & MODETRANOP) && (mode & MODEUIC)) {
-        // cite: bjtload.c:248-255 — UIC: seed from IC params.
-        const vbe_ic = polarity * (isNaN(params.ICVBE) ? 0 : params.ICVBE);
-        const vce_ic = polarity * (isNaN(params.ICVCE) ? 0 : params.ICVCE);
+        // cite: bjtload.c:248-255 — UIC: seed from BJTicVBE/BJTicVCE
+        // (getInitialConditions/bjtgetic.c — given IC, or rhs node differences).
+        const vbe_ic = polarity * _uicICVBE;
+        const vce_ic = polarity * _uicICVCE;
         vbeRaw  = vbe_ic;
         vbcRaw  = vbcxRaw = vbe_ic - vce_ic;
         vbxRaw  = vbcRaw;

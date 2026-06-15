@@ -262,6 +262,13 @@ abstract class MesfetAnalogElement extends PoolBackedAnalogElement {
   protected _icVDSGiven: boolean;
   protected _icVGSGiven: boolean;
 
+  // mesgetic.c:28-37 MESicVDS / MESicVGS — the UIC Vds / Vgs the boot DCOP reads
+  // at mesload.c:416-417. When the matching *Given flag is false,
+  // getInitialConditions() overwrites these with the CKTic-seeded rhs node
+  // differences (V(drain)−V(source), V(gate)−V(source)) instead of the default.
+  private _uicICVDS: number;
+  private _uicICVGS: number;
+
   // Internal nodes allocated during setup()- messetup.c:88-131.
   private _sourcePrimeNode = -1;
   private _drainPrimeNode  = -1;
@@ -301,11 +308,25 @@ abstract class MesfetAnalogElement extends PoolBackedAnalogElement {
       ICVDS:  props.getModelParam<number>("ICVDS"),
       ICVGS:  props.getModelParam<number>("ICVGS"),
     };
+    this._uicICVDS = this._params.ICVDS;
+    this._uicICVGS = this._params.ICVGS;
     this._mt = computeMesfetModelTemp(this._params);
   }
 
   get _p(): MesfetParams {
     return this._params;
+  }
+
+  /** ngspice MESgetic (mesgetic.c:28-37), dispatched by the engine's CKTic step
+   *  under UIC before the transient-boot DCOP reads the IC at mesload.c:416-417.
+   *  When ICVDS/ICVGS were not given, the UIC voltages are the drain-source /
+   *  gate-source differences from the CKTic-seeded rhs, not the default. */
+  getInitialConditions(rhs: Float64Array): void {
+    const drain  = this.pinNodes.get("D")!;
+    const gate   = this.pinNodes.get("G")!;
+    const source = this.pinNodes.get("S")!;
+    if (!this._icVDSGiven) this._uicICVDS = rhs[drain] - rhs[source];
+    if (!this._icVGSGiven) this._uicICVGS = rhs[gate] - rhs[source];
   }
 
   setup(ctx: SetupContext): void {
@@ -414,8 +435,10 @@ abstract class MesfetAnalogElement extends PoolBackedAnalogElement {
     } else if ((mode & MODEINITJCT) && (mode & MODETRANOP) && (mode & MODEUIC)) {
       // mesload.c:113-118- UIC operating-point seed from the instance IC params.
       //   vds = MEStype*MESicVDS; vgs = MEStype*MESicVGS; vgd = vgs - vds.
-      const vds0 = polarity * params.ICVDS;
-      vgs = polarity * params.ICVGS;
+      // MESicVDS/MESicVGS are CKTic's getInitialConditions() result (mesgetic.c):
+      // the given IC, or the rhs node differences when un-given.
+      const vds0 = polarity * this._uicICVDS;
+      vgs = polarity * this._uicICVGS;
       vgd = vgs - vds0;
     } else if ((mode & MODEINITJCT) && params.OFF === 0) {
       // mesload.c:119-122- initJct, device on.

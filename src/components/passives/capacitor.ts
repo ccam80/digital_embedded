@@ -221,6 +221,12 @@ export class AnalogCapacitorElement extends PoolBackedAnalogElement {
   private _nominalC: number;
   private C: number;
   private _IC: number;
+  // capgetic.c:28 — CAPicGiven: true when the netlist supplied IC.
+  private _icGiven: boolean;
+  // capgetic.c:29-31 — CAPinitCond: the voltage the UIC DCOP uses.  When
+  // !_icGiven, getInitialConditions() overwrites this with rhs[pos]-rhs[neg]
+  // (the nodeset-seeded voltage) before the transient-boot DCOP stamps it.
+  private _uicInitCond: number;
   private _TC1: number;
   private _TC2: number;
   private _TNOM: number;
@@ -292,7 +298,9 @@ export class AnalogCapacitorElement extends PoolBackedAnalogElement {
     // guards.
     this._capGiven = props.isModelParamGiven("capacitance");
     this._nominalC = this._capGiven ? props.getModelParam<number>("capacitance") : CAPACITOR_DEFAULTS["capacitance"]!;
-    this._IC       = props.isModelParamGiven("IC")    ? props.getModelParam<number>("IC")    : CAPACITOR_DEFAULTS["IC"]!;
+    this._icGiven  = props.isModelParamGiven("IC");
+    this._IC       = this._icGiven ? props.getModelParam<number>("IC") : CAPACITOR_DEFAULTS["IC"]!;
+    this._uicInitCond = this._IC;
     this._TC1      = props.isModelParamGiven("TC1")   ? props.getModelParam<number>("TC1")   : CAPACITOR_DEFAULTS["TC1"]!;
     this._TC2      = props.isModelParamGiven("TC2")   ? props.getModelParam<number>("TC2")   : CAPACITOR_DEFAULTS["TC2"]!;
     this._TNOM     = props.isModelParamGiven("TNOM")  ? props.getModelParam<number>("TNOM")  : CAPACITOR_DEFAULTS["TNOM"]!;
@@ -375,6 +383,20 @@ export class AnalogCapacitorElement extends PoolBackedAnalogElement {
     // allocElement(0,X) / allocElement(X,0) returns the TrashCan handle
     // 0, whose elVal[0] is zeroed every NR iter.
     this._handles = allocNortonStamp(ctx.solver, posNode, negNode);
+  }
+
+  /**
+   * getInitialConditions — ngspice CAPgetic (capgetic.c:28-31), dispatched by
+   * the engine's CKTic step under UIC before the transient-boot DCOP reads the
+   * initial voltage.  When IC was not given, the UIC capacitor voltage is
+   * V(pos)−V(neg) read from the nodeset-seeded rhs, not the default 0.
+   */
+  getInitialConditions(rhs: Float64Array): void {
+    if (!this._icGiven) {
+      const pos = this.pinNodes.get("pos")!;
+      const neg = this.pinNodes.get("neg")!;
+      this._uicInitCond = rhs[pos] - rhs[neg];
+    }
   }
 
   /**
@@ -577,10 +599,12 @@ export class AnalogCapacitorElement extends PoolBackedAnalogElement {
       ((mode & MODEDC) && (mode & MODEINITJCT)) ||
       ((mode & MODEUIC) && (mode & MODEINITTRAN));
 
-    // Read terminal voltage (capload.c:49-51).
+    // Read terminal voltage (capload.c:49-51). Under UIC the IC is CAPinitCond
+    // (capgetic.c): the given value, or — when un-given — V(pos)−V(neg) from the
+    // CKTic-seeded rhs, populated by getInitialConditions() before this load.
     let vcap: number;
     if (cond1) {
-      vcap = this._IC;
+      vcap = this._uicInitCond;
     } else {
       const v0 = voltages[n0];
       const v1 = voltages[n1];

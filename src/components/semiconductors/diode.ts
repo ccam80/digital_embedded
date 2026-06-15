@@ -676,6 +676,14 @@ export function createDiodeElement(
   const _rth0Given = props.isModelParamGiven("RTH0");
   const _wGiven = props.isModelParamGiven("W");
   const _lGiven = props.isModelParamGiven("L");
+  // DIOinitCondGiven (diodefs.h:83). When the user did not give IC, ngspice
+  // derives the UIC junction voltage from the converged-rhs node voltages in
+  // DIOgetic (diogetic.c:28-31) rather than leaving it unset. `_uicInitCond`
+  // starts at the given value (NaN sentinel when un-given) and the engine's
+  // CKTic dispatch overwrites it via getInitialConditions() before the UIC
+  // transient-boot DCOP reads it at dioload.c:142-143.
+  const _icGiven = props.isModelParamGiven("IC");
+  let _uicInitCond = params.IC;
 
   // ---------------------------------------------------------------------------
   // Geometry resolution — diosetup.c:239-291. area/perimeter/cmetal/cpoly.
@@ -825,6 +833,17 @@ export function createDiodeElement(
       this.stateSchema = DIODE_SCHEMA;
     }
 
+    /** ngspice DIOgetic (diogetic.c:28-31), dispatched by the engine's CKTic
+     *  step (cktic.c:43-49) under UIC before the transient-boot DCOP reads it at
+     *  dioload.c:142-143. When the user did not give IC, the UIC junction voltage
+     *  is V(anode)−V(cathode) from the seeded rhs (0 in the common no-nodeset
+     *  case), never the NaN un-given sentinel. */
+    getInitialConditions(rhs: Float64Array): void {
+      if (!_icGiven) {
+        _uicInitCond = rhs[nodeAnode] - rhs[nodeCathode];
+      }
+    }
+
     private _selfheat(): boolean {
       // diosetup.c:325 / dioload.c:80 — selfheat gates thermal-node wiring.
       return nodeTemp > 0 && params.THERMAL !== 0 && _rth0Given;
@@ -936,7 +955,7 @@ export function createDiodeElement(
         vd = s1[base + SLOT_VD];
         delTemp = s1[base + SLOT_DELTEMP];
       } else if ((mode & MODEINITJCT) && (mode & MODETRANOP) && (mode & MODEUIC)) {
-        vd = params.IC;
+        vd = _uicInitCond;
       } else if ((mode & MODEINITJCT) && params.OFF) {
         vd = 0;
         delTemp = 0.0;

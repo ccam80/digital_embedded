@@ -181,6 +181,11 @@ class ZenerAnalogElement extends PoolBackedAnalogElement {
   // Internal node labels- recorded during setup() when RS > 0
   private readonly _internalLabels: string[] = [];
 
+  // diogetic.c:28-31 — DIOinitCond. Zener exposes no IC param, so under UIC the
+  // junction voltage is always V(anode)−V(cathode) read from the CKTic-seeded
+  // rhs (getInitialConditions), matching the dio-model DEVsetic ngspice runs.
+  private _uicVd = 0;
+
   constructor(pinNodes: ReadonlyMap<string, number>, props: PropertyBag) {
     super(pinNodes);
     this._tempGiven = props.isModelParamGiven("TEMP");
@@ -194,6 +199,13 @@ class ZenerAnalogElement extends PoolBackedAnalogElement {
     this._nodeCathode = pinNodes.get("K")!;
     this._posPrimeNode = pinNodes.get("A")!;
     this._tp = this._computeZenerTp();
+  }
+
+  /** ngspice DIOgetic (diogetic.c:28-31), dispatched by the engine's CKTic step
+   *  under UIC before the boot DCOP reads the junction voltage. Zener has no IC
+   *  param, so the UIC voltage is always V(anode)−V(cathode) from the seeded rhs. */
+  getInitialConditions(rhs: Float64Array): void {
+    this._uicVd = rhs[this.pinNodes.get("A")!] - rhs[this._nodeCathode];
   }
 
   private _computeZenerTp(): ZenerTp {
@@ -327,9 +339,10 @@ class ZenerAnalogElement extends PoolBackedAnalogElement {
       // Z-W3-9: MODEINITTRAN seeds vd from state1  cite: dioload.c:128-129
       vdRaw = s1[base + SLOT_VD];
     } else if ((mode & MODEINITJCT) && (mode & MODETRANOP) && (mode & MODEUIC)) {
-      // dioload.c:130-132: MODEINITJCT && MODETRANOP && MODEUIC  DIOinitCond
-      // Simplified model has no IC param; fall back to 0  (DIOinitCond default).
-      vdRaw = 0;
+      // dioload.c:130-132: MODEINITJCT && MODETRANOP && MODEUIC  DIOinitCond.
+      // DIOinitCond is V(anode)−V(cathode) from the CKTic-seeded rhs (diogetic.c),
+      // populated by getInitialConditions(); zero in the common no-nodeset boot.
+      vdRaw = this._uicVd;
     } else if ((mode & MODEINITJCT) && (params.OFF !== undefined && params.OFF !== 0)) {
       // dioload.c:133-134: MODEINITJCT && DIOoff  vd = 0
       vdRaw = 0;

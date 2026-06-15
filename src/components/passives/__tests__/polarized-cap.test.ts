@@ -66,10 +66,9 @@ interface PolCapBuildOpts {
   capacitance: number;
   esr: number;
   leakageCurrent?: number;
-  voltageRating?: number;
+  BV?: number;
   reverseMax?: number;
   IC?: number;
-  M?: number;
   /** Optional series resistor between vs and cap:pos (Ω). 0 ⇒ omitted. */
   rSeries?: number;
   /** Reverse polarity wiring: cap sees V(pos) - V(neg) = -|vSource|. */
@@ -84,10 +83,9 @@ function buildPolCapCircuit(facade: DefaultSimulatorFacade, p: PolCapBuildOpts):
         capacitance:     p.capacitance,
         esr:             p.esr,
         leakageCurrent:  p.leakageCurrent ?? 1e-6,
-        voltageRating:   p.voltageRating  ?? 25,
+        BV:              p.BV  ?? 25,
         reverseMax:      p.reverseMax     ?? 1.0,
         IC:              p.IC ?? 0,
-        M:               p.M  ?? 1,
       } },
     { id: "gnd", type: "Ground" },
   ];
@@ -138,7 +136,7 @@ describe("PolarizedCap initialization (T1)", () => {
         capacitance:    100e-6,
         esr:            0.1,
         leakageCurrent: 1e-6,
-        voltageRating:  25,
+        BV:             25,
         rSeries:        1000,
       }),
       params: { tStop: 1e-3, maxTimeStep: 1e-4 },
@@ -179,7 +177,7 @@ describe("PolarizedCap DCOP analytical (T1)", () => {
         capacitance:    1e-6,
         esr:            1e-3,
         leakageCurrent: 1e-6,
-        voltageRating:  25,
+        BV:             25,
         rSeries:        1000,
       }),
     });
@@ -198,13 +196,17 @@ describe("PolarizedCap DCOP analytical (T1)", () => {
 
   it("dcop_dc_current_through_cap_equals_v_over_esr_plus_rleak", () => {
     // Cap with no series resistor: Vsrc=5V across (ESR + R_leak). At DCOP the
-    // cap body is open, so I = V / (ESR + R_leak). R_leak = 25V/1µA = 25MΩ.
-    // Expected I ≈ 5 / 25e6 = 2e-7 A. We read it via getElementPinCurrents.
+    // cap body is open, so the only DC path is ESR in series with R_leak and
+    // I = V / (ESR + R_leak). R_leak = 25V/1µA = 25MΩ, so I ≈ 5 / 25e6 = 2e-7 A.
+    // The DC current flows through the rEsr→rLeak series path, NOT the capacitor
+    // body (which is open at DC). The component's terminal current is the pos-pin
+    // current of the wrapper element (its leaf pin-currents concatenated; index 0
+    // is the rEsr pos pin = the current entering the cap's pos terminal).
     const V     = 5;
     const esr   = 0.1;
-    const Vrate = 25;
+    const BV    = 25;
     const Ileak = 1e-6;
-    const rLeak = Vrate / Ileak;
+    const rLeak = BV / Ileak;
 
     const fix = buildFixture({
       build: (_r, facade) => buildPolCapCircuit(facade, {
@@ -212,12 +214,12 @@ describe("PolarizedCap DCOP analytical (T1)", () => {
         capacitance:    100e-6,
         esr,
         leakageCurrent: Ileak,
-        voltageRating:  Vrate,
+        BV,
       }),
       params: { tStop: 1e-3, maxTimeStep: 1e-4 },
     });
 
-    const capIdx = findLeafIndexByLabel(fix.circuit.elements, "cap:cBody");
+    const capIdx = findLeafIndexByLabel(fix.circuit.elements, "cap");
     expect(capIdx).toBeGreaterThanOrEqual(0);
     const [iPos] = fix.engine.getElementPinCurrents(capIdx);
     const expectedI = V / (esr + rLeak);
@@ -386,7 +388,12 @@ describe("PolarizedCap parameter hot-load (T1)", () => {
       }),
       params: { tStop: 1e-6, maxTimeStep: 1e-9, uic: true },
     });
-    const capIdx = findLeafIndexByLabel(fix.circuit.elements, "cap:cBody");
+    // Read the component terminal current (wrapper pos pin = rEsr pos). At the
+    // first UIC step the cap body is a short (geq = C/dt huge), so the series
+    // current is ESR-limited: I ≈ V/ESR. ESR is hot-loadable — setComponentProperty
+    // routes "esr" through the wrapper binding to the rEsr leaf's resistance, and
+    // refreshTemperatureDerivedParams recomputes its conductance.
+    const capIdx = findLeafIndexByLabel(fix.circuit.elements, "cap");
     const [iBefore] = fix.engine.getElementPinCurrents(capIdx);
     // I ≈ V/ESR = 10/5 = 2A.
     expect(Math.abs(iBefore)).toBeCloseTo(2, 0);
@@ -399,64 +406,9 @@ describe("PolarizedCap parameter hot-load (T1)", () => {
     expect(Math.abs(iAfter)).toBeCloseTo(1, 0);
   });
 
-  it("hotload_leakageCurrent_changes_dc_steady_state_current", () => {
-    // R_leak = voltageRating / leakageCurrent. Raising leakageCurrent
-    // (with voltageRating fixed) lowers R_leak and thus raises the DC
-    // steady-state cap current I = V / (ESR + R_leak).
-    const V     = 5;
-    const Vrate = 25;
-    const esr   = 0.1;
-
-    const fix = buildFixture({
-      build: (_r, facade) => buildPolCapCircuit(facade, {
-        vSource:        V,
-        capacitance:    100e-6,
-        esr,
-        leakageCurrent: 1e-6,           // R_leak = 25e6 Ω
-        voltageRating:  Vrate,
-      }),
-      params: { tStop: 1e-3, maxTimeStep: 1e-4 },
-    });
-    const capIdx = findLeafIndexByLabel(fix.circuit.elements, "cap:cBody");
-    const [iBefore] = fix.engine.getElementPinCurrents(capIdx);
-    expect(Math.abs(iBefore)).toBeCloseTo(V / (esr + Vrate / 1e-6), 8);
-
-    fix.coordinator.setComponentProperty(fix.element("cap"), "leakageCurrent", 1e-3);
-    fix.coordinator.step();
-    const [iAfter] = fix.engine.getElementPinCurrents(capIdx);
-    // R_leak dropped 1000× → I rose ~1000×.
-    expect(Math.abs(iAfter)).toBeGreaterThan(Math.abs(iBefore));
-    expect(Math.abs(iAfter)).toBeCloseTo(V / (esr + Vrate / 1e-3), 6);
-  });
-
-  it("hotload_voltageRating_changes_dc_steady_state_current", () => {
-    // R_leak = voltageRating / leakageCurrent. Doubling voltageRating
-    // (with leakageCurrent fixed) doubles R_leak → halves the DC current.
-    const V     = 5;
-    const Ileak = 1e-6;
-    const esr   = 0.1;
-
-    const fix = buildFixture({
-      build: (_r, facade) => buildPolCapCircuit(facade, {
-        vSource:        V,
-        capacitance:    100e-6,
-        esr,
-        leakageCurrent: Ileak,
-        voltageRating:  25,             // R_leak = 25e6 Ω
-      }),
-      params: { tStop: 1e-3, maxTimeStep: 1e-4 },
-    });
-    const capIdx = findLeafIndexByLabel(fix.circuit.elements, "cap:cBody");
-    const [iBefore] = fix.engine.getElementPinCurrents(capIdx);
-    expect(Math.abs(iBefore)).toBeCloseTo(V / (esr + 25 / Ileak), 8);
-
-    fix.coordinator.setComponentProperty(fix.element("cap"), "voltageRating", 50);
-    fix.coordinator.step();
-    const [iAfter] = fix.engine.getElementPinCurrents(capIdx);
-    // R_leak doubled → I halved.
-    expect(Math.abs(iAfter)).toBeLessThan(Math.abs(iBefore));
-    expect(Math.abs(iAfter)).toBeCloseTo(V / (esr + 50 / Ileak), 8);
-  });
+  // leakageCurrent / BV are build-time model inputs (they set the clamp-diode
+  // breakdown and the derived leakage resistance at netlist-build), not
+  // runtime-adjustable parameters — their former hot-load tests were removed.
 
   it("hotload_reverseMax_threshold_controls_diagnostic_emission", () => {
     // Reverse-bias topology: cap sees V(pos) - V(neg) = -5V. With
@@ -510,37 +462,8 @@ describe("PolarizedCap parameter hot-load (T1)", () => {
     expect(vAfter).not.toBeCloseTo(vBefore);
   });
 
-  it("hotload_M_scales_dc_steady_state_current", () => {
-    // M multiplicity is applied at stamp time. Doubling M doubles every
-    // conductance stamp (G_esr, G_leak, geq) → at DC the source-branch
-    // current through the cap doubles.
-    const V     = 5;
-    const esr   = 0.1;
-    const Ileak = 1e-6;
-    const Vrate = 25;
-
-    const fix = buildFixture({
-      build: (_r, facade) => buildPolCapCircuit(facade, {
-        vSource:        V,
-        capacitance:    100e-6,
-        esr,
-        leakageCurrent: Ileak,
-        voltageRating:  Vrate,
-        M:              1,
-      }),
-      params: { tStop: 1e-3, maxTimeStep: 1e-4 },
-    });
-    const capIdx = findLeafIndexByLabel(fix.circuit.elements, "cap:cBody");
-    const [iBefore] = fix.engine.getElementPinCurrents(capIdx);
-
-    fix.coordinator.setComponentProperty(fix.element("cap"), "M", 2);
-    fix.coordinator.step();
-    const [iAfter] = fix.engine.getElementPinCurrents(capIdx);
-
-    expect(Math.abs(iAfter)).toBeGreaterThan(Math.abs(iBefore));
-    // M doubled → DC current doubles.
-    expect(Math.abs(iAfter) / Math.abs(iBefore)).toBeCloseTo(2, 1);
-  });
+  // Parallel multiplicity (M) is not a concept for elements in this project;
+  // it was removed from the PolarizedCap model, so it has no hot-load test.
 });
 
 // ===========================================================================
@@ -569,9 +492,10 @@ describe("PolarizedCap clamp-diode limiting events (T1)", () => {
     fix.coordinator.dcOperatingPoint();
 
     const events = fix.coordinator.getLimitingEvents();
-    // The clamp diode fires pnjlim on at least one junction during DCOP.
+    // The clamp diode fires pnjlim during DCOP. The diode reports its junction
+    // by anode-cathode pin pair ("AK"), the only junction a two-terminal diode has.
     expect(events.length).toBeGreaterThanOrEqual(1);
-    expect(events.some((e) => e.junction === "VD" || e.junction.startsWith("V"))).toBe(true);
+    expect(events.some((e) => e.junction === "AK")).toBe(true);
   });
 });
 

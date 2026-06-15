@@ -10,8 +10,10 @@
  * Internal node `nCap` sits between ESR and the capacitor body — matching the
  * inline element's _nCap topology. The four leaves expand into the
  * SPICE deck as ordinary R/C/D primitives so paired comparison against
- * ngspice succeeds without translation. rLeak is derived at netlist-build
- * time from voltageRating / leakageCurrent (function-form netlist).
+ * ngspice succeeds without translation. The cap's voltage rating is the clamp
+ * diode's reverse breakdown voltage `BV`: in forward operation the clamp is
+ * reverse-biased, so it breaks down when V(pos)−V(neg) exceeds BV. rLeak is
+ * derived at netlist-build time from BV / leakageCurrent (function-form netlist).
  *
  * The reverse-bias-cap UI diagnostic is lifted to a parent-side observer
  * (`PolarizedCapDiagnosticObserver`) registered via `analogObservers` on the
@@ -50,10 +52,9 @@ export const { paramDefs: POLARIZED_CAP_PARAM_DEFS, defaults: POLARIZED_CAP_MODE
   },
   secondary: {
     leakageCurrent: { default: 1e-6,  unit: "A", description: "DC leakage current at rated voltage", min: 0 },
-    voltageRating:  { default: 25,    unit: "V", description: "Maximum rated voltage", min: 1 },
+    BV:             { default: 25,    unit: "V", description: "Clamp-diode reverse breakdown voltage (the cap's effective voltage rating)", min: 1 },
     reverseMax:     { default: 1.0,   unit: "V", description: "Reverse voltage threshold that triggers a polarity warning", min: 0 },
     IC:             { default: 0,     unit: "V", description: "Initial condition: junction voltage for UIC (alias: initCond)" },
-    M:              { default: 1,                description: "Parallel-element multiplicity (applied at stamp time)" },
   },
 });
 
@@ -178,8 +179,10 @@ export class PolarizedCapElement extends AbstractCircuitElement {
 // POLARIZED_CAP_NETLIST_BUILDER  function-form MnaSubcircuitNetlist
 // ---------------------------------------------------------------------------
 //
-// rLeak is derived from voltageRating / leakageCurrent at netlist-build time
-// (the function-form netlist pattern, mirroring transformer.ts:186). The
+// rLeak is derived from BV / leakageCurrent at netlist-build time (the
+// function-form netlist pattern, mirroring transformer.ts:186): BV is the
+// clamp diode's reverse breakdown = the cap's rated voltage, and leakageCurrent
+// is the leakage at that rated voltage, so R_leak = BV / leakageCurrent. The
 // remaining sub-element params are string-resolved against the parent's
 // model params via the standard SubcircuitElementParam mechanism.
 //
@@ -190,11 +193,11 @@ export class PolarizedCapElement extends AbstractCircuitElement {
 export const POLARIZED_CAP_NETLIST_BUILDER = (
   parentParams: PropertyBag,
 ): MnaSubcircuitNetlist => {
-  // voltageRating/leakageCurrent are declared in POLARIZED_CAP_PARAM_DEFS and
-  // merged into the bag by the unified instantiation — read directly.
-  const voltageRating = parentParams.getModelParam<number>("voltageRating");
+  // BV/leakageCurrent are declared in POLARIZED_CAP_PARAM_DEFS and merged into
+  // the bag by the unified instantiation — read directly.
+  const BV = parentParams.getModelParam<number>("BV");
   const leakageCurrent = parentParams.getModelParam<number>("leakageCurrent");
-  const rLeak = leakageCurrent > 0 ? voltageRating / leakageCurrent : 1e12;
+  const rLeak = leakageCurrent > 0 ? BV / leakageCurrent : 1e12;
 
   return {
     ports: ["pos", "neg"],
@@ -212,21 +215,23 @@ export const POLARIZED_CAP_NETLIST_BUILDER = (
       },
       {
         typeId: "Capacitor", modelRef: "behavioral", subElementName: "cBody",
-        params: { capacitance: "capacitance", IC: "IC", M: "M" },
+        params: { capacitance: "capacitance", IC: "IC" },
       },
       {
         typeId: "Diode", modelRef: "spice", subElementName: "dClamp",
-        // Diode params are passed as literal numbers from DIODE_PARAM_DEFAULTS
-        // (with explicit CJO=0, TT=0 overrides) rather than string-lookups. Two
-        // reasons: (1) string-lookup form would route through parentProps first,
-        // and the PolarizedCap parent has its own `M` (capacitor multiplicity)
-        // and `IC` (cap initial voltage) which collide with diode `M` (grading
-        // coefficient) and `IC` (junction initial voltage); (2) passing them as
-        // sub-element params marks them given, so the generated ngspice clamp
-        // .model card emits the full diode model and matches digiTS bit-for-bit.
+        // Diode params are passed as literal numbers (CJO=0, TT=0, BV from the
+        // parent rating) rather than string-lookups. Two reasons: (1) string-
+        // lookup form would route through parentProps first, and the PolarizedCap
+        // parent has its own `IC` (cap initial voltage) which collides with diode
+        // `IC` (junction initial voltage); (2) passing them as sub-element params
+        // marks them given, so the generated ngspice clamp .model card emits the
+        // full diode model and matches digiTS bit-for-bit. BV is the cap's rated
+        // voltage: the reverse-biased clamp breaks down when the forward terminal
+        // voltage exceeds it.
         params: {
           CJO: 0,
           TT: 0,
+          BV,
         },
       },
     ],
@@ -317,13 +322,13 @@ const POLARIZED_CAP_PROPERTY_DEFS: PropertyDefinition[] = [
     description: "DC leakage current at rated voltage",
   },
   {
-    key: "voltageRating",
+    key: "BV",
     type: PropertyType.FLOAT,
-    label: "Voltage Rating (V)",
+    label: "Breakdown Voltage (V)",
     unit: "V",
     defaultValue: 25,
     min: 1,
-    description: "Maximum rated voltage",
+    description: "Clamp-diode reverse breakdown voltage (the cap's effective voltage rating)",
   },
   {
     key: "reverseMax",
@@ -366,8 +371,8 @@ export const POLARIZED_CAP_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [
     convert: (v) => parseFloat(v),
   },
   {
-    xmlName: "voltageRating",
-    propertyKey: "voltageRating",
+    xmlName: "BV",
+    propertyKey: "BV",
     convert: (v) => parseFloat(v),
   },
   {
