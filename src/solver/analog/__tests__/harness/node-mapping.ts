@@ -119,6 +119,35 @@ function canonicalizeOurLabel(label: string): string {
   return label.toUpperCase();
 }
 
+/**
+ * Candidate ngspice deck-name stems for a composite sub-element's branch row.
+ *
+ * The netlist generator joins each composite nesting level with "_"
+ * (`${rawLabel}_${subName}`, netlist-generator.ts:530,1492) but passes the
+ * top-level instance label through verbatim. Our intrinsic label is colon-joined
+ * at every level (compiler.ts:306, `${parentLabel}:${subName}`), and a synthetic
+ * boundary adapter's own instance label already carries ":" segments
+ * (`bridge-adapter:<uuid>:<pin>_pin`). A blanket ":"->"_" therefore over-converts
+ * the instance-label colons. The flattened label can't say which colons are
+ * sub-element joins, so yield one variant per join depth: rename the trailing k
+ * colons (k = colonCount..0) to "_", preserving the leading ones. k = colonCount
+ * is the all-underscore form (genuine N-level nesting, outer:mid:vs ->
+ * outer_mid_vs); a smaller k preserves a colon-bearing instance label
+ * (bridge-adapter:uuid:pin:vilSrc -> bridge-adapter:uuid:pin_vilSrc). Exactly one
+ * variant equals the real deck name; the rest never match in ngLookup.
+ */
+function branchLabelRenameVariants(label: string): string[] {
+  const colonIdx: number[] = [];
+  for (let i = 0; i < label.length; i++) if (label[i] === ":") colonIdx.push(i);
+  const variants: string[] = [];
+  for (let k = colonIdx.length; k >= 0; k--) {
+    const chars = label.split("");
+    for (let j = colonIdx.length - k; j < colonIdx.length; j++) chars[colonIdx[j]!] = "_";
+    variants.push(chars.join(""));
+  }
+  return variants;
+}
+
 // ---------------------------------------------------------------------------
 // Direct mapping (auto-generated netlist)
 // ---------------------------------------------------------------------------
@@ -216,10 +245,10 @@ export function buildDirectNodeMapping(
     }
     const intrinsic = el.label;
     if (intrinsic) {
-      const underscored = intrinsic.replace(/:/g, "_");
-      for (const prefix of branchPrefixCandidates) {
-        const canonical = canonicalizeSpiceLabel(underscored, prefix);
-        candidates.push(`${canonical.toLowerCase()}#branch`);
+      for (const variant of branchLabelRenameVariants(intrinsic)) {
+        for (const prefix of branchPrefixCandidates) {
+          candidates.push(`${canonicalizeSpiceLabel(variant, prefix).toLowerCase()}#branch`);
+        }
       }
     }
 

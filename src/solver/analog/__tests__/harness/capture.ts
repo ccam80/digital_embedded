@@ -124,40 +124,57 @@ export function buildElementLabelMap(
     map.set(i, `${prefix}${count}`);
   }
 
-  // Pass 3: composite leaves. Look up each leaf's wrapper by the raw parent
-  // label (= wrapper's `.label`, which is its user-label-or-instanceId) and
-  // build the canonical SPICE form `${wrapperHarnessLabel}_${subPath}` +
-  // SPICE prefix from the leaf's `deviceFamily`.
-  const wrapperHarnessLabelByRawParent = new Map<string, string>();
-  for (let i = 0; i < compiled.elements.length; i++) {
-    const el = compiled.elements[i];
-    if (!el || el.label.includes(":")) continue;
-    const harnessLabel = map.get(i);
-    if (harnessLabel !== undefined) {
-      wrapperHarnessLabelByRawParent.set(el.label, harnessLabel);
+  // Pass 3: composite leaves AND colon-bearing synthetic wrappers (the per-pin
+  // boundary adapters carry an atomic colon-segmented instance label,
+  // `bridge-adapter:<uuid>:<pin>_pin`). The deck emitter joins each composite
+  // nesting LEVEL with "_" (`${rawLabel}_${subName}`, netlist-generator.ts:530,
+  // 1492) but passes a top-level instance label through verbatim — so a colon is
+  // a sub-element join only when a shorter ELEMENT label is its prefix.
+  // Underscore exactly those joins; preserve colons that belong to an atomic
+  // instance label (no element prefix), matching what the generator emitted. A
+  // blanket ":"->"_" can't make that distinction and read back NaN for every
+  // bridge-adapter leaf state slot.
+  const allLabels = new Set<string>();
+  for (const el of compiled.elements) if (el) allLabels.add(el.label);
+
+  const flattenCache = new Map<string, string>();
+  const flattenLabel = (label: string): string => {
+    const hit = flattenCache.get(label);
+    if (hit !== undefined) return hit;
+    // Longest strict element-label prefix P with `label === P + ":" + rest`.
+    let parent: string | undefined;
+    for (const cand of allLabels) {
+      if (cand.length < label.length && label.startsWith(`${cand}:`) &&
+          (parent === undefined || cand.length > parent.length)) {
+        parent = cand;
+      }
     }
-  }
+    let out: string;
+    if (parent !== undefined) {
+      // `rest` is the single sub-element name (longest prefix ⇒ direct parent).
+      out = `${flattenLabel(parent)}_${label.slice(parent.length + 1)}`;
+    } else {
+      // Top-level: a colon-free wrapper has its harness label (user/auto-number)
+      // already in `map`; a colon-bearing synthetic instance label is passed
+      // through verbatim, exactly as the generator emitted its rawLabel.
+      const idx = compiled.elements.findIndex((e) => e?.label === label);
+      out = (idx >= 0 ? map.get(idx) : undefined) ?? label;
+    }
+    flattenCache.set(label, out);
+    return out;
+  };
+
   for (let i = 0; i < compiled.elements.length; i++) {
     if (map.has(i)) continue;
     const el = compiled.elements[i];
     if (!el || !el.label.includes(":")) continue;
 
-    const colonIdx = el.label.indexOf(":");
-    const rawParent = el.label.slice(0, colonIdx);
-    const subPath = el.label.slice(colonIdx + 1).replace(/:/g, "_");
-    const wrapperHarnessLabel = wrapperHarnessLabelByRawParent.get(rawParent) ?? rawParent;
-    const flattened = `${wrapperHarnessLabel}_${subPath}`;
-
+    const flattened = flattenLabel(el.label);
     const prefix = SPICE_PREFIX_BY_FAMILY[el.deviceFamily];
-    if (prefix !== undefined) {
-      map.set(i, canonicalizeSpiceLabel(flattened, prefix));
-    } else {
-      // No SPICE prefix for this family (e.g. BEHAVIORAL bridge adapters).
-      // Use the flattened label directly so diagnostic attribution stays
-      // distinct from auto-numbered slots even when no ngspice counterpart
-      // exists.
-      map.set(i, flattened);
-    }
+    // No SPICE prefix for this family (e.g. BEHAVIORAL leaves) → use the
+    // flattened label directly so diagnostic attribution stays distinct from
+    // auto-numbered slots even when no ngspice counterpart exists.
+    map.set(i, prefix !== undefined ? canonicalizeSpiceLabel(flattened, prefix) : flattened);
   }
 
   return map;
