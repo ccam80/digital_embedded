@@ -3,12 +3,14 @@
  *
  * Covers the ngspice optran.c / cktop.c:101-108 port:
  *   - option plumbing: optran / opstepsize / opfinaltime / opramptime on
- *     SimulationParams, default-off (nooptran=true equivalent, optran.c:51),
- *     hot-loadable via coordinator.configure (project requirement).
- *   - default-off invariant: with optran unset, the DC-OP ladder is the same
- *     direct NR + gmin + source stepping path as before — the OPtran fallback
- *     never runs (solveDcOperatingPoint only invokes ctx.opTranFallback when
- *     params.optran is set).
+ *     SimulationParams, default-ON to match ngspice's frontend init
+ *     (init.c:77-94 calls com_optran with "1 1 1 100n 10u 0" to "make optran
+ *     the standard", clearing the optran.c:117 nooptran gate), hot-loadable via
+ *     coordinator.configure (project requirement).
+ *   - static-ladder invariant: with optran explicitly disabled, the DC-OP
+ *     ladder is the direct NR + gmin + source stepping path with no fallback —
+ *     solveDcOperatingPoint only invokes ctx.opTranFallback when params.optran
+ *     is set.
  *
  * The bit-exact-vs-ngspice OPtran convergence gate is the T3 paired-harness
  * surface (ngspice-parity); see optran-fallback-parity.test.ts for that gate
@@ -55,12 +57,15 @@ function sourcePinVoltage(engine: MNAEngine, label: string): number {
 }
 
 describe("OPtran option plumbing — Surface 1 (headless)", () => {
-  it("defaults optran off with the optran.c:48-50 static defaults", () => {
-    // optran.c:51 nooptran = TRUE: the fallback is opt-in.
-    expect(DEFAULT_SIMULATION_PARAMS.optran).toBe(false);
-    // optran.c:48-50 opfinaltime=1e-6, opstepsize=1e-8, opramptime=0.
-    expect(DEFAULT_SIMULATION_PARAMS.opstepsize).toBe(1e-8);
-    expect(DEFAULT_SIMULATION_PARAMS.opfinaltime).toBe(1e-6);
+  it("defaults optran on with the init.c:82 command defaults (1 1 1 100n 10u 0)", () => {
+    // ngspice init.c:77-94 calls com_optran with "1 1 1 100n 10u 0" at frontend
+    // init to "make optran the standard", clearing the nooptran gate
+    // (optran.c:117). OPtran is therefore the always-on last-resort OP rung that
+    // CKTop runs after direct NR + gmin + source stepping fail (cktop.c:104).
+    expect(DEFAULT_SIMULATION_PARAMS.optran).toBe(true);
+    // init.c:82 command defaults: opstepsize=100n, opfinaltime=10u, opramptime=0.
+    expect(DEFAULT_SIMULATION_PARAMS.opstepsize).toBe(1e-7);
+    expect(DEFAULT_SIMULATION_PARAMS.opfinaltime).toBe(1e-5);
     expect(DEFAULT_SIMULATION_PARAMS.opramptime).toBe(0);
   });
 
@@ -105,16 +110,17 @@ describe("OPtran option plumbing — Surface 1 (headless)", () => {
   });
 });
 
-describe("OPtran default-off invariant — Surface 1 (headless)", () => {
-  it("with optran unset, the singular circuit fails the static ladder and never reaches OPtran", () => {
+describe("OPtran static-ladder invariant — Surface 1 (headless)", () => {
+  it("with optran explicitly disabled, the singular circuit fails the static ladder and never reaches OPtran", () => {
     // The inductor-short fixture has no DC operating point: an ideal inductor
     // bridging two source-pinned nodes is a DC branch-current singularity that
-    // gmin (a node-to-ground conductance) cannot resolve. With optran unset,
-    // ngspice's CKTop exhausts direct NR + gmin + source stepping and returns
-    // non-converged- OPtran is opt-in (cktop.c:101-108, optran.c:51 nooptran).
-    // digiTS matches: the static ladder fails and the fallback never runs, so
-    // the reported method is the last static strategy, gillespie-src.
+    // gmin (a node-to-ground conductance) cannot resolve. OPtran is on by
+    // default (init.c:77-94); disabling it isolates the static ladder, which
+    // exhausts direct NR + gmin + source stepping and returns non-converged.
+    // The fallback never runs, so the reported method is the last static
+    // strategy, gillespie-src.
     const { coordinator } = loadFixture();
+    coordinator.configure({ optran: false });
     const result = coordinator.dcOperatingPoint();
     expect(result).not.toBeNull();
     expect(result!.converged).toBe(false);
@@ -129,6 +135,7 @@ describe("OPtran default-off invariant — Surface 1 (headless)", () => {
     // fallback's entire purpose- it runs exactly when, and only when, the static
     // ladder cannot resolve the operating point.
     const base = loadFixture();
+    base.coordinator.configure({ optran: false });
     const baseResult = base.coordinator.dcOperatingPoint();
     expect(baseResult).not.toBeNull();
     expect(baseResult!.converged).toBe(false);

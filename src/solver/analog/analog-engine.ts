@@ -132,8 +132,18 @@ export class MNAEngine implements AnalogEngine {
   // -------------------------------------------------------------------------
   // Simulation time tracking
   // -------------------------------------------------------------------------
+  // Schedule clock (ngspice `optime`): drives timestep control, breakpoints,
+  // termination and history rotation. Advances on every accepted step, including
+  // each OPtran pseudo-transient step.
   private _simTime: number = 0;
   private _lastDt: number = 0;
+  // True only while the OPtran pseudo-transient runs. ngspice keeps two clocks:
+  // the schedule clock `optime` and the circuit clock `CKTtime` (read by source
+  // loads and CKTaccept). The transient advances both together; optran.c advances
+  // only `optime` and leaves `CKTtime` at the operating-point time. Here
+  // `this._simTime` is the schedule clock and `timeRef.value` is the circuit
+  // clock; this flag stops step() advancing the circuit clock during OPtran.
+  private _holdCircuitTime: boolean = false;
 
   // -------------------------------------------------------------------------
   // Solver configuration
@@ -332,19 +342,22 @@ export class MNAEngine implements AnalogEngine {
     // exit invariant via ctx.swapRhsBuffers(), so ctx.rhsOld already holds the
     // converging iter's input- no extra copy required here.
     const statePool = (this._compiled as ConcreteCompiledAnalogCircuit).statePool ?? null;
+    const cac = this._compiled as ConcreteCompiledAnalogCircuit;
 
     // Top-of-iteration acceptStep dispatch- mirrors ngspice CKTaccept at
     // dctran.c:410 (head of the `nextTime:` iteration body, BEFORE the
-    // breakpoint clamp). On the first call simTime=0 and breakFlag=true via
-    // the constructor's CKTbreak=1 pre-seed (dctran.c:188), so PULSE sources
-    // hit SAMETIME(time, 0) and register their first TR. On subsequent
-    // calls breakFlag carries over from the previous step's getClampedDt
-    // approaching-breakpoint clamp.
+    // breakpoint clamp). CKTaccept registers source breakpoints against the
+    // circuit clock (it reads CKTtime), so we pass timeRef.value- equal to the
+    // schedule clock in the transient, held at the OP time during OPtran. On the
+    // first call it is 0 and breakFlag=true via the constructor's CKTbreak=1
+    // pre-seed (dctran.c:188), so PULSE sources hit SAMETIME(time, 0) and
+    // register their first TR. On subsequent calls breakFlag carries over from
+    // the previous step's getClampedDt approaching-breakpoint clamp.
     const addBPTop = ctx.addBreakpointBound;
     const breakFlagTop = this._timestep.breakFlag;
     for (const el of elements) {
       if (el.acceptStep) {
-        el.acceptStep(this._simTime, addBPTop, breakFlagTop);
+        el.acceptStep(cac.timeRef.value, addBPTop, breakFlagTop);
       }
     }
 
@@ -397,14 +410,16 @@ export class MNAEngine implements AnalogEngine {
       // ngspice dctran.c:735- deltaOld[0] = delta each iteration.
       this._timestep.setDeltaOldCurrent(dt);
 
-      // ngspice dctran.c:731- advance simTime at top of each iteration.
+      // ngspice dctran.c:731- advance the schedule clock at the top of each
+      // iteration.
       this._simTime += dt;
 
-      // Publish the advanced simTime to timeRef so time-varying sources
-      // (AC voltage/current) evaluate at the correct time during the NR
-      // solve that follows.
-      const cac = this._compiled as ConcreteCompiledAnalogCircuit | undefined;
-      if (cac?.timeRef) cac.timeRef.value = this._simTime;
+      // Advance the circuit clock (timeRef, ngspice CKTtime) in lockstep so
+      // time-varying sources evaluate at the new time during the NR solve that
+      // follows. OPtran advances only the schedule clock (above) and holds the
+      // circuit clock at the operating-point time, exactly as optran.c steps a
+      // local `optime` while leaving CKTtime untouched.
+      if (!this._holdCircuitTime) cac.timeRef.value = this._simTime;
 
       // ngspice's NIpred predictor is undef'd in default builds
       // (ref/ngspice/visualc/include/ngspice/config.h:475 `/* #undef PREDICTOR */`,
@@ -681,8 +696,7 @@ export class MNAEngine implements AnalogEngine {
       this._convergenceLog.record(stepRec!);
     }
 
-    const cac = this._compiled as ConcreteCompiledAnalogCircuit | undefined;
-    if (cac?.timeRef) cac.timeRef.value = this._simTime;
+    if (!this._holdCircuitTime) cac.timeRef.value = this._simTime;
     this._lastDt = dt;
 
     // Advance timestep controller state. When tryOrderPromotion ran it already
@@ -1171,6 +1185,7 @@ export class MNAEngine implements AnalogEngine {
     const savedFirstStep = this._firstStep;
     const savedStepCount = this._stepCount;
     const savedCktMode = ctx.cktMode;
+    const savedHoldCircuitTime = this._holdCircuitTime;
 
     const delta = computeFirstStep(opFinal, opStep);
     const opParams: ResolvedSimulationParams = resolveSimulationParams({
@@ -1223,7 +1238,15 @@ export class MNAEngine implements AnalogEngine {
     this._simTime = 0;
     this._firstStep = true;
     this._stepCount = 0;
+    // optran.c keeps ckt->CKTtime at its pre-CKTop value of 0 (dctran.c:186) for
+    // the whole pseudo-transient- only the local `optime` advances. Set the
+    // circuit clock to the OP time and hold it: step() advances the schedule
+    // clock (_simTime) while time-varying sources (SIN/PULSE/etc.) stay at their
+    // DC value. Without the hold they ramp along the pseudo-transient and the
+    // settled state carries spurious reactive energy (e.g. inductor flux) into
+    // the OP.
     if (this._compiled?.timeRef) this._compiled.timeRef.value = 0;
+    this._holdCircuitTime = true;
 
     // optran.c:662-664- supply ramp. step() advances simTime then runs NR; we
     // need CKTsrcFact set BEFORE each NR call to optime (= post-advance time).
@@ -1275,9 +1298,16 @@ export class MNAEngine implements AnalogEngine {
     this._params = savedParams;
     this._timestep = savedTimestep;
     ctx.refreshTolerances(savedParams);
+    // ngspice dctran.c never resets CKTdiagGmin after CKTop, so the diagonal
+    // gmin gillespie_src parked on entry to OPtran (cktop.c:647, CKTgmin) carries
+    // unchanged into the transient solve. refreshTolerances just reset it to
+    // params.diagGmin; restore the inherited value so the main transient runs
+    // with the same diagonal gmin ngspice uses on a gillespie/OPtran-assisted OP.
+    ctx.diagonalGmin = inheritedDiagGmin;
     this._simTime = savedSimTime;
     this._firstStep = savedFirstStep;
     this._stepCount = savedStepCount;
+    this._holdCircuitTime = savedHoldCircuitTime;
     ctx.opTranFallback = savedFallback;
     if (this._compiled?.timeRef) this._compiled.timeRef.value = savedSimTime;
     // The OPtran pass left the matrix at the OP; the caller's cktMode for the

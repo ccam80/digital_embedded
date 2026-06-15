@@ -131,9 +131,6 @@ src/solver/analog/__tests__/harness/comparison-session-asserts.ts::transient_ste
 src/solver/analog/__tests__/harness/comparison-session-asserts.ts::transient_step_end_paired_matched_load
 src/solver/analog/__tests__/harness/comparison-session-asserts.ts::transient_step_end_paired_rail_saturation
 src/solver/analog/__tests__/harness/comparison-session-asserts.ts::transient_step_end_paired_rail_saturation
-src/solver/analog/__tests__/harness/comparison-session-asserts.ts::transient_temp_sweep_300_15K_paired
-src/solver/analog/__tests__/harness/comparison-session-asserts.ts::transient_temp_sweep_350K_paired
-src/solver/analog/__tests__/harness/comparison-session-asserts.ts::transient_temp_sweep_400K_paired
 src/solver/analog/__tests__/harness/comparison-session.ts::dcop_paired_rail_saturation
 src/solver/analog/__tests__/harness/comparison-session.ts::dcop_paired_rail_saturation
 src/solver/analog/__tests__/harness/comparison-session.ts::transient_step_end_paired_isolation

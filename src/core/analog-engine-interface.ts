@@ -281,14 +281,23 @@ export const DEFAULT_SIMULATION_PARAMS: ResolvedSimulationParams = {
   copyNodesets: false,
   indVerbosity: 2,
   epsmin: 1e-28,
-  // OPtran operating-point pseudo-transient fallback. Off by default — the
-  // `nooptran = TRUE` static flag at optran.c:51 makes OPtran return
-  // immediately, so the default DC-OP path never runs it. opstepsize /
-  // opfinaltime / opramptime carry the optran.c:48-50 static defaults and are
-  // only consulted once `optran` is enabled.
-  optran: false,
-  opstepsize: 1e-8,
-  opfinaltime: 1e-6,
+  // OPtran operating-point pseudo-transient fallback. On by default, matching
+  // ngspice's frontend initialisation (init.c:77-94), which calls com_optran
+  // with the parameter list "1 1 1 100n 10u 0" to "make optran the standard":
+  // it clears the `nooptran` gate (optran.c:117) so CKTop's unconditional
+  // `OPtran(ckt, converged)` call (cktop.c:104) actually runs as the last-resort
+  // operating-point rung after direct NR + gmin stepping + source stepping fail.
+  // OPtran integrates a pseudo-transient from 0 to opfinaltime and takes the
+  // settled point as the OP (optran.c), resolving operating points the static
+  // ladder cannot — e.g. an ideal inductor bridging source-pinned nodes (a
+  // transformer primary across a source), whose DC branch-current split is
+  // indeterminate and which gmin (a node-to-ground conductance) cannot break.
+  // For well-posed circuits the direct/gmin/source ladder converges first and
+  // OPtran never runs. opstepsize / opfinaltime carry the init.c command
+  // defaults (100 ns / 10 us); opramptime is 0 (sources at full value).
+  optran: true,
+  opstepsize: 1e-7,
+  opfinaltime: 1e-5,
   opramptime: 0,
 };
 
