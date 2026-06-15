@@ -9,7 +9,7 @@
  *   Input:         G  (gate, 1-bit)
  *   Bidirectional: S (source), D (drain)
  *
- * internalStateCount: 2 (closedFlag=0, blownFlag=1)
+ * internalStateCount: 1 (closedFlag, read by bus resolver)
  */
 
 import { AbstractCircuitElement } from "../../core/element.js";
@@ -195,8 +195,11 @@ export class FGPFETElement extends AbstractCircuitElement {
 // ---------------------------------------------------------------------------
 // executeFGPFET- flat simulation function
 //
-// G=0 and not blown → closed=1; else closed=0
-// State layout: [closedFlag=0, blownFlag=1]
+// G=0 and not blown → closed=1; else closed=0. blown is a compile-time OTP
+// property read live via layout.getProperty (the same accessor executeFuse
+// uses), not a seeded state slot.
+//
+// State layout: [closedFlag=0]
 // ---------------------------------------------------------------------------
 
 export function executeFGPFET(index: number, state: Uint32Array, highZs: Uint32Array, layout: ComponentLayout): void {
@@ -206,7 +209,7 @@ export function executeFGPFET(index: number, state: Uint32Array, highZs: Uint32A
   const stBase = (layout as FETLayout).stateOffset(index);
 
   const gate = state[wt[inBase]!]! & 1;
-  const blown = state[stBase + 1]! & 1;
+  const blown = layout.getProperty(index, "blown") ?? false;
   const closed = blown ? 0 : (gate ^ 1);
   state[stBase] = closed;
 
@@ -327,7 +330,7 @@ export const FGPFETDefinition: StandaloneComponentDefinition = {
       executeFn: executeFGPFET,
       inputSchema: ["G", "S", "D"],
       outputSchema: ["S", "D"],
-      stateSlotCount: 2,
+      stateSlotCount: 1,
       switchPins: [1, 2],
       defaultDelay: 0,
     },

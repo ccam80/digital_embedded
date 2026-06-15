@@ -25,15 +25,26 @@ function nodeOf(fix: ReturnType<typeof buildFixture>, label: string): number {
 // Programmatic circuit factories (T1) — analog regime
 // ---------------------------------------------------------------------------
 //
-// NFET / PFET / FGNFET / FGPFET expose three analog ports: G, D, S. Each
-// device is wired as a series source-follower:
-//   vs (1V) -> fet:D
-//   vg (configurable) -> fet:G
-//   fet:S -> rload (1k) -> gnd
-// With Ron=1Ω, Rload=1k, and the gate biased to drive the channel ON:
-//   V(rload:pos) = vs * Rload / (Ron + Rload) = 1 * 1000 / 1001 ≈ 0.999V
-// With the gate biased to drive the channel OFF (Roff=1e9):
-//   V(rload:pos) ≈ vs * Rload / (Roff + Rload) ≈ 1µV
+// NFET / PFET / FGNFET / FGPFET expose three analog ports: G, D, S. The
+// behavioral driver thresholds Vgs = V(G) - V(S) against Vth, so the gate
+// must be driven as a logic-level control held clear of the source swing —
+// otherwise the source feeds back into the gate decision and the ideal
+// (fixed-Ron) switch has no self-consistent operating point.
+//
+// NFET (conducts on high gate) is the canonical source-follower:
+//   vs (1V) -> fet:D ; fet:S -> rload (1k) -> gnd ; vg -> fet:G
+//   Logic-high gate vg=5V keeps Vgs = 5 - 0.999 = 4.001 > Vth even with the
+//   source at its conducting value, so the ON state is self-consistent.
+//
+// PFET (conducts on low gate) pins the source to the high rail so Vgs is
+// referenced to a fixed node and the output cannot feed back:
+//   vs (1V) -> fet:S ; fet:D -> rload (1k) -> gnd ; vg -> fet:G
+//   vg=0V -> Vgs = 0 - 1 = -1 < -Vth -> ON ; vg=1V -> Vgs = 0 -> OFF.
+//
+// With Ron=1Ω, Rload=1k the conducting output is the exact divider
+//   V(rload:pos) = vs * Rload / (Ron + Rload) = 1000 / 1001
+// and the isolated (Roff=1e9) output is
+//   V(rload:pos) = vs * Rload / (Roff + Rload) = 1000 / (1e9 + 1000).
 
 interface AnalogFetParams {
   vs?: number;
@@ -69,7 +80,10 @@ function buildAnalogNfetCircuit(facade: DefaultSimulatorFacade, p: AnalogFetPara
 }
 
 function buildAnalogPfetCircuit(facade: DefaultSimulatorFacade, p: AnalogFetParams = {}): Circuit {
-  // PFET active-low gate: vg=0V → on, vg=vs → off.
+  // PFET active-low gate: vg=0V → on, vg=vs → off. The source pins to the
+  // high rail (vs) so Vgs = V(G) - vs is referenced to a fixed node; the
+  // drain drives the load and the conducting output cannot feed back into
+  // the gate decision.
   return facade.build({
     components: [
       { id: "vs",    type: "DcVoltageSource", props: { label: "vs",    voltage: p.vs ?? 1 } },
@@ -83,11 +97,11 @@ function buildAnalogPfetCircuit(facade: DefaultSimulatorFacade, p: AnalogFetPara
       { id: "gnd",   type: "Ground",          props: { label: "gnd" } },
     ],
     connections: [
-      ["vs:pos",    "p1:D"],
+      ["vs:pos",    "p1:S"],
       ["vs:neg",    "gnd:out"],
       ["vg:pos",    "p1:G"],
       ["vg:neg",    "gnd:out"],
-      ["p1:S",      "rload:pos"],
+      ["p1:D",      "rload:pos"],
       ["rload:neg", "gnd:out"],
     ],
   });
@@ -175,14 +189,14 @@ describe("NFET initialization (T1)", () => {
   it("init_post_warm_start_node_voltage_pass_through_seed", () => {
     const fix = buildFixture({
       build: (_r, facade) => buildAnalogNfetCircuit(facade, {
-        vs: 1, vg: 1, Ron: 1, Roff: 1e9, Vth: 0.5, Rload: 1000,
+        vs: 1, vg: 5, Ron: 1, Roff: 1e9, Vth: 0.5, Rload: 1000,
       }),
     });
     // n1:D is on the same net as vs:pos, driven by vs=1V.
-    expect(fix.engine.getNodeVoltage(nodeOf(fix, "vs:pos"))).toBeCloseTo(1, 3);
-    // n1:S is on the same net as rload:pos. With NFET drv ON (vg-Vth>0), the
-    // channel conducts: V(rload:pos) ≈ vs * Rload / (Ron + Rload) ≈ 0.999V.
-    expect(fix.engine.getNodeVoltage(nodeOf(fix, "rload:pos"))).toBeCloseTo(1000 / 1001, 3);
+    expect(fix.engine.getNodeVoltage(nodeOf(fix, "vs:pos"))).toBeCloseTo(1, 9);
+    // n1:S is on the same net as rload:pos. Logic-high gate (vg=5, Vgs=4>Vth)
+    // holds the channel ON: V(rload:pos) = vs * Rload / (Ron + Rload).
+    expect(fix.engine.getNodeVoltage(nodeOf(fix, "rload:pos"))).toBeCloseTo(1000 / 1001, 9);
   });
 });
 
@@ -190,7 +204,7 @@ describe("NFET DCOP analytical (T1) — gate ON pass-through", () => {
   it("dcop_gate_on_drives_v_s_near_vs", () => {
     const fix = buildFixture({
       build: (_r, facade) => buildAnalogNfetCircuit(facade, {
-        vs: 1, vg: 1, Ron: 1, Roff: 1e9, Vth: 0.5, Rload: 1000,
+        vs: 1, vg: 5, Ron: 1, Roff: 1e9, Vth: 0.5, Rload: 1000,
       }),
     });
     const dc = fix.coordinator.dcOperatingPoint();
@@ -198,11 +212,10 @@ describe("NFET DCOP analytical (T1) — gate ON pass-through", () => {
     expect(dc!.converged).toBe(true);
 
     // n1:D on vs:pos = 1V (driven by vs).
-    expect(fix.engine.getNodeVoltage(nodeOf(fix, "vs:pos"))).toBeCloseTo(1, 6);
+    expect(fix.engine.getNodeVoltage(nodeOf(fix, "vs:pos"))).toBeCloseTo(1, 9);
     // n1:S on rload:pos. Closed-form: V(S) = vs * Rload / (Ron + Rload).
     const vS = fix.engine.getNodeVoltage(nodeOf(fix, "rload:pos"));
-    expect(vS).toBeCloseTo(1 * 1000 / (1 + 1000), 3);
-    expect(vS).toBeGreaterThan(1000 / 1001 - 1e-3);
+    expect(vS).toBeCloseTo(1000 / 1001, 9);
     expect(vS).toBeLessThanOrEqual(1);
   });
 });
@@ -218,11 +231,11 @@ describe("NFET DCOP analytical (T1) — gate OFF isolation", () => {
     expect(dc).not.toBeNull();
     expect(dc!.converged).toBe(true);
 
-    expect(fix.engine.getNodeVoltage(nodeOf(fix, "vs:pos"))).toBeCloseTo(1, 6);
+    expect(fix.engine.getNodeVoltage(nodeOf(fix, "vs:pos"))).toBeCloseTo(1, 9);
     // Gate OFF → channel high-resistance: V(S) = vs * Rload / (Roff + Rload)
-    //   = 1 * 1000 / (1e9 + 1000) ≈ 1e-6 V.
+    //   = 1000 / (1e9 + 1000) ≈ 1e-6 V.
     const vS = fix.engine.getNodeVoltage(nodeOf(fix, "rload:pos"));
-    expect(vS).toBeCloseTo(1 * 1000 / (1e9 + 1000), 5);
+    expect(vS).toBeCloseTo(1000 / (1e9 + 1000), 9);
     expect(vS).toBeLessThan(1e-3);
   });
 });
@@ -233,20 +246,19 @@ describe("NFET parameter hot-load (T1) — Ron", () => {
     // After  Ron=200: V(S) = 1000 / (200 + 1000) ≈ 0.833V.
     const fix = buildFixture({
       build: (_r, facade) => buildAnalogNfetCircuit(facade, {
-        vs: 1, vg: 1, Ron: 1, Roff: 1e9, Vth: 0.5, Rload: 1000,
+        vs: 1, vg: 5, Ron: 1, Roff: 1e9, Vth: 0.5, Rload: 1000,
       }),
     });
     fix.coordinator.dcOperatingPoint();
     const before = fix.engine.getNodeVoltage(nodeOf(fix, "rload:pos"));
-    expect(before).toBeCloseTo(1000 / 1001, 3);
+    expect(before).toBeCloseTo(1000 / 1001, 9);
 
     fix.coordinator.setComponentProperty(fix.element("n1"), "Ron", 200);
     fix.coordinator.dcOperatingPoint();
     const after = fix.engine.getNodeVoltage(nodeOf(fix, "rload:pos"));
 
-    expect(after).not.toBeCloseTo(before, 2);
     expect(after).toBeLessThan(before);
-    expect(after).toBeCloseTo(1000 / 1200, 2);
+    expect(after).toBeCloseTo(1000 / 1200, 9);
   });
 });
 
@@ -261,36 +273,36 @@ describe("NFET parameter hot-load (T1) — Roff", () => {
     });
     fix.coordinator.dcOperatingPoint();
     const before = fix.engine.getNodeVoltage(nodeOf(fix, "rload:pos"));
+    expect(before).toBeCloseTo(1000 / (1e9 + 1000), 9);
     expect(before).toBeLessThan(1e-3);
 
     fix.coordinator.setComponentProperty(fix.element("n1"), "Roff", 10);
     fix.coordinator.dcOperatingPoint();
     const after = fix.engine.getNodeVoltage(nodeOf(fix, "rload:pos"));
 
-    expect(after).not.toBeCloseTo(before, 2);
     expect(after).toBeGreaterThan(before);
-    expect(after).toBeCloseTo(1000 / 1010, 2);
+    expect(after).toBeCloseTo(1000 / 1010, 9);
   });
 });
 
 describe("NFET parameter hot-load (T1) — Vth", () => {
   it("hotload_Vth_above_gate_drive_isolates_channel", () => {
-    // Before Vth=0.5 with vg=1V → on. After Vth=2 with vg=1V → off.
+    // Before Vth=0.5 with vg=5V → on. After Vth=6 (above the 5V gate) → off.
     const fix = buildFixture({
       build: (_r, facade) => buildAnalogNfetCircuit(facade, {
-        vs: 1, vg: 1, Ron: 1, Roff: 1e9, Vth: 0.5, Rload: 1000,
+        vs: 1, vg: 5, Ron: 1, Roff: 1e9, Vth: 0.5, Rload: 1000,
       }),
     });
     fix.coordinator.dcOperatingPoint();
     const before = fix.engine.getNodeVoltage(nodeOf(fix, "rload:pos"));
-    expect(before).toBeCloseTo(1000 / 1001, 3);
+    expect(before).toBeCloseTo(1000 / 1001, 9);
 
-    fix.coordinator.setComponentProperty(fix.element("n1"), "Vth", 2);
+    fix.coordinator.setComponentProperty(fix.element("n1"), "Vth", 6);
     fix.coordinator.dcOperatingPoint();
     const after = fix.engine.getNodeVoltage(nodeOf(fix, "rload:pos"));
 
-    expect(after).not.toBeCloseTo(before, 2);
     expect(after).toBeLessThan(before);
+    expect(after).toBeCloseTo(1000 / (1e9 + 1000), 9);
     expect(after).toBeLessThan(1e-3);
   });
 });
@@ -333,10 +345,10 @@ describe("PFET initialization (T1)", () => {
         vs: 1, vg: 0, Ron: 1, Roff: 1e9, Vth: 0.5, Rload: 1000,
       }),
     });
-    expect(fix.engine.getNodeVoltage(nodeOf(fix, "vs:pos"))).toBeCloseTo(1, 3);
-    // PFET on with vg=0V (V(G)-V(S) < -Vth condition met as channel pulls
-    // high). V(rload:pos) ≈ vs * Rload / (Ron + Rload) ≈ 0.999V.
-    expect(fix.engine.getNodeVoltage(nodeOf(fix, "rload:pos"))).toBeCloseTo(1000 / 1001, 3);
+    expect(fix.engine.getNodeVoltage(nodeOf(fix, "vs:pos"))).toBeCloseTo(1, 9);
+    // PFET on with vg=0V: Vgs = 0 - vs = -1 < -Vth, source pinned to the rail.
+    // V(rload:pos) = vs * Rload / (Ron + Rload).
+    expect(fix.engine.getNodeVoltage(nodeOf(fix, "rload:pos"))).toBeCloseTo(1000 / 1001, 9);
   });
 });
 
@@ -351,9 +363,9 @@ describe("PFET DCOP analytical (T1) — gate ON pass-through", () => {
     expect(dc).not.toBeNull();
     expect(dc!.converged).toBe(true);
 
-    expect(fix.engine.getNodeVoltage(nodeOf(fix, "vs:pos"))).toBeCloseTo(1, 6);
+    expect(fix.engine.getNodeVoltage(nodeOf(fix, "vs:pos"))).toBeCloseTo(1, 9);
     const vS = fix.engine.getNodeVoltage(nodeOf(fix, "rload:pos"));
-    expect(vS).toBeCloseTo(1 * 1000 / (1 + 1000), 3);
+    expect(vS).toBeCloseTo(1000 / 1001, 9);
     expect(vS).toBeLessThanOrEqual(1);
   });
 });
@@ -371,7 +383,7 @@ describe("PFET DCOP analytical (T1) — gate OFF isolation", () => {
     expect(dc!.converged).toBe(true);
 
     const vS = fix.engine.getNodeVoltage(nodeOf(fix, "rload:pos"));
-    expect(vS).toBeCloseTo(1 * 1000 / (1e9 + 1000), 5);
+    expect(vS).toBeCloseTo(1000 / (1e9 + 1000), 9);
     expect(vS).toBeLessThan(1e-3);
   });
 });
@@ -385,15 +397,14 @@ describe("PFET parameter hot-load (T1) — Ron", () => {
     });
     fix.coordinator.dcOperatingPoint();
     const before = fix.engine.getNodeVoltage(nodeOf(fix, "rload:pos"));
-    expect(before).toBeCloseTo(1000 / 1001, 3);
+    expect(before).toBeCloseTo(1000 / 1001, 9);
 
     fix.coordinator.setComponentProperty(fix.element("p1"), "Ron", 200);
     fix.coordinator.dcOperatingPoint();
     const after = fix.engine.getNodeVoltage(nodeOf(fix, "rload:pos"));
 
-    expect(after).not.toBeCloseTo(before, 2);
     expect(after).toBeLessThan(before);
-    expect(after).toBeCloseTo(1000 / 1200, 2);
+    expect(after).toBeCloseTo(1000 / 1200, 9);
   });
 });
 
@@ -406,23 +417,23 @@ describe("PFET parameter hot-load (T1) — Roff", () => {
     });
     fix.coordinator.dcOperatingPoint();
     const before = fix.engine.getNodeVoltage(nodeOf(fix, "rload:pos"));
+    expect(before).toBeCloseTo(1000 / (1e9 + 1000), 9);
     expect(before).toBeLessThan(1e-3);
 
     fix.coordinator.setComponentProperty(fix.element("p1"), "Roff", 10);
     fix.coordinator.dcOperatingPoint();
     const after = fix.engine.getNodeVoltage(nodeOf(fix, "rload:pos"));
 
-    expect(after).not.toBeCloseTo(before, 2);
     expect(after).toBeGreaterThan(before);
-    expect(after).toBeCloseTo(1000 / 1010, 2);
+    expect(after).toBeCloseTo(1000 / 1010, 9);
   });
 });
 
 describe("PFET parameter hot-load (T1) — Vth", () => {
   it("hotload_Vth_inverts_channel_state", () => {
-    // PFET on-condition: V(G)-V(S) < -Vth.
-    // Before Vth=0.5, vg=0, V(S)≈vs=1 → V(G)-V(S)=-1 < -0.5 → ON.
-    // After Vth=5,             V(G)-V(S)=-1 > -5  → OFF.
+    // PFET on-condition: Vgs = V(G)-V(S) < -Vth, with the source pinned at vs=1.
+    // Before Vth=0.5, vg=0: Vgs = -1 < -0.5 → ON.
+    // After  Vth=5:         Vgs = -1 > -5  → OFF.
     const fix = buildFixture({
       build: (_r, facade) => buildAnalogPfetCircuit(facade, {
         vs: 1, vg: 0, Ron: 1, Roff: 1e9, Vth: 0.5, Rload: 1000,
@@ -430,14 +441,14 @@ describe("PFET parameter hot-load (T1) — Vth", () => {
     });
     fix.coordinator.dcOperatingPoint();
     const before = fix.engine.getNodeVoltage(nodeOf(fix, "rload:pos"));
-    expect(before).toBeCloseTo(1000 / 1001, 3);
+    expect(before).toBeCloseTo(1000 / 1001, 9);
 
     fix.coordinator.setComponentProperty(fix.element("p1"), "Vth", 5);
     fix.coordinator.dcOperatingPoint();
     const after = fix.engine.getNodeVoltage(nodeOf(fix, "rload:pos"));
 
-    expect(after).not.toBeCloseTo(before, 2);
     expect(after).toBeLessThan(before);
+    expect(after).toBeCloseTo(1000 / (1e9 + 1000), 9);
     expect(after).toBeLessThan(1e-3);
   });
 });

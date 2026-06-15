@@ -230,12 +230,11 @@ export class FGNFETElement extends AbstractCircuitElement {
 // ---------------------------------------------------------------------------
 // executeFGNFET- flat simulation function
 //
-// G=1 and not blown → closed=1; else closed=0
-// The blown flag is baked into propertyDefs; not available here directly.
-// The engine reads blown from component properties during compilation and
-// writes it to state[stBase + 1]. We read it from there.
+// G=1 and not blown → closed=1; else closed=0. blown is a compile-time OTP
+// property read live via layout.getProperty (the same accessor executeFuse
+// uses), not a seeded state slot.
 //
-// State layout: [closedFlag=0, blownFlag=1]
+// State layout: [closedFlag=0]
 // ---------------------------------------------------------------------------
 
 export function executeFGNFET(index: number, state: Uint32Array, highZs: Uint32Array, layout: ComponentLayout): void {
@@ -245,7 +244,7 @@ export function executeFGNFET(index: number, state: Uint32Array, highZs: Uint32A
   const stBase = (layout as FETLayout).stateOffset(index);
 
   const gate = state[wt[inBase]!]! & 1;
-  const blown = state[stBase + 1]! & 1;
+  const blown = layout.getProperty(index, "blown") ?? false;
   const closed = blown ? 0 : gate;
   state[stBase] = closed;
 
@@ -321,7 +320,7 @@ export const FGNFETDefinition: StandaloneComponentDefinition = {
       executeFn: executeFGNFET,
       inputSchema: ["G"],
       outputSchema: ["D", "S"],
-      stateSlotCount: 2,
+      stateSlotCount: 1,
       switchPins: [1, 2],
       defaultDelay: 0,
     },
