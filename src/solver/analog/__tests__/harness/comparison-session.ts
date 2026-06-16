@@ -32,6 +32,24 @@ import { convergenceSummary } from "./query.js";
 import { buildAcCaptureSession } from "./ngspice-bridge.js";
 import type { NgspiceJobSpec } from "./ngspice-bridge.js";
 import { runNgspiceGuarded } from "./ngspice-guarded.js";
+
+/**
+ * One mid-transient parameter hot-load applied to BOTH engines by
+ * `runTransient`. On the digiTS side the step loop calls
+ * `coordinator.setSourceByLabel(ourLabel, param, value)` once `nowTime`
+ * reaches `atTime`; on the ngspice side the same event is forwarded into the
+ * job spec as a `HotloadEvent` (alter/altermod + resume). `param` is the shared
+ * parameter name; `ourLabel` is the digiTS component label and `ngDevice` is
+ * the ngspice deck device/model name (they differ for composites).
+ */
+export interface HotloadInput {
+  atTime: number;
+  ourLabel: string;
+  ngDevice: string;
+  param: string;
+  value: number;
+  isModel: boolean;
+}
 import type {
   AcCaptureSession, AcCapturePoint, AcSessionShape, AcPointShape,
   AcDivergenceReport, AcSolutionDivergenceEntry, AcShapeDivergenceEntry,
@@ -1184,13 +1202,23 @@ export class ComparisonSession {
    * The master-switch hook bundle was installed in init(), so the per-step loop
    * needs no hook rewiring. At the end, the master switch is released.
    */
-  async runTransient(tStart: number, tStop: number, maxStep?: number): Promise<void> {
+  async runTransient(
+    tStart: number,
+    tStop: number,
+    maxStep?: number,
+    hotloads?: HotloadInput[],
+  ): Promise<void> {
     this._ensureInited();
     if (this._hasRun) return;
 
     this._analysis = "tran";
     this._comparisons = null;
     this._structuralFindings = [];
+
+    // Mid-run hot-loads, applied to the digiTS engine in the step loop and
+    // forwarded to ngspice via the job spec. `done` latches each event so it
+    // fires exactly once on the first step at/after its time.
+    const pendingHL = (hotloads ?? []).map((h) => ({ ...h, done: false }));
 
     // ngspice CKTstep → our outputStep, ngspice CKTmaxStep → our maxTimeStep.
     // The two are independent ngspice .tran fields (TSTEP and TMAX) and govern
@@ -1206,6 +1234,15 @@ export class ComparisonSession {
     const cfg: Partial<SimulationParams> = { tStop, outputStep: tstep, initTime: tStart };
     if (maxStep != null) cfg.maxTimeStep = maxStep;
     this._engine.configure(cfg);
+
+    // Plant each scheduled hot-load time as a permanent breakpoint so the engine
+    // lands a step exactly on it (forward clamp + order-1 + 0.1*saveDelta
+    // restart), mirroring ngspice converting the harness `stop` into a
+    // CKTsetBreak at analysis init (dctran.c:193-204). Without this the digiTS
+    // side strides across the discontinuity at maxStep while ngspice does not.
+    for (const h of pendingHL) {
+      this._engine.addBreakpoint(h.atTime);
+    }
 
     const stopStr = this._formatSpiceTime(tStop);
     const stepStr = this._formatSpiceTime(tstep);
@@ -1284,6 +1321,19 @@ export class ComparisonSession {
           ...(hasLte ? { lteDt: lteDtValue } : {}),
         });
         prevSimTime = nowTime;
+
+        // Apply any hot-load once a committed step's end time has passed its
+        // trigger. The strict `>` mirrors ngspice's `stop when time > atTime`
+        // (com_stop DBC_GT, breakp.c:133): the step that lands exactly on or
+        // first exceeds atTime still uses the old value (ngspice stops AFTER
+        // accepting it), and the new value takes effect on the next step() —
+        // exactly as the ngspice side resumes into its next step post-alter.
+        for (const h of pendingHL) {
+          if (!h.done && nowTime > h.atTime) {
+            this._coordinator.setSourceByLabel(h.ourLabel, h.param, h.value);
+            h.done = true;
+          }
+        }
       } else {
         // Engine did not advance (ERROR state or stalled). Commit whatever
         // the capture hook accumulated during this step() — a failed DC-OP
@@ -1333,6 +1383,17 @@ export class ComparisonSession {
             tStop: stopStr,
             tStep: stepStr,
             ...(tMaxStr !== undefined ? { tMax: tMaxStr } : {}),
+            ...(pendingHL.length
+              ? {
+                  hotloads: pendingHL.map((h) => ({
+                    atTime: this._formatSpiceTime(h.atTime),
+                    device: h.ngDevice,
+                    param: h.param,
+                    value: h.value,
+                    isModel: h.isModel,
+                  })),
+                }
+              : {}),
           },
         };
         const runResult = await runNgspiceGuarded(spec);

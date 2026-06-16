@@ -1254,6 +1254,65 @@ export class NgspiceBridge {
   }
 
   /**
+   * ngspice `stop when time > <t>` (com_stop, breakp.c:88-153). `t` is a
+   * space-separated SPICE-time string; ngspice stores the LHS "time" as a
+   * vector name and the RHS as a value, comparing with DBC_GT each accepted
+   * step. The condition holds for ALL steps past `t`, so it must be cleared
+   * (`deleteStops`) before `resume` or it re-trips immediately.
+   */
+  stopWhenTime(t: string): void { this._cmd(`stop when time > ${t}`); }
+
+  /** ngspice `delete all` — frees every stop condition (com_delete, breakp.c:414-419). */
+  deleteStops(): void { this._cmd("delete all"); }
+
+  /**
+   * ngspice `alter <dev> <param>=<value>` — instance-parameter hot-load on the
+   * live circuit (com_alter_common device.c:1271-1446 → if_setparam, do_model=0).
+   * ngspice lowercases the device/param itself (device.c:1376-1377).
+   */
+  alterDevice(name: string, param: string, value: number): void {
+    this._cmd(`alter ${name} ${param}=${value}`);
+  }
+
+  /**
+   * ngspice `altermod <mod> <param>=<value>` — model-parameter hot-load
+   * (com_altermod → com_alter_common, do_model=1); when CKTtime>0 if_setparam
+   * re-runs CKTtemp to re-fold derived params (spiceif.c:980).
+   */
+  alterModel(name: string, param: string, value: number): void {
+    this._cmd(`altermod ${name} ${param}=${value}`);
+  }
+
+  /** ngspice `resume` — continue the paused transient at the saved CKTtime/order/delta (dctran.c:340-358). */
+  resume(): void { this._cmd("resume"); }
+
+  /**
+   * Transient run with mid-run parameter hot-loads, mirroring the interactive
+   * alter+resume flow. Pauses at each hot-load time via `stop when time >`,
+   * applies alter/altermod, clears the stop, and resumes. Capture accumulates
+   * across all legs: `runTran` resets `_iterations`/`_outerEvents` once at the
+   * start, and each `resume` leg appends to them as the ni_* callbacks re-fire.
+   */
+  runTranWithHotloads(
+    tStop: string,
+    tStep: string,
+    tMax: string | undefined,
+    hotloads: HotloadEvent[],
+  ): void {
+    const evs = [...hotloads].sort((a, b) => Number(a.atTime) - Number(b.atTime));
+    this.stopWhenTime(evs[0]!.atTime);
+    this.runTran(tStop, tStep, tMax); // resets capture buffers, runs to first stop
+    for (let i = 0; i < evs.length; i++) {
+      const e = evs[i]!;
+      if (e.isModel) this.alterModel(e.device, e.param, e.value);
+      else this.alterDevice(e.device, e.param, e.value);
+      this.deleteStops();
+      if (i + 1 < evs.length) this.stopWhenTime(evs[i + 1]!.atTime);
+      this.resume(); // continue to the next stop, or to tStop on the last leg
+    }
+  }
+
+  /**
    * Issue ngspice `.ac <type> <n> <fStart> <fStop>`.
    * The deck must contain an AC voltage source (`vX n+ n- ac 1`) for the
    * sweep to do anything- ngspice's `ACan` does a DC operating point then
@@ -1340,11 +1399,28 @@ export class NgspiceBridge {
 // THIS function in its isolated child process.
 // ---------------------------------------------------------------------------
 
+/**
+ * One mid-transient parameter hot-load, applied on the ngspice side via the
+ * interactive `alter`/`altermod` + `resume` flow (com_alter device.c:1249,
+ * if_setparam spiceif.c:944; com_resume runcoms2.c:60). `atTime` is a SPICE-time
+ * string formatted caller-side (matching the deck's tStop/tStep) so the worker
+ * can issue `stop when time > atTime` (com_stop breakp.c:88) without re-parsing
+ * a JS number into an engineering-suffix literal.
+ */
+export interface HotloadEvent {
+  atTime: string;
+  device: string;
+  param: string;
+  value: number;
+  /** true → altermod (model param; if_setparam re-runs CKTtemp at spiceif.c:980); false → alter (instance). */
+  isModel: boolean;
+}
+
 /** The analysis to run, plus its parameters, in a serialization-friendly shape. */
 export type NgspiceJobAnalysis =
   | { kind: "dcop" }
   | { kind: "optran"; opstepsize: string; opfinaltime: string; opramptime: string }
-  | { kind: "tran"; tStop: string; tStep: string; tMax?: string }
+  | { kind: "tran"; tStop: string; tStep: string; tMax?: string; hotloads?: HotloadEvent[] }
   | { kind: "ac"; type: "dec" | "oct" | "lin"; n: number; fStart: number; fStop: number }
   | { kind: "tf"; output: string; insrc: string };
 
@@ -1429,7 +1505,16 @@ export async function runNgspiceInProcess(spec: NgspiceJobSpec): Promise<Ngspice
         rawNgspiceTopology: bridge.getRawTopology(),
       };
     } else if (spec.analysis.kind === "tran") {
-      bridge.runTran(spec.analysis.tStop, spec.analysis.tStep, spec.analysis.tMax);
+      if (spec.analysis.hotloads?.length) {
+        bridge.runTranWithHotloads(
+          spec.analysis.tStop,
+          spec.analysis.tStep,
+          spec.analysis.tMax,
+          spec.analysis.hotloads,
+        );
+      } else {
+        bridge.runTran(spec.analysis.tStop, spec.analysis.tStep, spec.analysis.tMax);
+      }
       return {
         analysis: "tran",
         session: bridge.getCaptureSession(),

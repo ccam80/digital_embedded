@@ -357,6 +357,40 @@ export function registerHarnessTools(
           .positive()
           .optional()
           .describe("Maximum timestep in seconds. Default: stopTime / 100."),
+        // z.preprocess coerces a JSON-string-encoded array (some MCP clients
+        // serialize nested array args as strings) into a real array before the
+        // array schema validates; a genuine array passes through untouched.
+        hotloads: z
+          .preprocess(
+            (v) => {
+              if (typeof v !== "string") return v;
+              try {
+                return JSON.parse(v);
+              } catch {
+                return v; // let the array schema report the type error
+              }
+            },
+            z
+              .array(
+                z.object({
+                  atTime: z.number().min(0).describe("Sim time (s) at/after which to apply the hot-load."),
+                  ourLabel: z.string().describe("digiTS component label (setComponentProperty target)."),
+                  ngDevice: z.string().describe("ngspice deck device/model name (alter/altermod target)."),
+                  param: z.string().describe("Parameter name (shared by both sides)."),
+                  value: z.number().describe("New parameter value."),
+                  isModel: z
+                    .boolean()
+                    .describe("true → ngspice altermod (model param); false → alter (instance param)."),
+                }),
+              )
+              .optional(),
+          )
+          .describe(
+            "Mid-transient parameter hot-loads applied to BOTH engines (digiTS setComponentProperty + " +
+              "ngspice alter/altermod + resume), to reproduce a live param change and compare per-step. " +
+              "Parity holds for primitives with a 1:1 ngspice device; behavioural composites (e.g. Schmitt) " +
+              "have no ngspice equivalent and run digiTS-only.",
+          ),
       }),
     },
     wrapTool("harness_run", async (args) => {
@@ -366,7 +400,7 @@ export function registerHarnessTools(
 
       const startTime = args.startTime ?? 0;
       const stopTime = args.stopTime ?? 1e-5;
-      await session.runTransient(startTime, stopTime, args.maxStep);
+      await session.runTransient(startTime, stopTime, args.maxStep, args.hotloads);
 
       entry.lastRunAt = new Date();
       entry.analysis = "tran";

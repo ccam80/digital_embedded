@@ -355,9 +355,16 @@ export class MNAEngine implements AnalogEngine {
     // the previous step's getClampedDt approaching-breakpoint clamp.
     const addBPTop = ctx.addBreakpointBound;
     const breakFlagTop = this._timestep.breakFlag;
+    // Per-step temp-breakpoint reset (dctran.c:742): clear the XSPICE temp bp so
+    // event devices re-post a still-pending one this step (square cfunc.mod re-posts
+    // every eval). Without the reset a consumed temp bp would persist and clamp dt
+    // negative on the next step. Runs before the dispatch so acceptStep re-posts
+    // into a clean slot; getClampedDt below then consumes it.
+    this._timestep.setTempBreakpoint(Infinity);
+    const setTempBPTop = (t: number): void => this._timestep.setTempBreakpoint(t);
     for (const el of elements) {
       if (el.acceptStep) {
-        el.acceptStep(cac.timeRef.value, addBPTop, breakFlagTop);
+        el.acceptStep(cac.timeRef.value, addBPTop, breakFlagTop, setTempBPTop);
       }
     }
 

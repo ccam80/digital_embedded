@@ -831,20 +831,50 @@ export class TimestepController {
   }
 
   /**
-   * Push an XSPICE-style temporary breakpoint (g_mif_info.breakpoint.current).
+   * Register an XSPICE-style temporary breakpoint (g_mif_info.breakpoint.current),
+   * matching cm_analog_set_temp_bkpt (cm.c:416-445). Event devices call this from
+   * element.acceptStep to land the next step on `time`: getClampedDt truncates dt
+   * so the step ends exactly on `time` (the temp-bp clamp) and the following call
+   * cuts CKTorder = 1 (dctran.c:525-526).
    *
-   * The next getClampedDt() call truncates dt so the step lands exactly on
-   * `time` and sets _lastTempBreakpoint = simTime + dt. The call after that
-   * sees AlmostEqualUlps(simTime, _lastTempBreakpoint, 100) and forces
-   * CKTorder = 1 (dctran.c:542-548).
-   *
-   * Pass +Infinity to clear (no temp bp pending). digiTS does not yet have
-   * an XSPICE event lane that drives this; the entry point exists so the
-   * dctran port at getClampedDt has a real source to consult once one is
-   * added. Mirrors mif_inp2.c which initializes the slot to 1e30.
+   * Guards mirror cm.c:
+   *  - +Infinity clears the slot- the per-step reset (ngspice resets
+   *    breakpoint.current to 1e30 at dctran.c:742 so devices re-post each step);
+   *  - a time at or before the last accepted timepoint is ignored- digiTS posts
+   *    forward-only and does not implement the cm.c:426 backup tier (abandon the
+   *    current step to hit a past breakpoint);
+   *  - a time within minBreak of a permanent breakpoint or of the current time is
+   *    discarded (cm.c:432-438);
+   *  - otherwise the earliest pending temp breakpoint is kept (cm.c:441-442).
    */
   setTempBreakpoint(time: number): void {
-    this._tempBreakpoint = time;
+    // +Infinity clears the slot (mif_inp2.c initializes it to 1e30). Bypasses the
+    // guards so the engine's per-step reset always takes effect.
+    if (!isFinite(time)) {
+      this._tempBreakpoint = time;
+      return;
+    }
+
+    // cm.c:426- forward-only: a time at or before the last accepted point would
+    // require the backup tier digiTS does not implement; ignore it.
+    if (time <= this._lastAcceptedSimTime) return;
+
+    // cm.c:432-438- discard if within minBreak of a permanent breakpoint
+    // (CKTbreaks[0]/[1]) or of the current time.
+    const t0 = this._breakpoints[0];
+    const t1 = this._breakpoints[1];
+    if (
+      (t0 !== undefined && Math.abs(time - t0) < this._minBreak) ||
+      (t1 !== undefined && Math.abs(time - t1) < this._minBreak) ||
+      Math.abs(time - this._lastAcceptedSimTime) < this._minBreak
+    ) {
+      return;
+    }
+
+    // cm.c:441-442- keep the earliest pending temp breakpoint.
+    if (time < this._tempBreakpoint) {
+      this._tempBreakpoint = time;
+    }
   }
 
 }

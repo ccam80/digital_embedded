@@ -93,11 +93,18 @@ export abstract class AnalogElement {
   abstract setParam(key: string, value: number): void;
 
   /** Called once per accepted timestep to register the next waveform edge as a breakpoint.
-   *  Gate on `atBreakpoint` (CKTbreak) to avoid stale registrations. */
+   *  Gate on `atBreakpoint` (CKTbreak) to avoid stale registrations.
+   *
+   *  `addBreakpoint` registers a permanent breakpoint (CKTsetBreak) for a known
+   *  future edge time. `setTempBreakpoint` registers an XSPICE-style temporary
+   *  breakpoint (cm_analog_set_temp_bkpt) that lives only for the next step- event
+   *  devices re-post it each step while their transition is pending (square
+   *  cfunc.mod), so the engine clears it before every acceptStep dispatch. */
   acceptStep?(
     simTime: number,
     addBreakpoint: (t: number) => void,
     atBreakpoint: boolean,
+    setTempBreakpoint: (t: number) => void,
   ): void;
 
   /** Element-specific convergence check. Return true = converged; false = keep iterating. */

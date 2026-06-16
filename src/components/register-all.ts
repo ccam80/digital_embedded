@@ -219,9 +219,6 @@ import {
   DigitalInputBoundaryAdapterUnloadedDefinition,
 } from "./digital-pins/digital-input-boundary-adapter.js";
 
-// Behavioral output driver (internalOnly)
-import { BehavioralOutputDriverDefinition, BehavioralOutputDriverTriStateDefinition } from "../solver/analog/behavioral-output-driver.js";
-
 // Optocoupler internal sub-elements (internalOnly)
 import { InternalCccsDefinition } from "./active/internal-cccs.js";
 
@@ -266,7 +263,7 @@ import { BehavioralDAsyncFlipflopDriverDefinition } from "../solver/analog/behav
 import { DACDriverDefinition } from "./active/dac-driver.js";
 import { ADCDriverDefinition } from "./active/adc-driver.js";
 import { ComparatorPushPullDriverDefinition } from "./active/comparator-pushpull-driver.js";
-import { SchmittTriggerDriverDefinition } from "./active/schmitt-trigger-driver.js";
+import { HystDefinition } from "./active/hyst.js";
 
 // Op-amp macromodel building blocks (internalOnly — Boyle/PSpice OpAmp form)
 import { BoyleInputStageDefinition } from "./active/boyle-input-stage.js";
@@ -516,10 +513,6 @@ export function createDefaultRegistry(
   registry.register(DigitalInputBoundaryAdapterLoadedDefinition);
   registry.register(DigitalInputBoundaryAdapterUnloadedDefinition);
 
-  // Behavioral output driver (internalOnly)
-  registry.register(BehavioralOutputDriverDefinition);
-  registry.register(BehavioralOutputDriverTriStateDefinition);
-
   // Optocoupler internal sub-elements (internalOnly)
   registry.register(InternalCccsDefinition);
 
@@ -562,7 +555,7 @@ export function createDefaultRegistry(
   registry.register(DACDriverDefinition);
   registry.register(ADCDriverDefinition);
   registry.register(ComparatorPushPullDriverDefinition);
-  registry.register(SchmittTriggerDriverDefinition);
+  registry.register(HystDefinition);
 
   // Op-amp macromodel building blocks (internalOnly)
   registry.register(BoyleInputStageDefinition);

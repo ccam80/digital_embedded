@@ -1,31 +1,6 @@
 import { describe, it, expect } from "vitest";
 
 import { buildFixture } from "../../../solver/analog/__tests__/fixtures/build-fixture.js";
-import { SCHMITT_TRIGGER_SCHEMA } from "../schmitt-trigger-driver.js";
-import { PoolBackedAnalogElement } from "../../../solver/analog/element.js";
-
-// ---------------------------------------------------------------------------
-// Slot indices
-// ---------------------------------------------------------------------------
-
-const SLOT_OUTPUT_LATCH = SCHMITT_TRIGGER_SCHEMA.indexOf.get("OUTPUT_LATCH")!;
-
-// ---------------------------------------------------------------------------
-// Helper: locate the SchmittTriggerDriverElement in a compiled circuit by
-// matching stateSchema.owner === "SchmittTriggerDriverElement".
-// ---------------------------------------------------------------------------
-
-function findSchmittDriver(
-  elements: ReadonlyArray<unknown>,
-): PoolBackedAnalogElement {
-  const idx = elements.findIndex(
-    (el) =>
-      el instanceof PoolBackedAnalogElement &&
-      (el as PoolBackedAnalogElement).stateSchema.owner === "SchmittTriggerDriverElement",
-  );
-  if (idx < 0) throw new Error("SchmittTriggerDriverElement not found in compiled circuit");
-  return elements[idx] as PoolBackedAnalogElement;
-}
 
 // ---------------------------------------------------------------------------
 // Programmatic builders for T1 categories.
@@ -89,47 +64,32 @@ function buildInvFixture(opts: { vIn: number; tStop?: number; maxTimeStep?: numb
 // ---------------------------------------------------------------------------
 
 describe("Schmitt initialization — non-inverting (T1)", () => {
-  it("init_noninv_low_input_latch_zero", () => {
-    // vIn=0.5 < vTL=1.0: non-inverting latch settles LOW (0).
+  it("init_noninv_low_input_output_low", () => {
+    // vIn=0.5 < vTL=1.0: non-inverting output settles toward vOL = 0V.
     const fix = buildNonInvFixture({ vIn: 0.5 });
-    const drv = findSchmittDriver(fix.circuit.elements);
-    const latch = fix.pool.state0[drv._stateBase + SLOT_OUTPUT_LATCH];
-    expect(latch).toBe(0);
-    // Output node settles toward vOL = 0V.
     const outV = fix.engine.getNodeVoltage(fix.circuit.labelToNodeId.get("st:out")!);
     expect(outV).toBeCloseTo(0.0, 3);
   });
 
-  it("init_noninv_high_input_latch_one", () => {
-    // vIn=2.5 > vTH=2.0: non-inverting latch settles HIGH (1).
+  it("init_noninv_high_input_output_high", () => {
+    // vIn=2.5 > vTH=2.0: non-inverting output settles toward vOH*rload/(rOut+rload).
     const fix = buildNonInvFixture({ vIn: 2.5 });
-    const drv = findSchmittDriver(fix.circuit.elements);
-    const latch = fix.pool.state0[drv._stateBase + SLOT_OUTPUT_LATCH];
-    expect(latch).toBe(1);
-    // Output node settles toward vOH * rload/(rOut+rload) = 3.3*10000/10050 ≈ 3.284V.
     const outV = fix.engine.getNodeVoltage(fix.circuit.labelToNodeId.get("st:out")!);
-    expect(outV).toBeGreaterThan(3.0);
+    expect(outV).toBeCloseTo(3.3 * 10000 / 10050, 3);
   });
 });
 
 describe("Schmitt initialization — inverting (T1)", () => {
   it("init_inv_low_input_output_high", () => {
-    // vIn=0.5 < vTL=1.0: inverting drives output toward vOH (inverted sense).
-    // OUTPUT_LATCH stores pre-invert level: latch=0, but output sense is flipped.
+    // vIn=0.5 < vTL=1.0: inverting output settles toward vOH (inverted sense).
     const fix = buildInvFixture({ vIn: 0.5 });
-    const drv = findSchmittDriver(fix.circuit.elements);
-    const latch = fix.pool.state0[drv._stateBase + SLOT_OUTPUT_LATCH];
-    expect(latch).toBe(0);
     const outV = fix.engine.getNodeVoltage(fix.circuit.labelToNodeId.get("st:out")!);
-    expect(outV).toBeGreaterThan(3.0);
+    expect(outV).toBeCloseTo(3.3 * 10000 / 10050, 3);
   });
 
   it("init_inv_high_input_output_low", () => {
-    // vIn=2.5 > vTH=2.0: inverting drives output toward vOL.
+    // vIn=2.5 > vTH=2.0: inverting output settles toward vOL = 0V.
     const fix = buildInvFixture({ vIn: 2.5 });
-    const drv = findSchmittDriver(fix.circuit.elements);
-    const latch = fix.pool.state0[drv._stateBase + SLOT_OUTPUT_LATCH];
-    expect(latch).toBe(1);
     const outV = fix.engine.getNodeVoltage(fix.circuit.labelToNodeId.get("st:out")!);
     expect(outV).toBeCloseTo(0.0, 3);
   });
@@ -183,12 +143,58 @@ describe("Schmitt DCOP analytical (T1)", () => {
 });
 
 // ---------------------------------------------------------------------------
+// Category 3 — Transient input sweep (Phase-1 proof: ring-free crossing)
+// A slow sine sweeps the input through vTL and vTH and back. The Hyst transfer
+// is continuous and Jacobian-coupled, so the output must track the rails with
+// NO overshoot- the ring the deleted stiff-Norton driver produced.
+// ---------------------------------------------------------------------------
+
+describe("Schmitt transient input sweep (T1)", () => {
+  it("noninv_swept_input_no_overshoot", () => {
+    const fix = buildFixture({
+      build: (_r, facade) => facade.build({
+        components: [
+          { id: "vsrc",  type: "AcVoltageSource", props: { label: "vsrc", waveform: "sine", amplitude: 1.5, dcOffset: 1.5, frequency: 1000 } },
+          { id: "rload", type: "Resistor",        props: { label: "rload", resistance: 10000 } },
+          { id: "st",    type: "SchmittNonInverting", props: { label: "st", vTH: 2.0, vTL: 1.0, vOH: 3.3, vOL: 0.0, rOut: 50 } },
+          { id: "gnd",   type: "Ground", props: { label: "gnd" } },
+        ],
+        connections: [
+          ["vsrc:pos", "st:in"], ["vsrc:neg", "gnd:out"],
+          ["st:out", "rload:pos"], ["rload:neg", "gnd:out"],
+        ],
+      }),
+      params: { tStop: 1e-3, maxTimeStep: 1e-6 },
+    });
+    const outNode = fix.circuit.labelToNodeId.get("st:out")!;
+    const vHigh = 3.3 * 10000 / 10050;
+    let maxOut = -Infinity;
+    let minOut = Infinity;
+    for (let i = 0; i < 1000; i++) {
+      fix.coordinator.step();
+      const v = fix.engine.getNodeVoltage(outNode);
+      if (v > maxOut) maxOut = v;
+      if (v < minOut) minOut = v;
+    }
+    // Ring-free: never overshoots the high-rail divider, never undershoots vOL.
+    expect(maxOut).toBeLessThanOrEqual(vHigh + 0.01);
+    expect(minOut).toBeGreaterThanOrEqual(-0.01);
+    // And the sweep actually drove both rails (crossed both thresholds).
+    expect(maxOut).toBeGreaterThan(vHigh - 0.05);
+    expect(minOut).toBeLessThan(0.05);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Category 4 — Parameter hot-load (T1)
 // One it() per settable parameter: vTH, vTL, vOH, vOL, rOut.
 // ---------------------------------------------------------------------------
 
 describe("Schmitt parameter hot-load (T1)", () => {
   it("hotload_vTH_shifts_rising_threshold", () => {
+    // Phase 2: live param-hotload discontinuity- a setComponentProperty rail-step
+    // rings into cOut at dt≫τ; the boundary forward-discontinuity fixes this, not
+    // the Hyst transfer (which only makes the input crossing continuous).
     // Non-inverting; vIn=1.5 is between vTL=1.0 and vTH=2.0.
     // After warm-start the latch is LOW. Lower vTH to 1.0: input 1.5 now
     // exceeds vTH, latch flips HIGH, output rises toward vOH*rload/(rOut+rload).
@@ -205,13 +211,17 @@ describe("Schmitt parameter hot-load (T1)", () => {
   });
 
   it("hotload_vTL_shifts_falling_threshold", () => {
-    // Non-inverting; start with vIn=2.5 => latch HIGH. Raise vTL to 2.6:
-    // input 2.5 < vTL, latch falls to LOW, output drops to vOL = 0V.
+    // Non-inverting; start with vIn=2.5 => latch HIGH. Raise the whole hysteresis
+    // band above the input while keeping vTH > vTL (vTH=3.0, vTL=2.6): input 2.5
+    // now sits below vTL, so the latch falls to LOW and HOLDS (2.5 < vTH=3.0, no
+    // re-trigger), output drops to vOL = 0V. Raising vTL alone above vTH would
+    // invert the band and oscillate the latch.
     const fix = buildNonInvFixture({ vIn: 2.5, tStop: 1e-3, maxTimeStep: 1e-6 });
     const outNode = fix.circuit.labelToNodeId.get("st:out")!;
     const before = fix.engine.getNodeVoltage(outNode);
     expect(before).toBeGreaterThan(3.0);
 
+    fix.coordinator.setComponentProperty(fix.element("st"), "vTH", 3.0);
     fix.coordinator.setComponentProperty(fix.element("st"), "vTL", 2.6);
     for (let i = 0; i < 20; i++) fix.coordinator.step();
 
@@ -220,6 +230,7 @@ describe("Schmitt parameter hot-load (T1)", () => {
   });
 
   it("hotload_vOH_changes_output_high_level", () => {
+    // Phase 2: live param-hotload discontinuity (rail-step rings into cOut at dt≫τ).
     // Non-inverting active HIGH; raising vOH from 3.3 to 5.0 increases output.
     // after = 5.0 * 10000/10050 ≈ 4.975V
     const fix = buildNonInvFixture({ vIn: 2.5, tStop: 1e-3, maxTimeStep: 1e-6 });
@@ -235,6 +246,7 @@ describe("Schmitt parameter hot-load (T1)", () => {
   });
 
   it("hotload_vOL_changes_output_low_level", () => {
+    // Phase 2: live param-hotload discontinuity (rail-step rings into cOut at dt≫τ).
     // Non-inverting active LOW; raise vOL from 0 to 0.4.
     // after = 0.4 * 10000/10050 ≈ 0.3980V
     const fix = buildNonInvFixture({ vIn: 0.5, tStop: 1e-3, maxTimeStep: 1e-6 });
