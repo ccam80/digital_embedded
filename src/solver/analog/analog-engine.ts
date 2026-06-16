@@ -71,9 +71,9 @@ export class MNAEngine implements AnalogEngine {
   // -------------------------------------------------------------------------
   private _solver: SparseSolver = new SparseSolver();
   private _timestep: TimestepController = new TimestepController(DEFAULT_SIMULATION_PARAMS);
-  // True when the compiled circuit contains an XSPICE 'A' device (code model).
-  // ngspice's CKTadevFlag (inppas2.c:107); gates the cktdojob.c:77-92 trtol cut.
-  private _hasCodeModel = false;
+  // ngspice's CKTadevFlag (inppas2.c:107): true when the compiled circuit holds
+  // an XSPICE 'A' device (XSPICE device family). Gates the cktdojob.c:77-92 cut.
+  private _hasAdevice = false;
   private _history: HistoryStore = new HistoryStore(0);
   private _diagnostics: DiagnosticCollector = new DiagnosticCollector();
   private _convergenceLog: ConvergenceLog = new ConvergenceLog(128);
@@ -233,15 +233,13 @@ export class MNAEngine implements AnalogEngine {
     // matches ngspice where CKTdeltaOld[7] lives on CKTcircuit. The
     // addBreakpoint closure captures `this._timestep` by reference, so it
     // resolves correctly after the controller is assigned below.
-    // ngspice cktdojob.c:77-92 — a circuit containing XSPICE 'A' devices (code
-    // models; here the Hyst element) tightens the transient LTE: CKTtrtol is
-    // reduced to 1 (gated on CKTadevFlag, set at inppas2.c:107) so steps across
-    // code-model transitions are smaller and more accurate. Mirror it before
-    // the timestep controller is built so dt selection matches ngspice.
-    this._hasCodeModel = compiled.elements.some(
-      (el) => (el as { isXspiceCodeModel?: boolean }).isXspiceCodeModel === true,
-    );
-    if (this._hasCodeModel && this._params.trtol > 1) {
+    // ngspice cktdojob.c:77-92 — a circuit containing an XSPICE 'A' device (the
+    // XSPICE device family) tightens the transient LTE: CKTtrtol is reduced to 1
+    // (gated on CKTadevFlag, set at inppas2.c:107) so steps across code-model
+    // transitions are smaller and more accurate. Mirror it before the timestep
+    // controller is built so dt selection matches ngspice.
+    this._hasAdevice = compiled.elements.some((el) => el.deviceFamily === "XSPICE");
+    if (this._hasAdevice && this._params.trtol > 1) {
       this._params = { ...this._params, trtol: 1 };
     }
 
@@ -1705,9 +1703,9 @@ export class MNAEngine implements AnalogEngine {
       delete partial.firstStep;
     }
     this._params = resolveSimulationParams({ ...baseline, ...params });
-    // resolveSimulationParams yields the default trtol; a code-model circuit
+    // resolveSimulationParams yields the default trtol; an 'A'-device circuit
     // takes the cktdojob.c:77-92 reduction to 1, applied here as at init.
-    if (this._hasCodeModel && this._params.trtol > 1) {
+    if (this._hasAdevice && this._params.trtol > 1) {
       this._params = { ...this._params, trtol: 1 };
     }
     // Non-destructive update: preserves currentDt (clamped to new maxTimeStep),

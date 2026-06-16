@@ -61,6 +61,12 @@ export const NGSPICE_LOAD_ORDER = {
   BEHAVIORAL: 49, // new- ngspice B-source position; every internalOnly
                   // behavioural driver leaf added by this phase uses
                   // this ordinal.
+
+  // XSPICE 'A'-device code models (hyst, dac_bridge, adc_bridge, ...). ngspice
+  // loads the static built-ins first (dev.c:280-283 over static_devices[]) and
+  // appends codemodel-loaded devices after them, so an 'A' device loads after
+  // every primitive- the same post-VSRC position the behavioural leaves take.
+  XSPICE: 49,
 } as const;
 
 /**
@@ -98,7 +104,8 @@ export type DeviceFamily =
   | "BEHAVIORAL"
   | "CPL"
   | "TXL"
-  | "URC";
+  | "URC"
+  | "XSPICE";
 
 /**
  * Per-`typeId` ngspice load-order lookup, mirroring `DEVices[]` indexing.
@@ -196,7 +203,7 @@ export function getDeviceFamilyByTypeId(typeId: string): DeviceFamily {
  */
 export const DECK_EMITTING_FAMILIES: ReadonlySet<DeviceFamily> = new Set<DeviceFamily>([
   "RES", "CAP", "IND", "VSRC", "ISRC", "DIO", "BJT", "MOS", "JFET", "MES",
-  "JFET2", "TRA", "CCCS", "CCVS", "VCCS", "VCVS", "ASRC", "CSW", "MUT",
+  "JFET2", "TRA", "CCCS", "CCVS", "VCCS", "VCVS", "ASRC", "CSW", "MUT", "XSPICE",
 ]);
 
 /**
@@ -215,6 +222,7 @@ export const SPICE_PREFIX_BY_FAMILY: Partial<Record<DeviceFamily, string>> = {
   DIO: "D", BJT: "Q", MOS: "M", JFET: "J", JFET2: "J", MES: "Z",
   VCVS: "E", VCCS: "G", CCVS: "H", CCCS: "F",
   SW: "S", CSW: "W", TRA: "T", URC: "U",
+  XSPICE: "A", // XSPICE code-model 'A' device (e.g. hyst): `a<name> … <model>`.
 };
 
 /**

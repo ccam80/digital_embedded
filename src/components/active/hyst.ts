@@ -104,12 +104,12 @@ function cmSmoothCorner(
 // ---------------------------------------------------------------------------
 
 export class HystElement extends PoolBackedAnalogElement {
-  readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.BEHAVIORAL;
-  readonly deviceFamily: DeviceFamily = "BEHAVIORAL";
-  // XSPICE 'A' device (code model). ngspice flags such a circuit (CKTadevFlag,
-  // inppas2.c:107) and tightens LTE by reducing CKTtrtol to 1 (cktdojob.c:77-92);
-  // the analog engine mirrors that reduction when this is present.
-  readonly isXspiceCodeModel = true;
+  // XSPICE 'A'-device code model: ngspice appends it to DEVices[] after the
+  // static built-ins, and a circuit containing one tightens LTE (CKTadevFlag →
+  // CKTtrtol = 1, cktdojob.c:77-92), which the analog engine mirrors for the
+  // XSPICE device family.
+  readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.XSPICE;
+  readonly deviceFamily: DeviceFamily = "XSPICE";
   readonly stateSchema = HYST_SCHEMA;
   readonly stateSize = HYST_SCHEMA.size;
 
@@ -311,10 +311,10 @@ export const HystDefinition: ComponentDefinition = {
       kind: "inline",
       paramDefs: HYST_PARAM_DEFS,
       params: {},
-      // Harness deck emission: `a<name> %v(in) %v(out) <model>` + `.model <model>
-      // hyst (...)`. ASRC load-order bucket; in/out mint deck nodes in this order
-      // (gnd is the implicit %v ground, node 0 when embedded).
-      spice: { device: "ASRC", deckNodeTokens: ["in", "out"] },
+      // Harness deck emission: `a<name> <in> <out> <model>` + `.model <model>
+      // hyst (...)`. XSPICE code-model device family; in/out mint deck nodes in
+      // this order (gnd is the implicit ground reference, node 0 when embedded).
+      spice: { device: "XSPICE", deckNodeTokens: ["in", "out"] },
       factory: (pinNodes: ReadonlyMap<string, number>, props: PropertyBag, _getTime: () => number): AnalogElement =>
         new HystElement(pinNodes, props),
     },
