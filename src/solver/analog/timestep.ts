@@ -274,7 +274,7 @@ export class TimestepController {
     // CKTdelmin. Under XSPICE this resolves to ~1e-15 for typical runs;
     // small enough that the loose `<=` pop predicate at dctran.c:629
     // behaves like the strict `>` pop at dctran.c:412 in practice. The
-    // non-XSPICE fallback (maxStep * 5e-5, dctran.c:157) is ~500× larger
+    // non-XSPICE delmin value (maxStep * 5e-5, dctran.c:157) is ~500× larger
     // and would pop breakpoints prematurely. digiTS targets the XSPICE
     // lane (mixed digital/analog), so the XSPICE init is the correct one.
     this._minBreak = 10 * this._delmin;

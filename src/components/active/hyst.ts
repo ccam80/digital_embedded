@@ -106,6 +106,10 @@ function cmSmoothCorner(
 export class HystElement extends PoolBackedAnalogElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.BEHAVIORAL;
   readonly deviceFamily: DeviceFamily = "BEHAVIORAL";
+  // XSPICE 'A' device (code model). ngspice flags such a circuit (CKTadevFlag,
+  // inppas2.c:107) and tightens LTE by reducing CKTtrtol to 1 (cktdojob.c:77-92);
+  // the analog engine mirrors that reduction when this is present.
+  readonly isXspiceCodeModel = true;
   readonly stateSchema = HYST_SCHEMA;
   readonly stateSize = HYST_SCHEMA.size;
 

@@ -192,9 +192,6 @@ describe("Schmitt transient input sweep (T1)", () => {
 
 describe("Schmitt parameter hot-load (T1)", () => {
   it("hotload_vTH_shifts_rising_threshold", () => {
-    // Phase 2: live param-hotload discontinuity- a setComponentProperty rail-step
-    // rings into cOut at dt≫τ; the boundary forward-discontinuity fixes this, not
-    // the Hyst transfer (which only makes the input crossing continuous).
     // Non-inverting; vIn=1.5 is between vTL=1.0 and vTH=2.0.
     // After warm-start the latch is LOW. Lower vTH to 1.0: input 1.5 now
     // exceeds vTH, latch flips HIGH, output rises toward vOH*rload/(rOut+rload).
@@ -230,7 +227,6 @@ describe("Schmitt parameter hot-load (T1)", () => {
   });
 
   it("hotload_vOH_changes_output_high_level", () => {
-    // Phase 2: live param-hotload discontinuity (rail-step rings into cOut at dt≫τ).
     // Non-inverting active HIGH; raising vOH from 3.3 to 5.0 increases output.
     // after = 5.0 * 10000/10050 ≈ 4.975V
     const fix = buildNonInvFixture({ vIn: 2.5, tStop: 1e-3, maxTimeStep: 1e-6 });
@@ -246,7 +242,6 @@ describe("Schmitt parameter hot-load (T1)", () => {
   });
 
   it("hotload_vOL_changes_output_low_level", () => {
-    // Phase 2: live param-hotload discontinuity (rail-step rings into cOut at dt≫τ).
     // Non-inverting active LOW; raise vOL from 0 to 0.4.
     // after = 0.4 * 10000/10050 ≈ 0.3980V
     const fix = buildNonInvFixture({ vIn: 0.5, tStop: 1e-3, maxTimeStep: 1e-6 });

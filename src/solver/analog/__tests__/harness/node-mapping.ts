@@ -255,7 +255,8 @@ export function buildDirectNodeMapping(
         for (const prefix of branchPrefixCandidates) {
           const canon = canonicalizeSpiceLabel(variant, prefix).toLowerCase();
           if (prefix === "A") {
-            // MIF code-model branch form; conn1 (out) for Hyst, conn0 fallback.
+            // MIF code-model branch form: conn1 (out) for Hyst; conn0 covers a
+            // code model whose v-output is its first connection.
             candidates.push(`${canon}#branch_1_0`, `${canon}#branch_0_0`);
           } else {
             candidates.push(`${canon}#branch`);
