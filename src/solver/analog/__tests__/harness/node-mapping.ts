@@ -233,7 +233,13 @@ export function buildDirectNodeMapping(
   //   (c) Top-level element whose deck label needed a prefix add (e.g. user
   //       called it "myInductor"; netlist emitted "LmyInductor"). Same prefix-
   //       loop covers it via case (b)'s path.
-  const branchPrefixCandidates = ["V", "L", "E", "F", "H"];
+  // "A" covers XSPICE `a`-instance code models (e.g. hyst). Unlike the
+  // single-letter branch devices (which CKTmkCur names `<inst>#branch`), the
+  // MIF framework names a code model's v-output branch
+  // `<inst>#branch_<connIdx>_<sub>` — the output port's 0-based connection
+  // index and sub-index (mif_inp2.c MIFmkBranch). digiTS's Hyst emits in=conn0,
+  // out=conn1, so its single v-output branch is `<inst>#branch_1_0`.
+  const branchPrefixCandidates = ["V", "L", "E", "F", "H", "A"];
   for (let ei = 0; ei < elements.length; ei++) {
     const el = elements[ei];
     if (el.branchIndex < 0) continue;
@@ -247,7 +253,13 @@ export function buildDirectNodeMapping(
     if (intrinsic) {
       for (const variant of branchLabelRenameVariants(intrinsic)) {
         for (const prefix of branchPrefixCandidates) {
-          candidates.push(`${canonicalizeSpiceLabel(variant, prefix).toLowerCase()}#branch`);
+          const canon = canonicalizeSpiceLabel(variant, prefix).toLowerCase();
+          if (prefix === "A") {
+            // MIF code-model branch form; conn1 (out) for Hyst, conn0 fallback.
+            candidates.push(`${canon}#branch_1_0`, `${canon}#branch_0_0`);
+          } else {
+            candidates.push(`${canon}#branch`);
+          }
         }
       }
     }

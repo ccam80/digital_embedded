@@ -71,7 +71,9 @@ const HYST_PARAM_DEFS: ParamDef[] = [
   { key: "out_lower_limit", default: 0.0 },
   { key: "out_upper_limit", default: 1.0 },
   { key: "input_domain",    default: 0.01 },
-  { key: "fraction",        default: 1 }, // boolean: 1 = TRUE (domain is a fraction of in_high-in_low)
+  // boolean: 1 = TRUE (domain is a fraction of in_high-in_low). ngspice's MIF
+  // boolean param parser wants the TRUE/FALSE keyword on the `.model` card.
+  { key: "fraction",        default: 1, spiceConverter: (v: number) => (v ? "TRUE" : "FALSE") },
 ];
 
 /**
@@ -305,6 +307,10 @@ export const HystDefinition: ComponentDefinition = {
       kind: "inline",
       paramDefs: HYST_PARAM_DEFS,
       params: {},
+      // Harness deck emission: `a<name> %v(in) %v(out) <model>` + `.model <model>
+      // hyst (...)`. ASRC load-order bucket; in/out mint deck nodes in this order
+      // (gnd is the implicit %v ground, node 0 when embedded).
+      spice: { device: "ASRC", deckNodeTokens: ["in", "out"] },
       factory: (pinNodes: ReadonlyMap<string, number>, props: PropertyBag, _getTime: () => number): AnalogElement =>
         new HystElement(pinNodes, props),
     },

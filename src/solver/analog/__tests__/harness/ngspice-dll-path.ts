@@ -110,3 +110,41 @@ export async function assertNgspiceDllHasAc(override?: string): Promise<void> {
 
   _acSymbolVerified.set(dllPath, true);
 }
+
+/**
+ * In-tree default directory holding the XSPICE code-model libraries (`*.cm`),
+ * built by `ref/ngspice/visualc/xspice/analog.vcxproj` (Release|x64) at
+ * `codemodels/x64/Release/`. The standalone `ngspice.dll` is built WITHOUT code
+ * models compiled in (visualc/how-to-ngspice-vstudio.txt:61-64); ngspice's
+ * design loads them at runtime from `.cm` DLLs via the `codemodel` command.
+ */
+export const DEFAULT_NGSPICE_CODEMODEL_DIR = resolve(
+  process.cwd(),
+  "ref/ngspice/visualc/xspice/codemodels/x64/Release",
+);
+
+/**
+ * Resolve the absolute paths of the XSPICE code-model libraries to load into
+ * the instrumented ngspice via the `codemodel` command. Only files that exist
+ * are returned (forward-slash form, ngspice-friendly), so a checkout that has
+ * not built the code models simply loads none- non-code-model circuits are
+ * unaffected. Precedence for the directory: explicit override →
+ * NGSPICE_CODEMODEL_DIR env var → in-tree default.
+ *
+ * `analog64.cm` carries the analog code models (incl. `hyst`); extend the list
+ * as further `.cm` libraries (digital, xtradev, …) are built and needed.
+ */
+export function resolveNgspiceCodemodelPaths(overrideDir?: string): string[] {
+  const dir = overrideDir ?? process.env.NGSPICE_CODEMODEL_DIR ?? DEFAULT_NGSPICE_CODEMODEL_DIR;
+  const found: string[] = [];
+  for (const name of ["analog64.cm"]) {
+    const p = resolve(dir, name);
+    try {
+      accessSync(p);
+      found.push(p.replace(/\\/g, "/"));
+    } catch {
+      /* not built on this checkout- skip */
+    }
+  }
+  return found;
+}

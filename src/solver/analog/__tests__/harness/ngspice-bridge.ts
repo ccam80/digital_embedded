@@ -41,7 +41,7 @@ import type { IntegrationMethod } from "../../integration.js";
 import type { LimitingEvent } from "../../newton-raphson.js";
 import { bitsToName } from "../../ckt-mode.js";
 import { DEVICE_MAPPINGS, projectPinCurrents } from "./device-mappings.js";
-import { assertNgspiceDllHasAc } from "./ngspice-dll-path.js";
+import { assertNgspiceDllHasAc, resolveNgspiceCodemodelPaths } from "./ngspice-dll-path.js";
 
 // ---------------------------------------------------------------------------
 // CKTmode constants (from ref/ngspice/src/include/ngspice/cktdefs.h:166-182)
@@ -817,6 +817,17 @@ export class NgspiceBridge {
     }
 
     this._cmd = this._lib.func("int ngSpice_Command(str)");
+
+    // Load the XSPICE code-model libraries (analog.cm: hyst, …) so decks that
+    // instantiate code models (`a<name> … <model>` + `.model <model> hyst`)
+    // resolve the model type. The standalone instrumented ngspice.dll is built
+    // with no code models compiled in (how-to-ngspice-vstudio.txt:61-64); they
+    // are loadable `.cm` DLLs registered at runtime via the `codemodel` command.
+    // Must run before any `circbyline`/`.model` parse. Absent `.cm` files yield
+    // an empty list, leaving primitive-only decks unchanged.
+    for (const cm of resolveNgspiceCodemodelPaths()) {
+      this._cmd(`codemodel ${cm}`);
+    }
   }
 
   /**

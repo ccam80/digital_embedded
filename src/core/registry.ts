@@ -125,13 +125,14 @@ export interface ParamDef {
   emitGroup?: { name: string; index: number };
   /**
    * Optional value transform applied at SPICE netlist emission only. Use when
-   * the digiTS internal unit differs from ngspice's expected netlist unit.
-   * Example: TEMP/TNOM are stored in Kelvin in digiTS but ngspice's parser
-   * adds CONSTCtoK (273.15), so they must be emitted in Celsius- the
-   * converter is `v => v - 273.15`. Storage and `getModelParam` are
+   * the digiTS internal unit differs from ngspice's expected netlist unit
+   * (example: TEMP/TNOM stored in Kelvin but emitted in Celsius via
+   * `v => v - 273.15`), or when a numeric digiTS encoding maps to a ngspice
+   * keyword value (example: a boolean stored as 0/1 emitted as `FALSE`/`TRUE`
+   * for an XSPICE MIF boolean model param). Storage and `getModelParam` are
    * unaffected.
    */
-  spiceConverter?: (value: number) => number;
+  spiceConverter?: (value: number) => number | string;
   /**
    * `true` if the param is emitted positionally on the instance line as a
    * bare value (no `KEY=`) and must NOT appear inside a `.model` card body.

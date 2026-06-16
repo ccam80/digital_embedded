@@ -90,6 +90,9 @@ export const ELEMENT_SPECS: Record<string, ElementSpec> = {
   // (e.g. Optocoupler). Same ngspice F-card; the sense V-source is identified
   // by a `{ kind: "ref" }` peer reference rather than user-facing sense pins.
   InternalCccs:    { prefix: "F" },
+  // XSPICE `hyst` analog code model: `a<name> %v(in) %v(out) <model>` with a
+  // `.model <model> hyst (...)` card. Ports single-ended v-type (hyst/ifspec.ifs:32-39).
+  Hyst:            { prefix: "a" },
   SwitchSPST:      { prefix: "S", modelType: "SW" },
   SwitchSPDT:      { prefix: "S", modelType: "SW" },
   Switch:          { prefix: "S", modelType: "SW" },
@@ -1072,6 +1075,24 @@ function emitPrimitive(
     );
   }
 
+  if (typeId === "Hyst") {
+    // XSPICE `hyst` analog code model (hyst/cfunc.mod cm_hyst). Both ports are
+    // single-ended v-type (hyst/ifspec.ifs:32-39), which ngspice's MIF parser
+    // takes as BARE ground-referenced node tokens (e.g. `a4 40 45 core1`,
+    // examples/xspice/.../analog_models2_dc.deck:33) - the `%vd(a b)` form is
+    // only for differential ports. Deck: `a<name> <in> <out> <model>` with a
+    // `.model <model> hyst (...)` card. pinLayout [in, out, gnd]; gnd is the
+    // implicit ground reference (node 0 when embedded), so only in/out mint deck
+    // tokens (matching deckNodeTokens).
+    const inNode = nodeAt(nodes, 0, rawLabel, "in");
+    const outNode = nodeAt(nodes, 1, rawLabel, "out");
+    const modelName = `${label}_hyst`;
+    if (!modelCards.has(modelName)) {
+      modelCards.set(modelName, modelCardSuffix(modelName, "hyst", paramDefs, props, emission));
+    }
+    return [`${label} ${inNode} ${outNode} ${modelName}`];
+  }
+
   throw new Error(
     `netlist-generator: typeId '${typeId}' (label='${rawLabel}') has an entry in ` +
     `ELEMENT_SPECS (prefix='${spec.prefix}') but no matching emit branch in ` +
@@ -1116,6 +1137,11 @@ function instanceParamSuffix(
     const v = def.spiceConverter ? def.spiceConverter(raw) : raw;
 
     if (def.emitGroup) {
+      // Grouped params are comma-joined numerics (the MOS IC triplet); a
+      // keyword-returning spiceConverter is never paired with emitGroup.
+      if (typeof v !== "number") {
+        throw new Error(`netlist-generator: emitGroup param '${def.key}' must convert to a number, got '${v}'`);
+      }
       let arr = groups.get(def.emitGroup.name);
       if (!arr) { arr = []; groups.set(def.emitGroup.name, arr); }
       arr.push({ index: def.emitGroup.index, value: v });
