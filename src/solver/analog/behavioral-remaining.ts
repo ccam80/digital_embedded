@@ -20,8 +20,8 @@ import { defineModelParams } from "../../core/model-params.js";
 //
 // Shared shape across both tri-state variants:
 //   loaded:    1 = loaded pin sub-elements (Loaded variants), 0 = unloaded.
-//   rOut/cOut: outPin's RC load (rOut feeds the Norton conductance inside
-//              BehavioralOutputDriver; cOut is a separate Capacitor child).
+//   rOut/cOut: outPin's RC load (rOut is the Thevenin output resistance, cOut
+//              the load capacitance, in the loaded output-pin composite).
 //   vOH/vOL:   driven analog rail voltages.
 //
 // The `behavioural` model is strictly 1-bit (matches mux precedent). Multi-

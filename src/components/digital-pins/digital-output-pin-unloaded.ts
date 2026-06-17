@@ -20,12 +20,11 @@
  *              ctrl = 0 → nDriveV = vOL;  ctrl = 1 → nDriveV = vOH.
  *   rOut     : Thevenin output resistance from nDriveV to node.
  *
- * The linear E-source replaces the threshold-snap Norton stamp used by the
- * old `BehavioralOutputDriver` leaf. Why linear: the discontinuity-free path
- * lets the Newton iteration converge in normal counts (no dt-collapse at
- * transition edges), and the Thevenin equivalent (target through R_out) is
- * exact at ctrl = 0 / ctrl = 1, which is where the digital-bit input
- * effectively sits in steady state.
+ * The linear E-source gives a discontinuity-free ctrl→rail path so the Newton
+ * iteration converges in normal counts (no dt-collapse at transition edges),
+ * and the Thevenin equivalent (target through R_out) is exact at ctrl = 0 /
+ * ctrl = 1, which is where the digital-bit input effectively sits in steady
+ * state.
  *
  * Hot-loadable params:
  *   - rOut → string-bound to Resistor.resistance.

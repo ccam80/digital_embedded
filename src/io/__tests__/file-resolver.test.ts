@@ -124,6 +124,29 @@ describe("HttpResolver", () => {
     await expect(resolver.resolve("Missing")).rejects.toThrow(ResolverNotFoundError);
   });
 
+  it("throws ResolverNotFoundError when an SPA catch-all returns index.html at 200", async () => {
+    // A missing subcircuit .dig on a dev/static server with an SPA fallback is
+    // answered with the app's index.html at HTTP 200. That HTML must be treated
+    // as not-found so the subcircuit loader skips the reference instead of
+    // feeding <html> into parseDigXml.
+    const fetchFn = vi.fn().mockResolvedValue({
+      ok: true,
+      text: async () =>
+        '<!DOCTYPE html>\n<html lang="en"><head><title>digiTS</title></head><body></body></html>',
+    });
+    const resolver = new HttpResolver("circuits/", fetchFn);
+    await expect(resolver.resolve("MissingSub")).rejects.toThrow(ResolverNotFoundError);
+  });
+
+  it("returns content for a real .dig with an <?xml prolog and leading BOM", async () => {
+    const fetchFn = vi.fn().mockResolvedValue({
+      ok: true,
+      text: async () => '﻿<?xml version="1.0"?>\n<circuit>real</circuit>',
+    });
+    const resolver = new HttpResolver("circuits/", fetchFn);
+    expect(await resolver.resolve("RealSub")).toContain("<circuit>real</circuit>");
+  });
+
   it("getBasePath and setBasePath", () => {
     const resolver = new HttpResolver("original/");
     expect(resolver.getBasePath()).toBe("original/");

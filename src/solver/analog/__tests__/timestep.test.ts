@@ -656,3 +656,72 @@ describe("Breakpoints", () => {
     expect(newDt).toBe(20e-6);
   });
 });
+
+// ---------------------------------------------------------------------------
+// XSPICE temporary-breakpoint backup tier
+//   cm_analog_set_temp_bkpt (cm.c:416-445) + the dctran.c:817-826 rewind.
+// ---------------------------------------------------------------------------
+
+describe("temp-breakpoint backup tier", () => {
+  // Reproduce the in-step clock: the engine advances CKTtime to `cktTime` with
+  // this step's `currentDt`, so the last accepted point is cktTime - currentDt.
+  // beginStepClock records CKTtime and resets breakpoint.current=1e30 (dctran.c:742).
+  function armed(cktTime: number, currentDt: number): TimestepController {
+    const ctrl = new TimestepController(DEFAULT_PARAMS);
+    ctrl.currentDt = currentDt;
+    ctrl.beginStepClock(cktTime);
+    return ctrl;
+  }
+
+  it("keeps_a_past_post_as_the_backup_trigger", () => {
+    // CKTtime=2µs, dt=1µs -> last accepted = 1µs. A post at 1.5µs is in the past
+    // relative to CKTtime but after the last accepted point -> kept (cm.c:426).
+    const ctrl = armed(2e-6, 1e-6);
+    ctrl.setTempBreakpoint(1.5e-6);
+    expect(ctrl.tempBreakpoint).toBe(1.5e-6);
+    // _tempBreakpoint < CKTtime is exactly the engine's backup condition.
+    expect(ctrl.tempBreakpoint).toBeLessThan(2e-6);
+  });
+
+  it("rewinds_and_lands_on_the_breakpoint_at_order_1", () => {
+    const ctrl = armed(2e-6, 1e-6);
+    ctrl.currentOrder = 2; // entered the step at order 2
+    ctrl.setTempBreakpoint(1.5e-6);
+
+    // Engine half (dctran.c:819): CKTtime -= CKTdelta, rewinding to 1µs.
+    const rewound = 2e-6 - 1e-6;
+    const newDt = ctrl.backupToTempBreakpoint(rewound); // dctran.c:818,820,826
+
+    expect(newDt).toBeCloseTo(0.5e-6, 15);          // CKTdelta = bkpt - CKTtime
+    expect(ctrl.currentDt).toBe(newDt);
+    expect(rewound + newDt).toBeCloseTo(1.5e-6, 15); // re-take lands on the bp
+    expect(ctrl.currentOrder).toBe(1);              // dctran.c:826
+  });
+
+  it("ignores_a_post_before_the_last_accepted_point", () => {
+    // cm.c:426 lower bound: time < (CKTtime - CKTdelta) + CKTminBreak -> ignored.
+    const ctrl = armed(2e-6, 1e-6); // last accepted = 1µs
+    ctrl.setTempBreakpoint(0.5e-6);
+    expect(ctrl.tempBreakpoint).toBe(Number.POSITIVE_INFINITY);
+  });
+
+  it("keeps_the_earliest_pending_breakpoint", () => {
+    // cm.c:441-442 take-min, across both forward and past posts.
+    const ctrl = armed(2e-6, 1e-6);
+    ctrl.setTempBreakpoint(3e-6);   // forward
+    expect(ctrl.tempBreakpoint).toBe(3e-6);
+    ctrl.setTempBreakpoint(1.5e-6); // earlier (past) -> wins
+    expect(ctrl.tempBreakpoint).toBe(1.5e-6);
+    ctrl.setTempBreakpoint(1.8e-6); // later -> ignored
+    expect(ctrl.tempBreakpoint).toBe(1.5e-6);
+  });
+
+  it("beginStepClock_resets_the_pending_breakpoint", () => {
+    // dctran.c:742 per-attempt reset so devices re-post each NR solve.
+    const ctrl = armed(2e-6, 1e-6);
+    ctrl.setTempBreakpoint(1.5e-6);
+    expect(ctrl.tempBreakpoint).toBe(1.5e-6);
+    ctrl.beginStepClock(3e-6);
+    expect(ctrl.tempBreakpoint).toBe(Number.POSITIVE_INFINITY);
+  });
+});

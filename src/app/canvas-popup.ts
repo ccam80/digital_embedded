@@ -27,7 +27,12 @@ export function createPopupController(
   deps: CanvasInteractionDeps,
 ): PopupController {
   let activePopup: HTMLElement | null = null;
+  let activeResizeObserver: ResizeObserver | null = null;
   function closePopup(): void {
+    if (activeResizeObserver) {
+      activeResizeObserver.disconnect();
+      activeResizeObserver = null;
+    }
     if (activePopup) {
       activePopup.remove();
       activePopup = null;
@@ -108,9 +113,6 @@ export function createPopupController(
     });
 
 
-    popup.style.left = `${Math.min(screenPt.x + 10, container.clientWidth - 200)}px`;
-    popup.style.top = `${Math.min(screenPt.y + 10, container.clientHeight - 200)}px`;
-
     // Drag support via header
     {
       let dragOffsetX = 0;
@@ -155,6 +157,30 @@ export function createPopupController(
 
     container.appendChild(popup);
     activePopup = popup;
+
+    // Position the popup near the double-click point but fully inside the
+    // canvas container. The container is overflow-clipped, so any part of the
+    // popup beyond its edges is unreachable; clamping against the popup's
+    // measured size (not a fixed height guess) keeps every row on-screen and
+    // lets the popup's own overflow-y:auto scrollbar cover tall content. The
+    // max-height (calc(100% - 16px)) caps offsetHeight to the container
+    // interior, so maxTop never drops below MARGIN.
+    const MARGIN = 8;
+    const clampIntoContainer = (desiredLeft: number, desiredTop: number): void => {
+      const maxLeft = container.clientWidth - popup.offsetWidth - MARGIN;
+      const maxTop = container.clientHeight - popup.offsetHeight - MARGIN;
+      popup.style.left = `${Math.max(MARGIN, Math.min(desiredLeft, maxLeft))}px`;
+      popup.style.top = `${Math.max(MARGIN, Math.min(desiredTop, maxTop))}px`;
+    };
+    clampIntoContainer(screenPt.x + 10, screenPt.y + 10);
+
+    // Expanding "Advanced Parameters" grows the popup after it is positioned;
+    // re-clamp on every size change so the grown popup never spills past the
+    // clipped container edge and its bottom rows stay reachable.
+    activeResizeObserver = new ResizeObserver(() => {
+      clampIntoContainer(popup.offsetLeft, popup.offsetTop);
+    });
+    activeResizeObserver.observe(popup);
   }
 
   return { closePopup, openPopup };

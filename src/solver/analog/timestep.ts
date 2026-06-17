@@ -111,6 +111,14 @@ export class TimestepController {
   private _isFirstGetClampedDt: boolean = true;
 
   /**
+   * ngspice CKTtime during the in-progress step- the advanced timepoint
+   * (last-accepted + currentDt). Set by beginStepClock() before each NR solve so
+   * setTempBreakpoint() classifies a post against CKTtime/CKTdelta exactly as
+   * cm_analog_set_temp_bkpt reads g_mif_info.ckt (cm.c:422-436).
+   */
+  private _cktTime: number = 0;
+
+  /**
    * XSPICE temporary breakpoint (g_mif_info.breakpoint.current).
    *
    * Default +Infinity- no temp bp pending. XSPICE-style event devices push
@@ -831,50 +839,83 @@ export class TimestepController {
   }
 
   /**
-   * Register an XSPICE-style temporary breakpoint (g_mif_info.breakpoint.current),
-   * matching cm_analog_set_temp_bkpt (cm.c:416-445). Event devices call this from
-   * element.acceptStep to land the next step on `time`: getClampedDt truncates dt
-   * so the step ends exactly on `time` (the temp-bp clamp) and the following call
-   * cuts CKTorder = 1 (dctran.c:525-526).
+   * Register an XSPICE temporary breakpoint, matching cm_analog_set_temp_bkpt
+   * (cm.c:416-445). Boundary devices call this from load() during the NR solve.
+   * The solver then either clamps the next step onto a future `time`
+   * (getClampedDt, dctran.c:589-597) or, when `time` lands between the last
+   * accepted point and CKTtime, abandons the step and backs up onto it (the
+   * engine backup branch, dctran.c:817-826).
    *
-   * Guards mirror cm.c:
-   *  - +Infinity clears the slot- the per-step reset (ngspice resets
-   *    breakpoint.current to 1e30 at dctran.c:742 so devices re-post each step);
-   *  - a time at or before the last accepted timepoint is ignored- digiTS posts
-   *    forward-only and does not implement the cm.c:426 backup tier (abandon the
-   *    current step to hit a past breakpoint);
-   *  - a time within minBreak of a permanent breakpoint or of the current time is
-   *    discarded (cm.c:432-438);
-   *  - otherwise the earliest pending temp breakpoint is kept (cm.c:441-442).
+   * Guards mirror cm.c against the in-progress CKTtime (_cktTime) / CKTdelta
+   * (currentDt):
+   *  - +Infinity clears the slot- the per-step reset (beginStepClock; ngspice
+   *    resets breakpoint.current to 1e30 at dctran.c:742 so devices re-post);
+   *  - cm.c:426- a time before the last accepted point ((CKTtime - CKTdelta) +
+   *    CKTminBreak) is ignored;
+   *  - cm.c:432-438- a time within minBreak of a permanent breakpoint or of
+   *    CKTtime is discarded;
+   *  - cm.c:441-442- otherwise the earliest pending temp breakpoint is kept.
    */
   setTempBreakpoint(time: number): void {
-    // +Infinity clears the slot (mif_inp2.c initializes it to 1e30). Bypasses the
-    // guards so the engine's per-step reset always takes effect.
+    // +Infinity clears the slot. Bypasses the guards so beginStepClock's
+    // per-step reset always takes effect (cm.c initializes to 1e30).
     if (!isFinite(time)) {
       this._tempBreakpoint = time;
       return;
     }
 
-    // cm.c:426- forward-only: a time at or before the last accepted point would
-    // require the backup tier digiTS does not implement; ignore it.
-    if (time <= this._lastAcceptedSimTime) return;
+    // cm.c:426- reject only a time before the last accepted timepoint. A time in
+    // [last-accepted, CKTtime) survives as the backup trigger (_tempBreakpoint <
+    // _cktTime), read by the engine's backup branch.
+    if (time < (this._cktTime - this.currentDt) + this._minBreak) return;
 
     // cm.c:432-438- discard if within minBreak of a permanent breakpoint
-    // (CKTbreaks[0]/[1]) or of the current time.
+    // (CKTbreaks[0]/[1]) or of the current time CKTtime.
     const t0 = this._breakpoints[0];
     const t1 = this._breakpoints[1];
     if (
       (t0 !== undefined && Math.abs(time - t0) < this._minBreak) ||
       (t1 !== undefined && Math.abs(time - t1) < this._minBreak) ||
-      Math.abs(time - this._lastAcceptedSimTime) < this._minBreak
+      Math.abs(time - this._cktTime) < this._minBreak
     ) {
       return;
     }
 
-    // cm.c:441-442- keep the earliest pending temp breakpoint.
+    // cm.c:441-442- keep the earliest pending temp breakpoint (take-min).
     if (time < this._tempBreakpoint) {
       this._tempBreakpoint = time;
     }
+  }
+
+  /**
+   * dctran.c:727,742- at the top of each NR attempt, record the advanced CKTtime
+   * (for the setTempBreakpoint guards) and reset breakpoint.current to its 1e30
+   * sentinel so boundary devices re-post their temp breakpoints during this solve.
+   */
+  beginStepClock(cktTime: number): void {
+    this._cktTime = cktTime;
+    this._tempBreakpoint = Number.POSITIVE_INFINITY;
+  }
+
+  /**
+   * Controller half of the XSPICE backup (dctran.c:818-826). The engine has
+   * already rewound CKTtime to `rewoundSimTime` (CKTtime -= CKTdelta); this saves
+   * CKTsaveDelta, computes the dt that lands the re-taken step exactly on the
+   * pending temp breakpoint, records breakpoint.last, and cuts CKTorder to 1.
+   * Returns the new dt (CKTdelta).
+   */
+  backupToTempBreakpoint(rewoundSimTime: number): number {
+    this._savedDelta = this.currentDt;                  // CKTsaveDelta = CKTdelta
+    const dt = this._tempBreakpoint - rewoundSimTime;   // CKTdelta = breakpoint.current - CKTtime
+    this.currentDt = dt;
+    this._lastTempBreakpoint = rewoundSimTime + dt;     // breakpoint.last = CKTtime + CKTdelta
+    this.currentOrder = 1;                              // CKTorder = 1 (dctran.c:826)
+    return dt;
+  }
+
+  /** g_mif_info.breakpoint.current- read by the engine backup test (dctran.c:817). */
+  get tempBreakpoint(): number {
+    return this._tempBreakpoint;
   }
 
 }

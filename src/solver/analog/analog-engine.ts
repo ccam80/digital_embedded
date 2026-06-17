@@ -441,6 +441,13 @@ export class MNAEngine implements AnalogEngine {
       // local `optime` while leaving CKTtime untouched.
       if (!this._holdCircuitTime) cac.timeRef.value = this._simTime;
 
+      // ngspice dctran.c:727,742- CKTtime is now advanced; record it for the
+      // setTempBreakpoint guards and reset breakpoint.current=1e30 so boundary
+      // devices re-post their temp breakpoints during this NR solve. The forward
+      // clamp already consumed the prior step's posts in getClampedDt (line 384,
+      // before this loop).
+      this._timestep.beginStepClock(this._simTime);
+
       // ngspice's NIpred predictor is undef'd in default builds
       // (ref/ngspice/visualc/include/ngspice/config.h:475 `/* #undef PREDICTOR */`,
       // doc/ngspice.texi:693-696 "enabling it is NOT considered safe"). Both
@@ -613,6 +620,21 @@ export class MNAEngine implements AnalogEngine {
           ctx.cktMode = (ctx.cktMode & MODEUIC) | MODETRAN | MODEINITTRAN;
         }
         // fall through to delmin check below
+      } else if (this._timestep.tempBreakpoint < this._simTime) {
+        // --- BACKUP (ngspice dctran.c:813-828, XSPICE) ---
+        // NR converged, but a boundary device posted a temp breakpoint in the
+        // past (an asynchronous edge this step overstepped). Abandon the step,
+        // rewind to the last accepted time, and re-take it landing exactly on
+        // the breakpoint at order 1. ngspice does NOT restore CKTrhs/CKTrhsOld
+        // here (dctran.c:817-826 only rewinds CKTtime + sets CKTdelta/order),
+        // identical to the LTE-reject path.
+        this.stepPhaseHook?.onAttemptEnd("backupRetry", true);
+        this._simTime -= dt;                                        // dctran.c:819
+        dt = this._timestep.backupToTempBreakpoint(this._simTime);  // dctran.c:818,820,821,826
+        if (this._stepCount === 0 && statePool) {                   // dctran.c:823-825 firsttime
+          ctx.cktMode = (ctx.cktMode & MODEUIC) | MODETRAN | MODEINITTRAN;
+        }
+        // fall through to delmin check below, then loop to re-take the step.
       } else {
         // --- NR CONVERGED- evaluate LTE (ngspice dctran.c:830+) ---
         this._timestep.currentDt = dt;
@@ -1859,7 +1881,7 @@ export class MNAEngine implements AnalogEngine {
    */
   stepPhaseHook: {
     onAttemptBegin(phase: DcOpNRPhase | "tranInit" | "tranPredictor" | "tranNR", dt: number): void;
-    onAttemptEnd(outcome: DcOpNRAttemptOutcome | "accepted" | "nrFailedRetry" | "lteRejectedRetry" | "finalFailure" | "tranPhaseHandoff", converged: boolean): void;
+    onAttemptEnd(outcome: DcOpNRAttemptOutcome | "accepted" | "nrFailedRetry" | "lteRejectedRetry" | "backupRetry" | "finalFailure" | "tranPhaseHandoff", converged: boolean): void;
   } | null = null;
 
   // -------------------------------------------------------------------------

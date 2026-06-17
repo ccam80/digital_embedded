@@ -180,8 +180,31 @@ export class HttpResolver implements FileResolver {
     if (!response.ok) {
       throw new ResolverNotFoundError(name);
     }
-    return response.text();
+    const body = await response.text();
+    // A dev/static server with an SPA catch-all answers a missing file with its
+    // index.html at HTTP 200, so response.ok does not distinguish "here is the
+    // .dig" from "here is the app page". A .dig is XML rooted at <circuit> (with
+    // an optional <?xml prolog) and never an HTML document, so an HTML body means
+    // the subcircuit file is absent. Surface it as not-found: the subcircuit
+    // loader then skips this reference (subcircuit-loader.ts loadRecursive)
+    // exactly as it does for a genuine 404, instead of feeding <html> into
+    // parseDigXml.
+    if (isHtmlDocument(body)) {
+      throw new ResolverNotFoundError(name);
+    }
+    return body;
   }
+}
+
+/**
+ * True when `text` is an HTML document rather than a circuit file. Matches the
+ * SPA fallback page (index.html) a dev/static server returns at HTTP 200 for a
+ * missing path. Checks the leading token after any BOM/whitespace; .dig content
+ * opens with `<?xml` or `<circuit`, never `<!doctype html` or `<html`.
+ */
+function isHtmlDocument(text: string): boolean {
+  const head = text.replace(/^﻿/, '').trimStart().slice(0, 64).toLowerCase();
+  return head.startsWith('<!doctype html') || head.startsWith('<html');
 }
 
 // ---------------------------------------------------------------------------
