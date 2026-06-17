@@ -401,20 +401,18 @@ describe('StatePool', () => {
   });
 
   describe('post-accept rotation invariant (framework-level)', () => {
-    // Canonisation of the per-component check the §3 audit deleted from
-    // src/components/sensors/__tests__/spark-gap-rollback.test.ts. The
-    // invariant is the engine's responsibility, not any individual element's,
-    // so it is asserted once across every pool-backed element of a
-    // representative steady-state circuit.
+    // The rotation contract: rotateStateVectors() is a pointer swap run once
+    // at the head of each accepted transient step (analog-engine.ts:426-428),
+    // so whatever sat in state0 at the close of step k must reappear in state1
+    // at the close of step k+1 (the recycled-buffer continuity in
+    // state-pool.ts:112-119). This is a rotation-CONTINUITY invariant across
+    // adjacent steps, not a same-step state0===state1 identity: state0 and
+    // state1 hold different timepoints once any slot evolves.
     //
-    // Why VRC at DC steady state: with a DC source and a fully-charged
-    // capacitor, no slot evolves between accepted steps. After
-    // _seedFromDcop runs, state1 = state0 = DCOP. The first transient step
-    // rotates (state1 <- old state0 = DCOP) and NR refills state0 to the
-    // same DCOP-equivalent values (the circuit has nowhere else to go), so
-    // state0[i] === state1[i] for every pool slot of every pool-backed
-    // element. Any divergence is honest signal that an element wrote a slot
-    // path that escapes the rotation contract.
+    // VRC is the carrier circuit: a DC source charging a capacitor through a
+    // resistor. Slots evolve step to step (the cap charges), so this exercises
+    // continuity with genuinely distinct state0/state1 values rather than a
+    // degenerate steady state where the two happen to coincide.
     function buildVrcSteadyState(facade: DefaultSimulatorFacade): Circuit {
       return facade.build({
         components: [
@@ -432,15 +430,22 @@ describe('StatePool', () => {
       });
     }
 
-    it('pool_state0_state1_agree_slot_for_slot_after_accepted_step', () => {
+    it('state1_after_step_equals_state0_captured_before_step', () => {
       const fix = buildFixture({
         build: (_r, facade) => buildVrcSteadyState(facade),
       });
 
-      // buildFixture already ran one warm-start step. Verify the invariant
-      // across every pool-backed element's full slot range.
       const poolBacked = fix.circuit.elements.filter(isPoolBacked);
       expect(poolBacked.length).toBeGreaterThan(0);
+
+      // Snapshot every pool slot of state0 at the close of step k (the
+      // warm-start step buildFixture already ran).
+      const snapshot = Float64Array.from(fix.pool.state0);
+
+      // Take step k+1. The rotation at the head of the step moves the
+      // state0-at-k buffer into state1, so after acceptance state1 must equal
+      // the snapshot slot-for-slot.
+      fix.coordinator.step();
 
       for (const el of poolBacked) {
         const base = el._stateBase;
@@ -450,25 +455,28 @@ describe('StatePool', () => {
           const slotName = el.stateSchema.slots[s]?.name ?? `slot_${s}`;
           const label = fix.elementLabels.get(el.elementIndex!) ?? el.label;
           expect(
-            fix.pool.state0[i],
-            `state0[${i}] (${label}.${slotName}) must equal state1[${i}]`,
-          ).toBe(fix.pool.state1[i]);
+            fix.pool.state1[i],
+            `state1[${i}] (${label}.${slotName}) after step k+1 must equal `
+            + `state0[${i}] captured at the close of step k`,
+          ).toBe(snapshot[i]);
         }
       }
     });
 
-    it('invariant_persists_across_multiple_accepted_steps', () => {
+    it('rotation_continuity_persists_across_multiple_accepted_steps', () => {
       const fix = buildFixture({
         build: (_r, facade) => buildVrcSteadyState(facade),
       });
 
-      // Drive a few additional accepted steps. The DC source + steady-state
-      // cap leaves nothing to evolve, so each rotate-then-NR-then-accept
-      // round must re-establish state0 === state1 across every slot.
+      const poolBacked = fix.circuit.elements.filter(isPoolBacked);
+
+      // Walk several accepted steps. At each step, the state0 captured before
+      // stepping must reappear verbatim as state1 after stepping — the
+      // pointer-swap rotation carries it across the boundary.
       for (let k = 0; k < 3; k++) {
+        const snapshot = Float64Array.from(fix.pool.state0);
         fix.coordinator.step();
 
-        const poolBacked = fix.circuit.elements.filter(isPoolBacked);
         for (const el of poolBacked) {
           const base = el._stateBase;
           for (let s = 0; s < el.stateSize; s++) {
@@ -476,12 +484,109 @@ describe('StatePool', () => {
             const slotName = el.stateSchema.slots[s]?.name ?? `slot_${s}`;
             const label = fix.elementLabels.get(el.elementIndex!) ?? el.label;
             expect(
-              fix.pool.state0[i],
-              `step ${k + 1}: state0[${i}] (${label}.${slotName}) must equal state1[${i}]`,
-            ).toBe(fix.pool.state1[i]);
+              fix.pool.state1[i],
+              `step ${k + 1}: state1[${i}] (${label}.${slotName}) must equal `
+              + `state0[${i}] captured before the step`,
+            ).toBe(snapshot[i]);
           }
         }
       }
+    });
+  });
+
+  describe('LTE-rejection rollback invariant (framework-level)', () => {
+    // The rollback invariant is DISTINCT from the rotation-continuity
+    // invariant above. Rotation continuity asks "does an accepted step carry
+    // state0 forward into state1?". Rollback asks "when a step is REJECTED for
+    // LTE, rewound, and retried at a smaller dt, is the last-accepted state
+    // preserved rather than corrupted by the rejected attempt?".
+    //
+    // Mechanism (analog-engine.ts:426-428 + the for(;;) retry loop):
+    // rotateStateVectors() runs ONCE at the head of each step, BEFORE the
+    // retry loop. So state1 := state0-at-last-accept. On an LTE rejection the
+    // engine rewinds simTime and shrinks dt (analog-engine.ts:683-694) but
+    // does NOT re-rotate — the retry NR refills state0 while state1 keeps the
+    // last-accepted values. Therefore, after a rejected-then-retried step
+    // finally accepts, state1 must still equal the state0 snapshot taken at
+    // the close of the previous accepted step.
+    //
+    // Deterministic trigger: a square-wave-driven series RLC (R=10 Ω,
+    // L=1 mH, C=1 µF → f₀ ≈ 5 kHz) excited at 1 kHz with a coarse
+    // maxTimeStep=50 µs. The sharp flux ramps at each square-wave edge force
+    // getLteTimestep to propose dt below the executed step, so LTE rejection
+    // reliably fires within the run (the assertion is REACHED, not skipped).
+    function buildSeriesRlc(facade: DefaultSimulatorFacade): Circuit {
+      return facade.build({
+        components: [
+          { id: 'vs',  type: 'AcVoltageSource', props: { label: 'V1', amplitude: 5, frequency: 1000, waveform: 'square' } },
+          { id: 'r1',  type: 'Resistor',        props: { label: 'R1', resistance: 10 } },
+          { id: 'l1',  type: 'Inductor',        props: { label: 'L1', inductance: 1e-3 } },
+          { id: 'c1',  type: 'Capacitor',       props: { label: 'C1', capacitance: 1e-6 } },
+          { id: 'gnd', type: 'Ground' },
+        ],
+        connections: [
+          ['vs:pos', 'r1:pos'],
+          ['r1:neg', 'l1:pos'],
+          ['l1:neg', 'c1:pos'],
+          ['c1:neg', 'gnd:out'],
+          ['vs:neg', 'gnd:out'],
+        ],
+      });
+    }
+
+    it('state1_after_rejected_step_equals_last_accepted_snapshot', () => {
+      const tStop = 3 / 1000;
+      const fix = buildFixture({
+        build: (_r, facade) => buildSeriesRlc(facade),
+        params: { tStop, maxTimeStep: 50e-6 },
+      });
+      fix.coordinator.setConvergenceLogEnabled(true);
+
+      const poolBacked = fix.circuit.elements.filter(isPoolBacked);
+      expect(poolBacked.length).toBeGreaterThan(0);
+
+      // Walk the transient. Before each step, snapshot state0 (the
+      // last-accepted state). After the step, read its convergence record; the
+      // first step whose record has lteRejected === true is the one whose
+      // last-accepted state must survive the rejection: state1-after must equal
+      // the pre-step snapshot.
+      let rejectedStepFound = false;
+      let prevTime = fix.engine.simTime;
+      while (fix.engine.simTime < tStop) {
+        const snapshot = Float64Array.from(fix.pool.state0);
+        const logBefore = fix.coordinator.getConvergenceLog()!.length;
+
+        fix.coordinator.step();
+
+        expect(fix.engine.simTime).toBeGreaterThan(prevTime);
+        prevTime = fix.engine.simTime;
+
+        const log = fix.coordinator.getConvergenceLog()!;
+        // The step just taken appended exactly one accepted record.
+        const rec = log[logBefore];
+        if (rec !== undefined && rec.lteRejected === true) {
+          for (const el of poolBacked) {
+            const base = el._stateBase;
+            for (let s = 0; s < el.stateSize; s++) {
+              const i = base + s;
+              const slotName = el.stateSchema.slots[s]?.name ?? `slot_${s}`;
+              const label = fix.elementLabels.get(el.elementIndex!) ?? el.label;
+              expect(
+                fix.pool.state1[i],
+                `rolled-back step: state1[${i}] (${label}.${slotName}) must `
+                + `equal the last-accepted state0[${i}] snapshot taken before `
+                + `the rejected step`,
+              ).toBe(snapshot[i]);
+            }
+          }
+          rejectedStepFound = true;
+          break;
+        }
+      }
+
+      // The deterministic RLC excitation guarantees a rejection; if this fails
+      // the trigger has stopped firing and the assertions above never ran.
+      expect(rejectedStepFound).toBe(true);
     });
   });
 
