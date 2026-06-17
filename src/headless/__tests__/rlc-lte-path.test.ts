@@ -74,6 +74,11 @@ describe('LTE/composite-tolerance path- MCP (facade) surface', () => {
 
     const engine = facade.compile(circuit);
 
+    // Warm-start the deferred DCOP at Vs=0 so the cap seeds at 0 V (t=0
+    // boundary) before the source kick; clockAdvance:false keeps the schedule
+    // clock at its start so the transient begins at t=0.
+    facade.step(engine, { clockAdvance: false });
+
     // Hot-update the DC source to 5 V- relies on the hot-loadable guarantee.
     facade.setSignal(engine, 'Vs', 5);
 
@@ -124,6 +129,11 @@ describe('LTE/composite-tolerance path- MCP (facade) surface', () => {
     });
 
     const engine = facade.compile(circuit);
+
+    // Warm-start the deferred DCOP at Vs=0 so the inductor seeds at 0 A (t=0
+    // boundary) before the source kick; clockAdvance:false keeps the schedule
+    // clock at its start so the transient begins at t=0.
+    facade.step(engine, { clockAdvance: false });
 
     // Hot-update to 1 V
     facade.setSignal(engine, 'Vs', 1);

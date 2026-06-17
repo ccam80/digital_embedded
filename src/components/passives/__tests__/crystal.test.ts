@@ -70,6 +70,72 @@ function nodeOf(fix: ReturnType<typeof buildFixture>, label: string): number {
 }
 
 // ---------------------------------------------------------------------------
+// AC resonator topology: V_AC -> xtal -> R_load -> GND.
+//
+// The BVD motional arm (R_s, L_s, C_s) has its series resonance at
+// f_s = 1/(2π√(L_s·C_s)). With frequency=1e6 and C_s=2e-14, L_s and C_s are
+// chosen so f_s = 1 MHz. At f_s the motional arm impedance collapses to ~R_s,
+// so the V_AC / (xtal ∥ C_0) / R_load divider passes a large signal to
+// xtal:neg. Both `frequency` (which sets L_s and shifts f_s) and
+// `qualityFactor` (which sets R_s and thus the divider depth at resonance)
+// move the complex AC node voltage at xtal:neg — the observable the DC-block
+// topology cannot expose (R_s/L_s carry ~0 current at a DC operating point).
+// ---------------------------------------------------------------------------
+
+interface AcResonatorParams {
+  frequency?: number;
+  qualityFactor?: number;
+  motionalCapacitance?: number;
+  shuntCapacitance?: number;
+  rLoad?: number;
+}
+
+function buildAcResonatorCircuit(facade: DefaultSimulatorFacade, p: AcResonatorParams): Circuit {
+  return facade.build({
+    components: [
+      { id: "vac", type: "AcVoltageSource", props: {
+          label: "vac",
+          amplitude: 0.1,
+          frequency: p.frequency ?? 1e6,
+          waveform: "sine",
+      } },
+      { id: "xtal", type: "QuartzCrystal", props: {
+          label: "xtal",
+          frequency: p.frequency ?? 1e6,
+          qualityFactor: p.qualityFactor ?? 1000,
+          motionalCapacitance: p.motionalCapacitance ?? 2e-14,
+          shuntCapacitance: p.shuntCapacitance ?? 5e-12,
+      } },
+      { id: "rload", type: "Resistor", props: { label: "rload", resistance: p.rLoad ?? 1000 } },
+      { id: "gnd", type: "Ground", props: { label: "gnd" } },
+    ],
+    connections: [
+      ["vac:pos", "xtal:pos"],
+      ["xtal:neg", "rload:pos"],
+      ["rload:neg", "gnd:out"],
+      ["vac:neg", "gnd:out"],
+    ],
+  });
+}
+
+// Complex magnitude of the AC solution at a node, at the single sweep point
+// nearest the series resonance (1 MHz). `acAnalysis` relinearises at DC then
+// solves the complex MNA system per frequency; the magnitude at xtal:neg is
+// the divider response and depends on the motional R_s / L_s.
+function acMagAtResonance(fix: ReturnType<typeof buildFixture>, node: string): number {
+  const res = fix.coordinator.acAnalysis({
+    type: "lin",
+    numPoints: 1,
+    fStart: 1e6,
+    fStop: 1e6,
+    outputNodes: [node],
+  })!;
+  const re = res.real.get(node)!;
+  const im = res.imag.get(node)!;
+  return Math.hypot(re[0], im[0]);
+}
+
+// ---------------------------------------------------------------------------
 // QuartzCrystal initialization (T1) — Cat 1
 // ---------------------------------------------------------------------------
 
@@ -136,40 +202,39 @@ describe("QuartzCrystal DCOP analytical (T1)", () => {
 // changes when each documented parameter is hot-loaded.
 
 describe("QuartzCrystal parameter hot-load (T1)", () => {
-  it("hotload_frequency_changes_transient_response", () => {
-    // Cat 4: frequency feeds L_s (1/f^2) and R_s (linear in f).
-    // At a non-DC step, swapping f shifts both L_s and R_s and therefore
-    // the integrated companion-current contribution; expect V(xtal:neg)
-    // to differ between two different frequencies at a comparable step.
+  it("hotload_frequency_changes_ac_resonance_response", () => {
+    // Cat 4: frequency feeds L_s = 1/(4π²f²C_s) and R_s = 2πf·L_s/Q. The
+    // DC-block topology cannot expose this — at a DC operating point the
+    // motional arm (R_s, L_s) carries ~0 current through the blocking C_s, so
+    // a change in L_s/R_s leaves V(xtal:neg) untouched. The AC resonator
+    // probes the series resonance: hot-loading frequency shifts f_s away from
+    // the 1 MHz sweep point, collapsing the divider response at xtal:neg.
     const fix = buildFixture({
-      build: (_r, facade) => buildDcBlockCircuit(facade, { V: 1.0, rBleed: 1e9, frequency: 1e6 }),
+      build: (_r, facade) => buildAcResonatorCircuit(facade, { frequency: 1e6 }),
     });
-    fix.coordinator.step();
-    fix.coordinator.step();
-    const before = fix.engine.getNodeVoltage(nodeOf(fix, "xtal:neg"));
+    const before = acMagAtResonance(fix, "xtal:neg");
 
     const xtalEl = fix.element("xtal");
-    fix.coordinator.setComponentProperty(xtalEl, "frequency", 1e7);
-    fix.coordinator.step();
-    const after = fix.engine.getNodeVoltage(nodeOf(fix, "xtal:neg"));
+    fix.coordinator.setComponentProperty(xtalEl, "frequency", 1.01e6);
+    const after = acMagAtResonance(fix, "xtal:neg");
     expect(after).not.toBeCloseTo(before);
   });
 
-  it("hotload_qualityFactor_changes_transient_response", () => {
-    // Cat 4: Q only enters R_s = 2*pi*f*L_s/Q; raising Q drops R_s,
-    // which changes the motional-arm conductance stamp and the resulting
-    // node voltage at a transient step.
+  it("hotload_qualityFactor_changes_ac_resonance_response", () => {
+    // Cat 4: Q enters only R_s = 2πf·L_s/Q. At a DC operating point R_s sits
+    // in series with the blocking C_s and carries ~0 current, so the DC-block
+    // topology cannot expose a Q change. At series resonance the motional arm
+    // impedance collapses to ~R_s, so R_s sets the divider depth at xtal:neg;
+    // raising Q lowers R_s and raises the AC response. Probe at the 1 MHz
+    // resonance point and assert the magnitude moves.
     const fix = buildFixture({
-      build: (_r, facade) => buildDcBlockCircuit(facade, { V: 1.0, rBleed: 1e9, qualityFactor: 1000 }),
+      build: (_r, facade) => buildAcResonatorCircuit(facade, { qualityFactor: 1000 }),
     });
-    fix.coordinator.step();
-    fix.coordinator.step();
-    const before = fix.engine.getNodeVoltage(nodeOf(fix, "xtal:neg"));
+    const before = acMagAtResonance(fix, "xtal:neg");
 
     const xtalEl = fix.element("xtal");
     fix.coordinator.setComponentProperty(xtalEl, "qualityFactor", 50000);
-    fix.coordinator.step();
-    const after = fix.engine.getNodeVoltage(nodeOf(fix, "xtal:neg"));
+    const after = acMagAtResonance(fix, "xtal:neg");
     expect(after).not.toBeCloseTo(before);
   });
 

@@ -227,8 +227,9 @@ describe("ProgramCounter  bridge / digital (T1)", () => {
   it("jump_then_increment_continues_from_loaded_value", () => {
     // Cat 9: documented sequence used by CPU PC - branch-then-fetch. Load
     // D=1 (jump target), then switch to increment - the next rising edge
-    // advances the counter from the loaded value to loaded+1, and Q
-    // observes that advanced value on the same step.
+    // advances the counter from the loaded value by one, modulo 2^bitWidth,
+    // and Q observes that advanced value on the same step. At bitWidth=1 the
+    // increment of the loaded value 1 wraps: (1 + 1) & 0b1 = 0.
     const fix = buildPcFixture();
     fix.coordinator.writeByLabel("DRIVE_D", digital(1));
     fix.coordinator.writeByLabel("DRIVE_EN", digital(0));
@@ -237,12 +238,13 @@ describe("ProgramCounter  bridge / digital (T1)", () => {
     clockCycle(fix);
     expect(fix.coordinator.readByLabel("OBS_Q")).toMatchObject({ type: "digital", value: 1 });
 
-    // Switch to increment mode. Counter advances 1 -> 2.
+    // Switch to increment mode. Counter advances from the loaded 1 by one,
+    // wrapping at the 1-bit width: (1 + 1) & 0b1 = 0.
     fix.coordinator.writeByLabel("DRIVE_LD", digital(0));
     fix.coordinator.writeByLabel("DRIVE_EN", digital(1));
 
     clockCycle(fix);
-    expect(fix.coordinator.readByLabel("OBS_Q")).toMatchObject({ type: "digital", value: 2 });
+    expect(fix.coordinator.readByLabel("OBS_Q")).toMatchObject({ type: "digital", value: 0 });
 
     fix.coordinator.dispose();
   });

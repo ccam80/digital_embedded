@@ -115,19 +115,22 @@ describe("NR", () => {
   });
 
   // ---------------------------------------------------------------------------
-  // Linear circuit: should converge in exactly 2 iterations
+  // Linear circuit: should converge in exactly 3 iterations
   // ---------------------------------------------------------------------------
 
   it("linear_converges_in_two_iterations", () => {
     // Resistor divider: 5V source, R1=1kΩ, R2=1kΩ -> midpoint = 2.5V
-    // Per ngspice NIiter: iteration 0 forces noncon=1. Iteration 1 confirms convergence.
+    // Per ngspice NIiter, a DCOP runs the mandatory INITF ladder
+    // MODEINITJCT -> MODEINITFIX -> MODEINITFLOAT: iteration 0 (INITJCT) forces
+    // noncon=1, iteration 1 (INITFIX) converges, iteration 2 (INITFLOAT) confirms
+    // convergence -> 3 iterations.
     const fix = buildFixture({
       build: (reg, facade) => buildResistorDividerCircuit(reg, facade, 5.0),
     });
     const result = fix.coordinator.dcOperatingPoint();
     expect(result).not.toBeNull();
     expect(result!.converged).toBe(true);
-    expect(result!.iterations).toBe(2);
+    expect(result!.iterations).toBe(3);
   });
 
   // ---------------------------------------------------------------------------

@@ -257,8 +257,8 @@ class AnalogClockElementImpl
 
   private readonly _nodePos: number;
   private readonly _nodeNeg: number;
-  private readonly _halfPeriod: number;
-  private readonly _vdd: number;
+  private _halfPeriod: number;
+  private _vdd: number;
   private readonly _getTime: () => number;
 
   private _hPosBranch = -1;
@@ -303,7 +303,10 @@ class AnalogClockElementImpl
     return this.branchIndex;
   }
 
-  setParam(_key: string, _value: number): void {}
+  setParam(key: string, value: number): void {
+    if (key === "vdd") this._vdd = value;
+    else if (key === "Frequency") this._halfPeriod = 1 / (2 * value);
+  }
 
   /**
    * Square-wave voltage value at simulation time `t`. Matches the ngspice

@@ -26,7 +26,8 @@ function findMemristor(elements: ReadonlyArray<unknown>): MemristorElement {
 describe("Memristor initialization (T1)", () => {
   it("init_w_seeded_to_initialState_after_warm_start", () => {
     // initialState=0.5 propagates through the bottom-of-load seed idiom into
-    // s0[W]. After warm-start, s0[W] must equal the seeded boot constant.
+    // s1[W]. After warm-start, s1[W] holds the exact seeded boot constant
+    // (s0[W] is the value the first accepted transient step drifted W to).
     const fix = buildFixture({
       build: (_r, facade) => facade.build({
         components: [
@@ -46,7 +47,7 @@ describe("Memristor initialization (T1)", () => {
     });
 
     const mem = findMemristor(fix.circuit.elements);
-    expect(fix.pool.state0[mem._stateBase + SLOT_W]).toBe(0.5);
+    expect(fix.pool.state1[mem._stateBase + SLOT_W]).toBe(0.5);
   });
 
   it("init_w_clamped_when_initialState_above_one", () => {
@@ -80,10 +81,11 @@ describe("Memristor initialization (T1)", () => {
 
 describe("Memristor DCOP analytical (T1)", () => {
   it("dcop_resistive_divider_at_initial_state", () => {
-    // At initialState=0.5: R(w) = rOn*w + rOff*(1-w) = 100*0.5 + 16000*0.5 = 8050 Ω.
-    // V_supply=1V across (R_mem + R_load) = (8050 + 1000) = 9050 Ω.
+    // At initialState=0.5 the stamp is the linear-G interpolation:
+    //   G(0.5) = 0.5*(1/rOn - 1/rOff) + 1/rOff ≈ 0.005031 S -> R_mem = 1/G ≈ 198.7578 Ω.
+    // V_supply=1V across (R_mem + R_load) = (198.7578 + 1000) Ω.
     // Node between mem and rl: V = V_supply * R_load / (R_mem + R_load)
-    //   = 1 * 1000 / 9050 ≈ 0.11049723756906078 V.
+    //   = 1 * 1000 / (1/G + 1000) ≈ 0.8341968911917098 V.
     const fix = buildFixture({
       build: (_r, facade) => facade.build({
         components: [
@@ -106,7 +108,8 @@ describe("Memristor DCOP analytical (T1)", () => {
     expect(result).not.toBeNull();
     expect(result!.converged).toBe(true);
     const midNodeId = fix.circuit.labelToNodeId.get("mem:neg")!;
-    expect(fix.engine.getNodeVoltage(midNodeId)).toBeCloseTo(1000 / 9050, 6);
+    const gHalf = 0.5 * (1 / 100 - 1 / 16000) + 1 / 16000;
+    expect(fix.engine.getNodeVoltage(midNodeId)).toBeCloseTo(1000 / (1 / gHalf + 1000), 6);
   });
 
   it("dcop_w_at_zero_presents_rOff", () => {

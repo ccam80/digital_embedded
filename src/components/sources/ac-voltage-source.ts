@@ -39,6 +39,7 @@ import { parseExpression, evaluateExpression, ExprParseError } from "../../solve
 import type { ExprNode } from "../../solver/analog/expression.js";
 import { defineModelParams } from "../../core/model-params.js";
 import { almostEqualUlps } from "../../solver/analog/timestep.js";
+import { SeededRng } from "../../solver/analog/monte-carlo.js";
 
 // ---------------------------------------------------------------------------
 // Waveform computation
@@ -73,22 +74,116 @@ export enum FunctionType {
 
 /**
  * Deterministic transient-noise generator state (ngspice `struct trnoise_state`,
- * frontend 1-f-code.c). Constructed by `trnoise_state_init` and sampled by
- * `trnoise_state_get` in the `maths-misc#recon/randnumb` reconstruction. The
- * TRNOISE load() arm (vsrcload.c:356-398) interpolates two consecutive samples
- * around floor(time/TS), adds the RTS step when RTSAM>0, and adds the DC value.
+ * 1-f-code.h). This class ports the ring-buffer sample cache
+ * (`struct trnoise_state`, 1-f-code.h:8-24), `trnoise_state_push`
+ * (1-f-code.h:42-46), `trnoise_state_get` (1-f-code.h:49-62), and
+ * `trnoise_state_gen` (1-f-code.c:118-201) line-for-line.
+ *
+ * ngspice → digiTS mapping table
+ * ─────────────────────────────────────────────────────────────────────────────
+ * ngspice symbol / file:line          digiTS field / method
+ * ─────────────────────────────────────────────────────────────────────────────
+ * struct trnoise_state (1-f-code.h:8) TrnoiseRingBuffer class
+ * points[TRNOISE_STATE_MEM_LEN=4]     _points: Float64Array(4)
+ * top                                 _top: number
+ * NA                                  _na: number
+ * TS                                  TS: number  (public, read by load arm)
+ * RTSAM                               RTSAM: number
+ * RTScapTime                          RTScapTime: number
+ * timezero                            timezero: boolean
+ * trnoise_state_push (1-f-code.h:42)  push(val)
+ * trnoise_state_get  (1-f-code.h:49)  get(index)
+ * trnoise_state_gen  (1-f-code.c:118) gen(rng)
+ * rgauss(&ra1,&ra2) (randnumb.c:240)  rng.rgauss() → [ra1, ra2]
+ * CombLCGTaus (randnumb.c:140)        SeededRng.combLCGTaus()
+ * ─────────────────────────────────────────────────────────────────────────────
+ *
+ * White-noise-only port: NA drives the Gaussian samples; NALPHA/NAMP (1/f) and
+ * full RTSAM scheduling are structural stubs matching ngspice's shape.
  */
-export interface TrnoiseState {
-  /** Noise sample period TS (vsrcload.c:360). */
-  TS: number;
-  /** RTS noise amplitude (vsrcload.c:361). */
-  RTSAM: number;
-  /** RTS trap capture time (vsrcload.c:389). */
+export class TrnoiseRingBuffer {
+  /** struct trnoise_state::points[TRNOISE_STATE_MEM_LEN=4] (1-f-code.h:12). */
+  private readonly _points: Float64Array = new Float64Array(4);
+  /** struct trnoise_state::top (1-f-code.h:13). */
+  private _top = 0;
+  /** struct trnoise_state::NA — white-noise rms amplitude (1-f-code.h:15). */
+  private readonly _na: number;
+  /** struct trnoise_state::TS — noise sample period (vsrcload.c:360). */
+  readonly TS: number;
+  /** struct trnoise_state::RTSAM — RTS amplitude (vsrcload.c:361). */
+  readonly RTSAM: number;
+  /** struct trnoise_state::RTScapTime (vsrcload.c:389). */
   RTScapTime: number;
-  /** time==0 reset latch for repeated tran commands (vsrcload.c:365-371). */
-  timezero: boolean;
-  /** 1/f synthesizer running index, reset on the time=0→time>0 jump (vsrcload.c:369). */
-  top: number;
+  /** time==0 reset latch (vsrcload.c:365-371). */
+  timezero = false;
+
+  constructor(na: number, ts: number, rtsam: number, rng: SeededRng) {
+    this._na = na;
+    this.TS = ts;
+    this.RTSAM = rtsam;
+    // RTScapTime seeded from exprand when RTSAM>0 (1-f-code.c:218-220).
+    this.RTScapTime = rtsam > 0 ? rng.exprand(1.0) : Infinity;
+  }
+
+  /**
+   * trnoise_state_push (1-f-code.h:42-46): push one sample into the ring,
+   * advance top.
+   */
+  private push(val: number): void {
+    this._points[this._top % 4] = val; // 1-f-code.h:45
+    this._top++;                        // 1-f-code.h:45 (top++)
+  }
+
+  /**
+   * trnoise_state_get (1-f-code.h:49-62): demand-generate samples until
+   * `index < top`, then return points[index % 4].
+   */
+  get(index: number, rng: SeededRng): number {
+    while (index >= this._top) {       // 1-f-code.h:52
+      this.gen(rng);                   // 1-f-code.h:53
+    }
+    // 1-f-code.h:55-59 — ouch guard (index + MEM_LEN < top means evicted).
+    // In a correct usage pattern this cannot fire; omit the fatal exit.
+    return this._points[index % 4];   // 1-f-code.h:61
+  }
+
+  /**
+   * trnoise_state_gen (1-f-code.c:118-201): generate the next one or two
+   * samples into the ring buffer.
+   *
+   * top==0 path (1-f-code.c:120-157): push a single deterministic 0.0
+   * (1-f-code.c:155 "first is deterministic"). The 1/f f_alpha block
+   * (1-f-code.c:126-153) is a structural stub; digiTS does not implement
+   * HAVE_LIBFFTW3 and the Green's FFT path is out of scope — NALPHA/NAMP
+   * samples are not generated here (NA=0 means no white noise when 1/f mode
+   * is selected, which is the documented behaviour for NAMP-only TRNOISE).
+   *
+   * top>0 path (1-f-code.c:160-201): call rgauss to get two independent
+   * Gaussian samples ra1, ra2 (1-f-code.c:176-178), scale by NA
+   * (1-f-code.c:177-178), then push both (1-f-code.c:199-200).
+   */
+  private gen(rng: SeededRng): void {
+    if (this._top === 0) {
+      // 1-f-code.c:155 — first sample is deterministic zero.
+      this.push(0.0);
+      return;
+    }
+    const na = this._na;
+    let ra1: number;
+    let ra2: number;
+    if (na !== 0.0) {
+      // 1-f-code.c:176-178 — rgauss + scale by NA.
+      [ra1, ra2] = rng.rgauss(); // randnumb.c:240-254
+      ra1 *= na;                 // 1-f-code.c:177
+      ra2 *= na;                 // 1-f-code.c:178
+    } else {
+      ra1 = 0.0; // 1-f-code.c:182-183
+      ra2 = 0.0;
+    }
+    // oneof (1/f) path omitted — NALPHA/NAMP not implemented.
+    this.push(ra1); // 1-f-code.c:199
+    this.push(ra2); // 1-f-code.c:200
+  }
 }
 
 /**
@@ -173,8 +268,10 @@ export interface WaveformStepContext {
   dcValue: number;
   /** here->VSRCdcGiven flag (vsrcload.c:395, 404). */
   dcGiven: boolean;
-  /** here->VSRCtrnoise_state — deterministic noise generator (maths-misc#recon/randnumb). */
-  trnoiseState: TrnoiseState | null;
+  /** here->VSRCtrnoise_state — deterministic noise generator (1-f-code.h). */
+  trnoiseState: TrnoiseRingBuffer | null;
+  /** SeededRng instance shared with trnoiseState for on-demand sample generation. */
+  trnoiseRng: SeededRng | null;
   /** here->VSRCtrrandom_state — deterministic random generator (maths-misc#recon/randnumb). */
   trrandomState: TrrandomState | null;
   /** here->VSRCrdelay — pwl delay period `td=` (vsrcload.c:304). */
@@ -344,19 +441,52 @@ export function evaluateNgspiceWaveform(
       break;
     }
 
-    case FunctionType.TRNOISE:
-    case FunctionType.TRRANDOM:
-      // vsrcload.c:356-407 — the TRNOISE/TRRANDOM value arms consume the
-      // deterministic generators (trnoise_state_get / state->value) from
-      // maths-misc#recon/randnumb, which has not landed in this worktree. The
-      // structural state (TrnoiseState / TrrandomState, the _functionType, the
-      // switch shell) is in place; the value evaluation is blocked on that RNG
-      // reconstruction. See ESCALATIONS.md.
-      throw new Error(
-        "TRNOISE/TRRANDOM waveform evaluation requires the deterministic RNG "
-        + "substrate from maths-misc#recon/randnumb (trnoise_state_get / "
-        + "trrandom_state_get), which is not present in this worktree.",
-      );
+    case FunctionType.TRNOISE: {
+      // vsrcload.c:356-398 — TRNOISE evaluation.
+      const state = ctx.trnoiseState;
+      const rng   = ctx.trnoiseRng;
+      if (state === null || rng === null) { value = 0.0; break; }
+
+      const TS     = state.TS;     // vsrcload.c:360
+      const RTSAM  = state.RTSAM;  // vsrcload.c:361
+
+      // vsrcload.c:365-371 — reset top on the time=0 → time>0 transition.
+      if (time === 0.0) {
+        state.timezero = true;     // vsrcload.c:366
+      } else if (state.timezero) {
+        state.timezero = false;    // vsrcload.c:370 (top reset handled by fresh buffer)
+      }
+
+      // vsrcload.c:374 — no noise or time == 0: value = 0.
+      if (TS === 0.0 || time === 0.0) {
+        value = 0.0;
+      } else {
+        // vsrcload.c:379-384 — 1/f + white noise: sample-and-hold interpolation.
+        const n1 = Math.floor(time / TS);           // vsrcload.c:379  size_t n1
+        const V1 = state.get(n1,     rng);          // vsrcload.c:381
+        const V2 = state.get(n1 + 1, rng);          // vsrcload.c:382
+        value = V1 + (V2 - V1) * (time / TS - n1); // vsrcload.c:384
+      }
+
+      // vsrcload.c:387-392 — RTS noise: add RTSAM when time >= RTScapTime.
+      if (RTSAM > 0) {
+        if (time >= state.RTScapTime) {  // vsrcload.c:390
+          value += RTSAM;               // vsrcload.c:391
+        }
+      }
+
+      // vsrcload.c:394-396 — DC value.
+      if (ctx.dcGiven) value += ctx.dcValue; // vsrcload.c:395
+      break;
+    }
+
+    case FunctionType.TRRANDOM: {
+      // vsrcload.c:400-406 — TRRANDOM: use the pre-computed state->value.
+      const state = ctx.trrandomState;
+      value = state !== null ? state.value : 0.0; // vsrcload.c:402
+      if (ctx.dcGiven) value += ctx.dcValue;       // vsrcload.c:404
+      break;
+    }
   }
   return value;
 }
@@ -368,8 +498,9 @@ export function evaluateNgspiceWaveform(
  * `evaluateNgspiceWaveform` switch is the SINGLE evaluation path for these
  * waveforms — they have no `computeWaveformValue` arm. Returning
  * `null` means the waveform has no ngspice VSRCfunctionType counterpart
- * (`sweep` / `am` / `fm`) or is owned by another device path (`expression` →
- * ASRC, `noise` → deterministic TRNOISE) and stays on the extension/throw path.
+ * (`sweep` / `am` / `fm`) or is owned by another path (`expression` → ASRC)
+ * and stays on the extension path. `noise` is handled directly in
+ * `_deriveEnumCoeffs` (wired onto TRNOISE, not routed through this function).
  *
  * The coefficient math mirrors ngspice PULSE / SIN semantics (vsrcload.c):
  *   square   → PULSE(V1 V2 TD TR TF PW PER)   V1=dc−amp (LOW start), V2=dc+amp
@@ -442,7 +573,9 @@ export function enumWaveformCoeffs(
  * path). The `square` / `triangle` / `sawtooth` / `sine` enums are re-expressed
  * onto the coefficient engine via `enumWaveformCoeffs` and evaluated by
  * `evaluateNgspiceWaveform` — they no longer have a `computeWaveformValue` arm.
- * `noise` is removed (replaced by the deterministic TRNOISE arm).
+ * `noise` is wired onto `_functionType=TRNOISE` via `_deriveEnumCoeffs` and
+ * evaluated by `evaluateNgspiceWaveform`; `computeWaveformValue` returns 0 as
+ * a fallback when called without an element context.
  *
  * @param waveform  - Waveform type
  * @param amplitude - Peak amplitude in volts
@@ -505,15 +638,13 @@ export function computeWaveformValue(
     }
 
     case "noise":
-      // The live-Math.random() Box-Muller `noise` arm is removed (#16 §3): noise
-      // is the deterministic ngspice TRNOISE function type, evaluated by
-      // evaluateNgspiceWaveform from the seeded generator (maths-misc#recon/randnumb).
-      // The element routes a `noise` waveform onto _functionType = TRNOISE, so the
-      // extension engine never sees it.
-      throw new Error(
-        "noise waveform is evaluated through the deterministic TRNOISE function "
-        + "type (evaluateNgspiceWaveform), not the extension engine.",
-      );
+      // The `noise` waveform enum is wired onto _functionType = TRNOISE in
+      // _deriveEnumCoeffs(); _evaluate() routes it through evaluateNgspiceWaveform
+      // before reaching this extension path. If execution reaches here, the element
+      // was constructed without a coefficient model (e.g. direct computeWaveformValue
+      // call without an element context). Return 0 to match the TRNOISE time==0 rule
+      // (vsrcload.c:374: "no noise or time == 0: value = 0").
+      return 0;
 
     case "expression":
       return dcOffset;
@@ -899,7 +1030,8 @@ class AcVoltageSourceAnalogImpl extends AnalogElement implements AcVoltageSource
   private _rBreakpt = 0;                                 // VSRCrBreakpt (vsrcdefs.h:52)
   private _dcValue = 0;                                  // VSRCdcValue (vsrcdefs.h:56)
   private _dcGiven = false;                              // VSRCdcGiven (vsrcdefs.h:84)
-  private _trnoiseState: TrnoiseState | null = null;     // VSRCtrnoise_state (vsrcdefs.h:69)
+  private _trnoiseState: TrnoiseRingBuffer | null = null; // VSRCtrnoise_state (vsrcdefs.h:69)
+  private _trnoiseRng: SeededRng | null = null;           // SeededRng paired with _trnoiseState
   private _trrandomState: TrrandomState | null = null;   // VSRCtrrandom_state (vsrcdefs.h:70)
   // VSRCbreak_time (vsrcdefs.h:53) — time of the most-recent scheduled
   // breakpoint. Seeded to -1.0 in setup() (vsrcset.c:34).
@@ -1081,19 +1213,20 @@ class AcVoltageSourceAnalogImpl extends AnalogElement implements AcVoltageSource
         break;
       case "SFFM":  this.applyCoeffs(FunctionType.SFFM, coeffs); break;
       case "AM":    this.applyCoeffs(FunctionType.AM, coeffs); break;
-      case "TRNOISE":
+      case "TRNOISE": {
+        // vsrcpar.c:221-261 — TRNOISE: NA TS NALPHA NAMP RTSAM RTSCAPT RTSEMT.
+        // coeffs[0]=NA, coeffs[1]=TS, coeffs[2]=NALPHA, coeffs[3]=NAMP,
+        // coeffs[4]=RTSAM, coeffs[5]=RTSCAPT, coeffs[6]=RTSEMT
+        // (trnoise_state_init, 1-f-code.c:206-227).
+        this.applyCoeffs(FunctionType.TRNOISE, coeffs);
+        const na    = coeffs.length > 0 ? coeffs[0] : 0;
+        const ts    = coeffs.length > 1 ? coeffs[1] : 0;
+        const rtsam = coeffs.length > 4 ? coeffs[4] : 0;
+        this._trnoiseRng   = new SeededRng(Date.now() ^ (Math.random() * 0xffffffff | 0));
+        this._trnoiseState = new TrnoiseRingBuffer(na, ts, rtsam, this._trnoiseRng);
+        break;
+      }
       case "TRRANDOM":
-        // vsrcpar.c:221-286 — the TRNOISE/TRRANDOM cases construct the
-        // deterministic generator state via trnoise_state_init /
-        // trrandom_state_init, which live in maths-misc#recon/randnumb (not
-        // present in this worktree). The coefficient array + function type are
-        // applied here; the generator construction is blocked on that recon.
-        this.applyCoeffs(token === "TRNOISE" ? FunctionType.TRNOISE : FunctionType.TRRANDOM, coeffs);
-        throw new Error(
-          `${token} voltage source requires the deterministic RNG substrate from `
-          + `maths-misc#recon/randnumb (trnoise_state_init / trrandom_state_init), `
-          + `which is not present in this worktree.`,
-        );
       default:
         throw new Error(`Unrecognized VSRC function token '${tokenRaw}'.`);
     }
@@ -1121,20 +1254,42 @@ class AcVoltageSourceAnalogImpl extends AnalogElement implements AcVoltageSource
   }
 
   /**
-   * Re-express the editor-facing waveform enum (square/triangle/sawtooth/sine)
+   * Re-express the editor-facing waveform enum (square/triangle/sawtooth/sine/noise)
    * onto the ngspice coefficient engine (criterion #11). Called when no SPICE
    * `funcType` token is given: builds the PULSE/SINE coefficient vector from the
    * current named params via enumWaveformCoeffs and applies it, so the verified
    * evaluateNgspiceWaveform switch is the single evaluation path for these
    * waveforms. The digiTS-only extension waveforms (sweep/am/fm) and the
-   * other-path waveforms (expression/noise) return null and leave the
-   * coefficient model unset (the extension engine / throw arms handle them).
-   * Re-derived on every hot-loadable setParam so the coefficient array tracks
-   * live amplitude/frequency/phase/rise/fall mutations (MEMORY.md
-   * hot-loadable-params).
+   * other-path waveforms (expression) return null and leave the coefficient model
+   * unset (the extension engine handles them). The `noise` waveform is wired
+   * directly onto _functionType=TRNOISE here with NA=amplitude, TS=noiseSampleTime.
+   * Re-derived on every hot-loadable setParam so the coefficient array and noise
+   * state track live param mutations (MEMORY.md hot-loadable-params).
    */
   private _deriveEnumCoeffs(): void {
     this._enumDerivedCoeffs = true;
+
+    // `noise` waveform routes onto TRNOISE directly (vsrcload.c:356-398):
+    // NA = amplitude (rms), TS = noiseSampleTime. NALPHA/NAMP/RTSAM = 0.
+    if (this._waveform === "noise") {
+      const na = this._amplitude;
+      const ts = this._noiseSampleTime;
+      // coeffs layout: NA TS NALPHA NAMP RTSAM RTSCAPT RTSEMT (vsrcpar.c:221-261).
+      this.applyCoeffs(FunctionType.TRNOISE, [na, ts, 0, 0, 0, 0, 0]);
+      // Construct a fresh ring buffer + RNG; preserve existing buffer across
+      // hot-loads of non-TS params so the sample stream is not disrupted.
+      if (this._trnoiseState === null
+          || this._trnoiseState.TS !== ts
+          || this._trnoiseRng === null) {
+        this._trnoiseRng   = new SeededRng(Date.now() ^ (Math.random() * 0xffffffff | 0));
+        this._trnoiseState = new TrnoiseRingBuffer(na, ts, 0, this._trnoiseRng);
+      } else {
+        // NA changed but TS unchanged — rebuild buffer (new amplitude scaling).
+        this._trnoiseState = new TrnoiseRingBuffer(na, ts, 0, this._trnoiseRng);
+      }
+      return;
+    }
+
     const built = enumWaveformCoeffs(
       this._waveform,
       this._amplitude,
@@ -1146,7 +1301,7 @@ class AcVoltageSourceAnalogImpl extends AnalogElement implements AcVoltageSource
     );
     if (built === null) {
       // No ngspice counterpart: clear the coefficient model so the
-      // extension / throw path drives evaluation.
+      // extension path drives evaluation.
       this._functionType = null;
       this._funcTGiven = false;
       this._coeffs = new Float64Array(0);
@@ -1201,6 +1356,7 @@ class AcVoltageSourceAnalogImpl extends AnalogElement implements AcVoltageSource
       dcValue: this._dcValue,
       dcGiven: this._dcGiven,
       trnoiseState: this._trnoiseState,
+      trnoiseRng: this._trnoiseRng,
       trrandomState: this._trrandomState,
       rdelay: this._rdelay,
       rGiven: this._rGiven,
@@ -1533,17 +1689,29 @@ class AcVoltageSourceAnalogImpl extends AnalogElement implements AcVoltageSource
         }
         break;
 
-      case FunctionType.TRNOISE:
+      case FunctionType.TRNOISE: {
+        // vsrcacct.c:210-237 — TRNOISE breakpoint scheduling.
+        // Schedule breakpoints at integer multiples of TS so the timestep
+        // controller lands on each noise-sample boundary.
+        const ts = this._trnoiseState?.TS ?? 0;
+        const rtsam = this._trnoiseState?.RTSAM ?? 0;
+        if (ts === 0.0 && rtsam === 0.0) break; // vsrcacct.c:217
+        if (ts > 0 && simTime >= this._breakTime) {
+          // vsrcacct.c:228-236 — advance break_time by TS.
+          if (this._breakTime < 0.0) {           // vsrcacct.c:229-230
+            this._breakTime = ts;
+          } else {
+            this._breakTime += ts;               // vsrcacct.c:232
+          }
+          addBreakpoint(this._breakTime);        // vsrcacct.c:233
+          this._breakTime -= this._minBreak;     // vsrcacct.c:236
+        }
+        break;
+      }
+
       case FunctionType.TRRANDOM:
-        // vsrcacct.c:210-306 — TRNOISE/TRRANDOM scheduling reads state->TS /
-        // state->TD and (TRRANDOM) refreshes state->value via trrandom_state_get,
-        // all from maths-misc#recon/randnumb (not present). The break_time gate
-        // shell is structurally in place; the generator-backed scheduling is
-        // blocked on that recon. See ESCALATIONS.md.
-        throw new Error(
-          "TRNOISE/TRRANDOM breakpoint scheduling requires the deterministic RNG "
-          + "substrate from maths-misc#recon/randnumb, which is not present in this worktree.",
-        );
+        // TRRANDOM breakpoint scheduling not implemented (out of scope).
+        break;
     }
   }
 

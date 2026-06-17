@@ -7,8 +7,9 @@
  *
  * Canonical Template D exemplar — combines Template C's matrix-stamping body
  * with Template A's state-bearing latch machinery. Reads N digital input
- * voltages from `rhsOld[D_i] - rhsOld[GND]` as floats (arithmetic Kleene,
- * no threshold); reads `rhsOld[VREF] - rhsOld[GND]` for the reference;
+ * voltages from `rhsOld[D_i] - rhsOld[GND]` and quantizes each at the
+ * logic-HIGH boundary (the dPin DIPL's Kleene 0.5 indeterminate resolves to
+ * logic LOW); reads `rhsOld[VREF] - rhsOld[GND]` for the reference;
  * computes output target; stamps a VSRC-style branch row that enforces
  * V_OUT - V_GND = target.
  *
@@ -55,7 +56,7 @@ function getDacSchema(bits: number): StateSchema {
   for (let i = 0; i < bits; i++) {
     slots.push({
       name: `LATCHED_BIT_${i}`,
-      doc: `Float input bit ${i} read from rhsOld[D${i}] - rhsOld[GND]. Lies in {0, 0.5, 1}.`,
+      doc: `Quantized input bit ${i}: rhsOld[D${i}] - rhsOld[GND] resolved at the logic-HIGH boundary to {0, 1}.`,
     });
   }
   slots.push({
@@ -170,16 +171,19 @@ export class DACDriverElement extends PoolBackedAnalogElement {
     const gnd  = rhsOld[gndNode];
     const vref = rhsOld[vrefNode] - gnd;
 
-    // Read each digital input bit as a float (arithmetic Kleene- no threshold).
+    // Read each digital input bit and quantize at the logic-HIGH boundary. The
+    // dPin DIPL emits the Kleene classifier {0, 0.5, 1}; an indeterminate 0.5
+    // (input between vIL and vIH) resolves to logic LOW for code assembly.
     const inputs: number[] = [];
     for (let i = 0; i < this._bits; i++) {
       const diNode = this.pinNodes.get(`D${i}`)!;
-      const v = rhsOld[diNode] - gnd;
+      const vraw = rhsOld[diNode] - gnd;
+      const v = vraw >= 1 ? 1 : 0;
       inputs.push(v);
     }
 
-    // Assemble fractional code from bit floats (LSB = D0).
-    // A 0.5 V D0 input contributes 0.5 LSB to the unipolar output.
+    // Assemble the integer code from quantized bits (LSB = D0). Each bit is
+    // already 0 or 1, so a sub-threshold input contributes nothing to the code.
     const code = inputs.reduce((acc, v, i) => acc + v * (1 << i), 0);
 
     // Compute target voltage.

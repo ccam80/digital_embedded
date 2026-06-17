@@ -38,6 +38,7 @@ interface AcSourceProps {
   modulationFreq?: number;
   modulationDepth?: number;
   modulationIndex?: number;
+  noiseSampleTime?: number;
 }
 
 function buildAcSourceCircuit(facade: DefaultSimulatorFacade, props: AcSourceProps): Circuit {
@@ -110,10 +111,17 @@ describe("AcVoltageSource extended waveforms (Cat 4 compile-time seed)", () => {
     expect(vSweep).not.toBeCloseTo(vSine, 4);
   });
 
-  it("am_mode_diverges_from_pure_sine_after_warmstart", () => {
+  it("am_mode_diverges_from_pure_sine_after_warmstart", async () => {
     // V_am(t) = (1 + depth * sin(2π * modFreq * t)) * A * sin(2π * f * t)
     // With depth=1 and modFreq=100Hz, the envelope multiplies the carrier by
-    // 1 + sin(2π*100*t). At any non-zero t this differs from pure sine.
+    // 1 + sin(2π*100*t). The warm-start step alone lands at t = T_carrier/6 ≈
+    // 1.67e-7 s, where the 100Hz envelope is still ≈1.0001 and the carrier sine
+    // is itself near its zero crossing, so |V_am - V_sine| is ~1e-7 — below the
+    // 4-decimal bar. Sample instead at the carrier's first quarter-period
+    // (t = T_carrier/4 = 0.25 ms): there the carrier sine is at its peak (≈A)
+    // and the 100Hz envelope has advanced to 1 + sin(2π*100*0.25e-3) ≈ 1.156,
+    // so the AM-vs-sine gap is ~0.15 and the divergence is unambiguous.
+    const sampleTime = 0.25e-3; // T_carrier/4 with frequency = 1000 Hz
     const fixSine = buildFixture({
       build: (_r, facade) => buildAcSourceCircuit(facade, { waveform: "sine", frequency: 1000 }),
     });
@@ -126,10 +134,18 @@ describe("AcVoltageSource extended waveforms (Cat 4 compile-time seed)", () => {
       }),
     });
 
-    const vSine = fixSine.engine.getNodeVoltage(getAcsrcPosNode(fixSine));
-    const vAm = fixAm.engine.getNodeVoltage(getAcsrcPosNode(fixAm));
+    const [vSine] = await fixSine.facade.sampleAtTimes(
+      fixSine.coordinator,
+      [sampleTime],
+      () => fixSine.engine.getNodeVoltage(getAcsrcPosNode(fixSine)),
+    );
+    const [vAm] = await fixAm.facade.sampleAtTimes(
+      fixAm.coordinator,
+      [sampleTime],
+      () => fixAm.engine.getNodeVoltage(getAcsrcPosNode(fixAm)),
+    );
 
-    expect(vAm).not.toBeCloseTo(vSine, 4);
+    expect(vAm).not.toBeCloseTo(vSine!, 4);
   });
 
   it("fm_mode_diverges_from_pure_sine_after_warmstart", () => {
@@ -197,11 +213,14 @@ describe("AcVoltageSource extended waveforms (Cat 4 compile-time seed)", () => {
   });
 
   it("noise_mode_produces_finite_node_voltage_distinct_from_sine", () => {
-    // Documented contract: noise mode draws a Gaussian sample per evaluation
-    // (Box-Muller, mean=0, std=1 scaled by amplitude). At a single warm-start
-    // sample point the node voltage is a single random draw — it must be
-    // a number (no NaN / Infinity stamp escaping into the matrix), and over
-    // a population of independently-built fixtures the values vary.
+    // Documented contract (TRNOISE, vsrcload.c:356-398): noise mode evaluates
+    // the sample-and-hold interpolation V1 + (V2-V1)*(t/TS - n1) at t > 0.
+    // At t == 0 TRNOISE returns 0 (vsrcload.c:374), so we step each fixture
+    // past the warm-start to a time > 0. Each fixture has its own freshly-seeded
+    // SeededRng, so the Gaussian endpoints V1/V2 differ across builds.
+    // The node voltage must be finite (no NaN/Infinity) and over 32 builds at
+    // least two distinct values must appear (ruling out a degenerate constant).
+    const TS = 1e-4; // 0.1 ms noise sample period
     const samples: number[] = [];
     for (let i = 0; i < 32; i++) {
       const fix = buildFixture({
@@ -209,15 +228,19 @@ describe("AcVoltageSource extended waveforms (Cat 4 compile-time seed)", () => {
           waveform: "noise",
           amplitude: 2.0,
           frequency: 1000,
+          noiseSampleTime: TS,
         }),
+        params: { tStop: TS * 3, maxTimeStep: TS / 5 },
       });
+      // Step past t=0 to get the first non-zero TRNOISE evaluation.
+      fix.coordinator.step();
       const v = fix.engine.getNodeVoltage(getAcsrcPosNode(fix));
+      // Must be a finite number (no NaN/Infinity from a broken stamp).
+      expect(Number.isFinite(v)).toBe(true);
       samples.push(v);
     }
 
-    // Population variability: at least two distinct values across 32 builds —
-    // a constant output would indicate the noise stamp degenerated to a
-    // deterministic value, which is the documented-contract failure mode.
+    // Population variability: at least two distinct values across 32 builds.
     const distinct = new Set(samples).size;
     expect(distinct).toBeGreaterThan(1);
   });

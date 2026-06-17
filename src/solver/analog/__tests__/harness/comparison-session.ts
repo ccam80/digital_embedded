@@ -1539,8 +1539,9 @@ export class ComparisonSession {
 
       this._ourTopology.matrixRowLabels.forEach((label, row) => {
         if (row < this._ourTopology.nodeCount) return;
-        const ourV = ourFinal && row < ourFinal.voltages.length ? ourFinal.voltages[row] : NaN;
-        const ngV = ngFinal && row < ngFinal.voltages.length ? ngFinal.voltages[row] : NaN;
+        const slot = row + 1;
+        const ourV = ourFinal && slot < ourFinal.voltages.length ? ourFinal.voltages[slot] : NaN;
+        const ngV = ngFinal && slot < ngFinal.voltages.length ? ngFinal.voltages[slot] : NaN;
         branches[label] = makeComparedValue(ourV, ngV);
       });
 

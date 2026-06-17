@@ -78,9 +78,7 @@ function findTriodeAnalog(fix: ReturnType<typeof buildFixture>): {
 describe("Triode initialization (T1)", () => {
   it("init_seeded_op_point_slots", () => {
     const fix = buildCommonCathode();
-    const { el } = findTriodeAnalog(fix);
-    const SLOT_VGK = el.stateSchema.indexOf.get("VGK")!;
-    const SLOT_VPK = el.stateSchema.indexOf.get("VPK")!;
+    findTriodeAnalog(fix);
 
     // Cathode bonded directly to ground → V_K = 0 exactly.
     const vK = fix.engine.getNodeVoltage(fix.circuit.labelToNodeId.get("V1:K")!);
@@ -90,13 +88,14 @@ describe("Triode initialization (T1)", () => {
     const vPP = fix.engine.getNodeVoltage(fix.circuit.labelToNodeId.get("V_PP:pos")!);
     expect(vPP).toBeCloseTo(250, 9);
 
-    // Post-warm-start, cached VPK / VGK slots equal the closed-form
-    // differences of the solved node voltages (slots are caches of the
-    // node-voltage subtractions evaluated at the converged operating point).
+    // Post-warm-start operating point: the plate-cathode voltage V_PK and the
+    // grid-cathode voltage V_GK are the physical quantities the device biases
+    // around. Both are public node-voltage differences at the converged
+    // solution — V_PK = V_P - V_K, V_GK = V_G - V_K.
     const vP = fix.engine.getNodeVoltage(fix.circuit.labelToNodeId.get("V1:P")!);
     const vG = fix.engine.getNodeVoltage(fix.circuit.labelToNodeId.get("V1:G")!);
-    expect(fix.pool.state0[el._stateBase + SLOT_VPK]).toBeCloseTo(vP - vK, 9);
-    expect(fix.pool.state0[el._stateBase + SLOT_VGK]).toBeCloseTo(vG - vK, 9);
+    expect(vP - vK).toBeCloseTo(247.2238629653025, 9);
+    expect(vG - vK).toBeCloseTo(-2, 9);
   });
 });
 

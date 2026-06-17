@@ -21,6 +21,7 @@
 import { describe, it, expect } from "vitest";
 import { ComparisonSession } from "./harness/comparison-session.js";
 import { DefaultSimulatorFacade } from "../../../headless/default-facade.js";
+import { VT } from "../../../core/constants.js";
 import type { StepEndReport } from "./harness/types.js";
 
 /**
@@ -432,7 +433,7 @@ describe("End-to-end: analytical verification", () => {
     const R = 10000;
     const Is = 1e-14;
     const n = 1.0;
-    const Vt = 0.02585;
+    const Vt = VT;
 
     const session = await ComparisonSession.createSelfCompare({
       buildCircuit: (registry) => {

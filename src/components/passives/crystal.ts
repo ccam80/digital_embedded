@@ -40,6 +40,7 @@ import {
   ComponentCategory,
   type AttributeMapping,
   type StandaloneComponentDefinition,
+  type AnalogWrapperHookFactory,
 } from "../../core/registry.js";
 import { formatSI } from "../../editor/si-format.js";
 import { defineModelParams } from "../../core/model-params.js";
@@ -315,6 +316,40 @@ function crystalCircuitFactory(props: PropertyBag): CrystalCircuitElement {
   return new CrystalCircuitElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
 }
 
+const crystalWrapperHook: AnalogWrapperHookFactory = (
+  _pinNodes,
+  props,
+  _getTime,
+  subElementsByName,
+) => {
+  let frequency = props.getModelParam<number>("frequency");
+  let qualityFactor = props.getModelParam<number>("qualityFactor");
+  let motionalCapacitance = props.getModelParam<number>("motionalCapacitance");
+  let shuntCapacitance = props.getModelParam<number>("shuntCapacitance");
+  const rS = subElementsByName.get("rS");
+  const lS = subElementsByName.get("lS");
+  const cS = subElementsByName.get("cS");
+  const c0 = subElementsByName.get("c0");
+  const push = (): void => {
+    const Ls = crystalMotionalInductance(frequency, motionalCapacitance);
+    const Rs = crystalSeriesResistance(frequency, Ls, qualityFactor);
+    rS?.setParam("resistance", Rs);
+    lS?.setParam("inductance", Ls);
+    cS?.setParam("capacitance", motionalCapacitance);
+    c0?.setParam("capacitance", shuntCapacitance);
+  };
+  return {
+    setParam(key: string, value: number): void {
+      if (key === "frequency") frequency = value;
+      else if (key === "qualityFactor") qualityFactor = value;
+      else if (key === "motionalCapacitance") motionalCapacitance = value;
+      else if (key === "shuntCapacitance") shuntCapacitance = value;
+      else return;
+      push();
+    },
+  };
+};
+
 export const CrystalDefinition: StandaloneComponentDefinition = {
   name: "QuartzCrystal",
   typeId: -1,
@@ -336,5 +371,6 @@ export const CrystalDefinition: StandaloneComponentDefinition = {
       params: CRYSTAL_DEFAULTS,
     },
   },
+  analogWrapperHook: crystalWrapperHook,
   defaultModel: "behavioral",
 };

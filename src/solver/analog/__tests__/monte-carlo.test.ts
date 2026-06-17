@@ -40,7 +40,7 @@ import type { AnalogElement } from "../element.js";
 
 function makeResistor(nodeA: number, nodeB: number, resistance: number): AnalogElement {
   const props = new PropertyBag();
-  props.replaceModelParams({ ...RESISTOR_DEFAULTS, resistance });
+  props.replaceModelParams({ ...RESISTOR_DEFAULTS, resistance }, { markGiven: true });
   const factory = (ResistorDefinition.modelRegistry!["behavioral"] as { kind: "inline"; factory: AnalogFactory }).factory;
   return factory(new Map([["pos", nodeA], ["neg", nodeB]]), props, () => 0);
 }
@@ -49,6 +49,25 @@ function makeVoltageSource(posNode: number, negNode: number, voltage: number): A
   const props = new PropertyBag();
   props.replaceModelParams({ ...DC_VOLTAGE_SOURCE_DEFAULTS, voltage });
   return makeDcVoltageSource(new Map([["pos", posNode], ["neg", negNode]]), props, () => 0);
+}
+
+/**
+ * Bucket elements by their device family, mirroring the compiler's per-family
+ * grouping (compiler.ts:1803-1809). The engine's per-NR-iteration load loop
+ * dispatches over `elementsByFamily` (ckt-load.ts:127), so a circuit built with
+ * an empty family map never calls any device's `load()` and solves to the
+ * trivial all-zero solution.
+ */
+function bucketByFamily(
+  elements: readonly AnalogElement[],
+): ReadonlyMap<DeviceFamily, readonly AnalogElement[]> {
+  const byFamily = new Map<DeviceFamily, AnalogElement[]>();
+  for (const el of elements) {
+    let bucket = byFamily.get(el.deviceFamily);
+    if (!bucket) { bucket = []; byFamily.set(el.deviceFamily, bucket); }
+    bucket.push(el);
+  }
+  return byFamily;
 }
 
 // ---------------------------------------------------------------------------
@@ -90,7 +109,7 @@ function buildDividerCircuit(
   return new ConcreteCompiledAnalogCircuit({
     nodeCount: 2,
     elements: [vs, r1El, r2El],
-    elementsByFamily: new Map<DeviceFamily, readonly AnalogElement[]>(),
+    elementsByFamily: bucketByFamily([vs, r1El, r2El]),
     labelToNodeId,
     wireToNodeId: new Map(),
     models: new Map(),
@@ -123,7 +142,7 @@ function buildSweepDividerFactory(nominalR2: number = 1000): SweepCircuitFactory
     return new ConcreteCompiledAnalogCircuit({
       nodeCount: 2,
       elements: [vs, r1El, r2El],
-      elementsByFamily: new Map<DeviceFamily, readonly AnalogElement[]>(),
+      elementsByFamily: bucketByFamily([vs, r1El, r2El]),
       labelToNodeId,
       wireToNodeId: new Map(),
       models: new Map(),
@@ -168,7 +187,7 @@ function buildRcSweepFactory(_c: number = 1e-9): SweepCircuitFactory {
     return new ConcreteCompiledAnalogCircuit({
       nodeCount: 2,
       elements: [vs, rEl, r2El],
-      elementsByFamily: new Map<DeviceFamily, readonly AnalogElement[]>(),
+      elementsByFamily: bucketByFamily([vs, rEl, r2El]),
       labelToNodeId,
       wireToNodeId: new Map(),
       models: new Map(),

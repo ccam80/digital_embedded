@@ -355,19 +355,23 @@ describe("Timer555 parameter hot-load (T1)", () => {
         }),
     });
 
-    // disBase is an internal composite net; observe via the discharge resistor
-    // pin that is connected to the BJT collector — V(DIS) shifts as the BJT's
-    // base drive changes.
-    const disNode = fix.circuit.labelToNodeId.get("t:DIS")!;
+    // vDrop drives the discharge BJT base net (nDisBase), clamped toward vDrop
+    // by the latch driver's Norton stamp. The discharge BJT collector (DIS)
+    // saturates and is insensitive to base drive, so observe the base net that
+    // vDrop actually moves. The composite-internal node is published in the
+    // engine node table as `${label}#${suffix}`.
+    const baseNode = fix.engine
+      .getNodeTable()
+      .find((e) => e.name === "t#nDisBase")!.number;
     for (let i = 0; i < 10; i++) fix.coordinator.step();
-    const before = fix.engine.getNodeVoltage(disNode);
+    const before = fix.engine.getNodeVoltage(baseNode);
 
     const tElem = fix.element("t");
     fix.coordinator.setComponentProperty(tElem, "vDrop", 3.0);
     for (let i = 0; i < 10; i++) fix.coordinator.step();
-    const after = fix.engine.getNodeVoltage(disNode);
+    const after = fix.engine.getNodeVoltage(baseNode);
 
-    // Raising vDrop from 1.5V to 3.0V must change the DIS-node voltage.
+    // Raising vDrop from 1.5V to 3.0V must move the discharge BJT base net.
     expect(after).not.toBeCloseTo(before);
   });
 

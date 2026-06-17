@@ -231,7 +231,9 @@ export class ADCDriverElement extends PoolBackedAnalogElement {
     // even though the SAR FSM specifies it stays high through phase 3.
     let outputEoc   = s1[base + this._slotOutputEoc];
 
-    const risingEdge = this._firstSample ? 0 : vClock * (1 - prevClock);
+    const clkHigh  = vClock    > 0.5 ? 1 : 0;
+    const prevHigh = prevClock > 0.5 ? 1 : 0;
+    const risingEdge = this._firstSample ? 0 : clkHigh * (1 - prevHigh);
     this._firstSample = false;
     const edge = risingEdge > 0;
 

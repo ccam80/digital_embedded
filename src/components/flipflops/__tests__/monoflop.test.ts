@@ -150,8 +150,19 @@ describe("Monoflop", () => {
     const facade = new DefaultSimulatorFacade(registry);
     const coord = facade.compile(buildMono(facade, 5));
     facade.setSignal(coord, "R", 0);
-    // Set C high from the start; without a 0->1 transition, no trigger.
+    // Establish prevClock=1 without a rising edge: C=0 → step seeds prevClock=0,
+    // then C=1 → step delivers the first 0->1 edge and seeds prevClock=1.
+    // Use R to clear the Q that first edge armed, leaving clock high with
+    // prevClock=1 so subsequent steps see no new transition.
+    facade.setSignal(coord, "C", 0);
+    facade.step(coord);
     facade.setSignal(coord, "C", 1);
+    facade.step(coord);
+    facade.setSignal(coord, "R", 1);
+    facade.step(coord);
+    facade.setSignal(coord, "R", 0);
+    facade.step(coord);
+    // C remains high; prevClock is now 1. No new rising edge occurs.
     facade.step(coord);
     facade.step(coord);
     facade.step(coord);

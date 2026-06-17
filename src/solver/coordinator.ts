@@ -96,6 +96,8 @@ export class DefaultSimulationCoordinator implements SimulationCoordinator {
   private _analysisPhase: "dcop" | "tranInit" | "tranFloat" = "dcop";
   private _convergenceLogPreHookState: boolean = false;
   private _captureHookInstalled: boolean = false;
+  /** Accumulates limiting events across all NR iterations during setLimitingCapture capture. */
+  private _limitingAccumulator: LimitingEvent[] | null = null;
 
   constructor(compiled: CompiledCircuitUnified, registry?: ComponentRegistry) {
     this._registry = registry ?? null;
@@ -1028,16 +1030,41 @@ export class DefaultSimulationCoordinator implements SimulationCoordinator {
     if (this._analog === null) return;
     const mnaEngine = this._analog as MNAEngine;
     if (enabled) {
+      this._limitingAccumulator = [];
+      const acc = this._limitingAccumulator;
       mnaEngine.limitingCollector = [] as LimitingEvent[];
+      // Register a postIterationHook that unions per-iteration events into the
+      // persistent accumulator before the NR loop clears limitingCollector at
+      // the top of the next iteration (niiter.c:889 ni_limit_reset analogue).
+      // Only installed when applyCaptureHook has not set its own hook — the
+      // capture-hook path (harness) does not use setLimitingCapture.
+      if (mnaEngine.postIterationHook === null) {
+        mnaEngine.postIterationHook = (
+          _iteration: number,
+          _rhs: Float64Array,
+          _prevVoltages: Float64Array,
+          _noncon: number,
+          _globalConverged: boolean,
+          _elemConverged: boolean,
+          limitingEvents: LimitingEvent[],
+        ) => {
+          for (const ev of limitingEvents) acc.push(ev);
+        };
+      }
     } else {
+      this._limitingAccumulator = null;
       mnaEngine.limitingCollector = null;
+      // Remove the hook only if it is the one we installed (guard: our hook
+      // does not have a drainForLog property; harness hooks do).
+      const h = mnaEngine.postIterationHook as unknown as { drainForLog?: unknown } | null;
+      if (h !== null && h.drainForLog === undefined) {
+        mnaEngine.postIterationHook = null;
+      }
     }
   }
 
   getLimitingEvents(): readonly LimitingEvent[] {
-    if (this._analog === null) return Object.freeze([]);
-    const mnaEngine = this._analog as MNAEngine;
-    return mnaEngine.limitingCollector ?? Object.freeze([]);
+    return this._limitingAccumulator ?? Object.freeze([]);
   }
 
   /**

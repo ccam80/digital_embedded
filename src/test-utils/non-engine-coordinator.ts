@@ -123,7 +123,7 @@ export function buildNonEngineCoordinator(
   const observers = new Set<MeasurementObserver>();
   const snapshotCalls = { saves: 0, restores: [] as SnapshotId[] };
   const setComponentPropertyCalls: SetComponentPropertyCall[] = [];
-  let nextSnapshotId = 1;
+  let nextSnapshotId = 0;
 
   return {
     // --- TooltipDataSource / EditorBindingDataSource shared `compiled` shape ---

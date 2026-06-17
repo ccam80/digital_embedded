@@ -122,12 +122,14 @@ export class AnalogFuseElement extends PoolBackedAnalogElement {
     rBlown: number,
     i2tRating: number,
     onStateChange?: (blown: boolean, thermalRatio: number) => void,
+    blown: boolean = false,
   ) {
     super(pinNodes);
     this._rCold = Math.max(rCold, 1e-12);
     this._rBlown = Math.max(rBlown, 1e-6);
     this._i2tRating = Math.max(i2tRating, 1e-30);
     this._onStateChange = onStateChange ?? null;
+    this._intact = !blown;
   }
 
   /** RuntimeDiagnosticAware: engine wires this in MNAEngine.init() so that
@@ -297,6 +299,7 @@ function buildAnalogFuseElement(
   rCold: number,
   rBlown: number,
   i2tRating: number,
+  blown: boolean,
 ): PoolBackedAnalogElement {
   const p = { rCold, rBlown, i2tRating };
   const el = new AnalogFuseElement(
@@ -304,12 +307,13 @@ function buildAnalogFuseElement(
     p.rCold,
     p.rBlown,
     p.i2tRating,
-    (blown, thermalRatio) => {
+    (blownNow, thermalRatio) => {
       props.set("_thermalRatio", thermalRatio);
-      if (blown) {
+      if (blownNow) {
         props.set("blown", true);
       }
     },
+    blown,
   );
   el.setParam = function(key: string, value: number): void {
     if (key in p) {
@@ -331,5 +335,6 @@ export function createAnalogFuseElement(
     props.getModelParam<number>("rCold"),
     props.getModelParam<number>("rBlown"),
     props.getModelParam<number>("i2tRating"),
+    props.getOrDefault<boolean>("blown", false),
   );
 }

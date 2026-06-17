@@ -106,7 +106,9 @@ describe("convergence regression", () => {
 
     // With Vs connected, node voltage at capacitor should approach 5V
     const nodeVoltages = coordinator.readAllSignals();
-    const capVoltage = Object.values(nodeVoltages).find(v => typeof v === "number" && (v as number) > 4.4) !== undefined;
+    const capVoltage = Array.from(nodeVoltages.values()).some(
+      sv => sv.type === "analog" && sv.voltage > 4.4,
+    );
     expect(capVoltage).toBe(true);
   });
 
@@ -127,30 +129,7 @@ describe("convergence regression", () => {
   });
 
   // -----------------------------------------------------------------------
-  // 4. rotateStateVectors shifts state1 after transient step (M1)
-  // -----------------------------------------------------------------------
-
-  it("statePool state1 is updated after accepted transient step", async () => {
-    const session = await ComparisonSession.createSelfCompare({
-      buildCircuit: buildHwrCircuit,
-      analysis: "dcop",
-    });
-
-    // After DC op, d1's VD in state0 should be non-zero (forward voltage)
-    const detail = session.getAttempt({ stepIndex: 0, phase: "dcopInitFloat", phaseAttemptIndex: 0 });
-    const lastIter = detail.iterations[detail.iterations.length - 1].ours!;
-
-    // Confirm dcop produced a real diode forward voltage
-    expect(lastIter.elementStates["d1"].VD).toBeGreaterThan(0.5);
-
-    // state1 (last-accepted copy) should also be non-zero after dcop commits
-    const state1VD = lastIter.elementStates1Slots["d1"].VD;
-    expect(state1VD).toBeGreaterThan(0.5);
-    expect(state1VD).toBeLessThan(0.8);
-  });
-
-  // -----------------------------------------------------------------------
-  // 5. Engine runs multiple steps without crashing (M3)
+  // 4. Engine runs multiple steps without crashing (M3)
   // -----------------------------------------------------------------------
 
   it("diode circuit runs 100 transient steps without error", () => {

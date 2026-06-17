@@ -474,7 +474,7 @@ describe('circuit_patch', () => {
         { id: 'Y', type: 'Out', props: { label: 'Y' } },
       ],
       connections: [
-        ['A:out', 'g:in'],
+        ['A:out', 'g:In_1'],
         // g:out → Y:in NOT connected
       ],
     };

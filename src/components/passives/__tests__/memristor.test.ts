@@ -97,8 +97,9 @@ describe("Memristor initialization (T1)", () => {
     });
     const mem = findMemristor(fix.circuit.elements);
 
-    // Post-warm-start state0[W] holds the seeded initialState.
-    const w0 = fix.pool.state0[mem._stateBase + SLOT_W];
+    // Post-warm-start the seeded initialState lives in state1[W]; state0[W]
+    // holds the value the first accepted transient step drifted W forward to.
+    const w0 = fix.pool.state1[mem._stateBase + SLOT_W];
     expect(w0).toBeCloseTo(0.5, 9);
 
     // Memristor node tracks the linear-G voltage divider:
@@ -118,7 +119,7 @@ describe("Memristor initialization (T1)", () => {
     });
     const mem = findMemristor(fix.circuit.elements);
 
-    const w0 = fix.pool.state0[mem._stateBase + SLOT_W];
+    const w0 = fix.pool.state1[mem._stateBase + SLOT_W];
     expect(w0).toBeCloseTo(0.05, 9);
   });
 });

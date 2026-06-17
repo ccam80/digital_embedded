@@ -72,7 +72,7 @@ test.describe('Master circuit assembly via UI', () => {
     // --- WIRING (captured from manual session) ---
     // Net A: A.out → bus at x=7 down to NOT, then gate In_1 pins tap the bus
     // First wire creates the vertical bus: A(3,4) → (7,4) → (7,22) → NOT(10,22)
-    await builder.drawWireExplicit('A', 'out', 'G_NOT', 'in', [[7, 4], [7, 22]]);
+    await builder.drawWireExplicit('A', 'out', 'G_NOT', 'In_1', [[7, 4], [7, 22]]);
     // Tap bus for AND: AND.In_1(10,4) → bus at (7,4)
     await builder.drawWireFromPinExplicit('G_AND', 'In_1', 7, 4);
     // Tap bus for OR: OR.In_1(10,10) → bus at (7,10)

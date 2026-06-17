@@ -203,7 +203,11 @@ describe("Fuse parameter hot-load (T1)", () => {
     fix.coordinator.setComponentProperty(fuseCe, "rBlown", 1e6);
     fix.coordinator.step();
     const after = fix.engine.getNodeVoltage(outNode);
-    expect(after).not.toBeCloseTo(before);
+    // Both blown-regime divider voltages are sub-millivolt, so a precision-2
+    // not.toBeCloseTo cannot separate them. Assert the rBlown change as a
+    // relative effect instead: dropping rBlown 1e9 -> 1e6 scales the open-circuit
+    // divider output up by the resistance ratio (9 + 1e9)/(9 + 1e6) ~= 1000x.
+    expect(after / before).toBeCloseTo((9.0 + 1e9) / (9.0 + 1e6), 1);
     expect(after).toBeCloseTo(5.0 * 9.0 / (9.0 + 1e6), 8);
   });
 

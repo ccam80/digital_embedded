@@ -155,7 +155,6 @@ class OpampElement extends AnalogElement {
   private readonly _nInn: number;
   private readonly _nOut: number;
   private readonly _p: Record<string, number>;
-  private readonly _rOut: number;
 
   // Internal node (only used when rOut > 0); assigned in setup()
   private _nVint = 0;
@@ -191,7 +190,6 @@ class OpampElement extends AnalogElement {
   ) {
     super(pinNodes);
     this._p = p;
-    this._rOut = p.rOut;
     this._nInp = pinNodes.get("in+")!;
     this._nInn = pinNodes.get("in-")!;
     this._nOut = pinNodes.get("out")!;
@@ -207,7 +205,7 @@ class OpampElement extends AnalogElement {
 
     const k = this.branchIndex;
 
-    if (this._rOut > 0) {
+    if (this._p.rOut > 0) {
       // Allocate internal voltage node between ideal source and output resistance
       this._nVint = ctx.makeVolt(this.label ?? "opamp", "vint");
       this._internalLabels.push("vint");
@@ -253,9 +251,9 @@ class OpampElement extends AnalogElement {
     const vDiff = vInpV - vInnV;
     const effectiveGain = this._p.gain * scale;
 
-    if (this._rOut > 0) {
+    if (this._p.rOut > 0) {
       // RES stamp (ressetup.c:46-49): conductance G = 1/rOut
-      const G = 1 / this._rOut;
+      const G = 1 / this._p.rOut;
       solver.stampElement(this._hResAA,  G);
       solver.stampElement(this._hResBB,  G);
       solver.stampElement(this._hResAB, -G);

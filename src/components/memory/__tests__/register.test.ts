@@ -451,15 +451,17 @@ interface RegisterFileWithSplitterFixture {
 
 /**
  * Cat 13 fixture: a 3-bit In is routed through a Splitter (inputSplitting:"3",
- * outputSplitting:"2") toward the RegisterFile's 2-bit Rw port. A separate
- * 2-bit In (RW) also connects to rf:Rw on the same net. Because the Splitter
- * is an infrastructure component in the digital engine (noop executeFn), the
- * Splitter's output pin acts as a wire terminator on the Rw net rather than a
- * live driver. The 2-bit In RW directly drives Rw; setSignal("RW", sourceValue)
- * internally calls BitVector.fromNumber(sourceValue, 2), which masks the value
- * to the port width: effective_addr = sourceValue & ((1 << 2) - 1). The Splitter
- * topology is present as the canonical bus-adapter component, documenting the
- * architectural boundary between the 3-bit and 2-bit domains.
+ * outputSplitting:"2") to demonstrate the bus-width boundary between the 3-bit
+ * IN3 domain and a 2-bit address domain. The Splitter's 2-bit output terminates
+ * on its own Out display (SPL_SINK) so it is the sole driver of that net,
+ * keeping the bus-adapter chain present as documentation without driving the
+ * RegisterFile address net.
+ *
+ * The RegisterFile's 2-bit Rw port is driven by a single source: the 2-bit In
+ * (RW). setSignal("RW", sourceValue) internally calls
+ * BitVector.fromNumber(sourceValue, 2), which masks the value to the port
+ * width: effective_addr = sourceValue & ((1 << 2) - 1). One driver per net means
+ * the bus resolver sees no tri-state conflict.
  *
  * Splitter pin labels (derived from parsePorts / portName):
  *   input  "3"  → single port, pos=0 bits=3 → label "0-2"
@@ -471,6 +473,7 @@ function buildRegisterFileWithSplitterFixture(): RegisterFileWithSplitterFixture
   const components: Array<{ id: string; type: string; props: Record<string, PropertyValue> }> = [
     { id: "in3",    type: "In",           props: { label: "IN3", bitWidth: 3 } },
     { id: "spl",    type: "Splitter",     props: { label: "SPL", "inputSplitting": "3", "outputSplitting": "2" } },
+    { id: "spl_sink", type: "Out",        props: { label: "SPL_SINK", bitWidth: addrBits } },
     { id: "in_rw",  type: "In",           props: { label: "RW",  bitWidth: addrBits } },
     { id: "in_din", type: "In",           props: { label: "DIN", bitWidth } },
     { id: "in_we",  type: "In",           props: { label: "WE",  bitWidth: 1 } },
@@ -482,9 +485,9 @@ function buildRegisterFileWithSplitterFixture(): RegisterFileWithSplitterFixture
     { id: "out_db", type: "Out",          props: { label: "DB",  bitWidth } },
   ];
   const connections: Array<[string, string]> = [
-    ["in3:out",    "spl:0-2"],   // 3-bit bus into Splitter input
-    ["spl:0,1",    "rf:Rw"],     // Splitter output terminates on Rw net (adapter boundary)
-    ["in_rw:out",  "rf:Rw"],     // 2-bit In drives the Rw net; setSignal masks to addrBits
+    ["in3:out",    "spl:0-2"],       // 3-bit bus into Splitter input
+    ["spl:0,1",    "spl_sink:in"],   // Splitter 2-bit output terminates on its own display
+    ["in_rw:out",  "rf:Rw"],         // 2-bit In is the sole driver of the Rw net; setSignal masks to addrBits
     ["in_din:out", "rf:Din"],
     ["in_we:out",  "rf:we"],
     ["in_c:out",   "rf:C"],

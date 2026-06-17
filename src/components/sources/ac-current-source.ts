@@ -42,7 +42,7 @@ import {
   type Waveform,
   type ExtendedWaveformParams,
   type WaveformStepContext,
-  type TrnoiseState,
+  type TrnoiseRingBuffer,
   type TrrandomState,
   FunctionType,
   computeWaveformValue,
@@ -318,7 +318,8 @@ class AcCurrentSourceAnalogImpl extends AnalogElement {
   private _funcTGiven = false;
   private _dcValue = 0;
   private _dcGiven = false;
-  private _trnoiseState: TrnoiseState | null = null;
+  private _trnoiseState: TrnoiseRingBuffer | null = null;
+  private _trnoiseRng: import("../../solver/analog/monte-carlo.js").SeededRng | null = null;
   private _trrandomState: TrrandomState | null = null;
   // ISRC has no ISRCbreak_time / ISRCrdelay / ISRCr / ISRCrGiven / ISRCrBreakpt
   // (isrcdefs.h:21-67 — none present). ISRCaccept (isrcacct.c) recomputes every
@@ -519,6 +520,7 @@ class AcCurrentSourceAnalogImpl extends AnalogElement {
       dcValue: this._dcValue,
       dcGiven: this._dcGiven,
       trnoiseState: this._trnoiseState,
+      trnoiseRng: this._trnoiseRng,
       trrandomState: this._trrandomState,
       // ISRC PWL is non-repeating (isrcload.c:278-302): no delay, no repeat.
       // Feeding rdelay=0/rGiven=false/rBreakpt=0 collapses the shared engine's

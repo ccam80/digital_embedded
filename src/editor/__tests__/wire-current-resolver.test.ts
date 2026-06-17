@@ -9,6 +9,7 @@
 
 import { describe, it, expect } from "vitest";
 import { WireCurrentResolver } from "../wire-current-resolver.js";
+import type { ComponentCurrentPath } from "../wire-current-resolver.js";
 import { buildFixture } from "../../solver/analog/__tests__/fixtures/build-fixture.js";
 import { Wire } from "../../core/circuit.js";
 import type { CircuitElement } from "../../core/element.js";
@@ -64,6 +65,38 @@ function wiresAtPin(
     throw new Error(`no wire terminates at pin ${ce.instanceId}:${pinLabel}`);
   }
   return touching;
+}
+
+/**
+ * Geometry key for a component-body path: the pin0→pin1 world endpoints that
+ * define it. Mirrors `CurrentFlowAnimator._componentPathKey`
+ * (`current-animation.ts`), the production consumer that addresses a path by
+ * its endpoints — never by its position in `getComponentPaths()`.
+ */
+function pathGeoKey(
+  pin0: { x: number; y: number },
+  pin1: { x: number; y: number },
+): string {
+  return `${pin0.x},${pin0.y}-${pin1.x},${pin1.y}`;
+}
+
+/**
+ * The component body path for a 2-terminal element, located by GEOMETRY.
+ *
+ * `resolve()` builds a 2-terminal path with `pin0 = pinWorldPosition(ce,
+ * pins[0])` and `pin1 = pinWorldPosition(ce, pins[1])`, so the path is
+ * uniquely addressable by those two world endpoints. Returns undefined when
+ * the element has fewer than two pins or no matching path was emitted.
+ */
+function pathForTwoTerminal(
+  pathByGeo: ReadonlyMap<string, ComponentCurrentPath>,
+  ce: CircuitElement,
+): ComponentCurrentPath | undefined {
+  const pins = ce.getPins();
+  if (pins.length < 2) return undefined;
+  const pin0 = pinWorldPosition(ce, pins[0]);
+  const pin1 = pinWorldPosition(ce, pins[1]);
+  return pathByGeo.get(pathGeoKey(pin0, pin1));
 }
 
 // ===========================================================================
@@ -151,14 +184,18 @@ describe("WireCurrentResolver - DC behaviour through buildFixture", () => {
     expect(paths.length).toBeGreaterThanOrEqual(3);
 
     // Each component body path's current matches its element current.
+    // Correlate a path to its element by GEOMETRY (the pin0→pin1 world
+    // endpoints that define the path), not by emit order — this is the same
+    // key the production consumer (current-animation.ts _componentPathKey)
+    // uses to address a path.
+    const pathByGeo = new Map<string, ComponentCurrentPath>();
+    for (const p of paths) pathByGeo.set(pathGeoKey(p.pin0, p.pin1), p);
     const bodyByLabel = new Map<string, number>();
-    let pIdx = 0;
     for (const [eIdx, ce] of fix.circuit.elementToCircuitElement) {
       void eIdx;
       const lbl = ce.getProperties().getOrDefault<string>("label", "");
-      if (pIdx >= paths.length) break;
-      bodyByLabel.set(lbl, paths[pIdx].current);
-      pIdx++;
+      const path = pathForTwoTerminal(pathByGeo, ce);
+      if (path) bodyByLabel.set(lbl, path.current);
     }
     expect(Math.abs((bodyByLabel.get("r1") ?? 0) - I_R1) / I_R1).toBeLessThan(0.01);
     expect(Math.abs((bodyByLabel.get("r2") ?? 0) - I_R2) / I_R2).toBeLessThan(0.01);
@@ -284,14 +321,16 @@ describe("WireCurrentResolver - 4-node resistor ladder KCL", () => {
     const paths = resolver.getComponentPaths();
     expect(paths.length).toBeGreaterThanOrEqual(8);
 
-    let pIdx = 0;
-    for (const [eIdx] of fix.circuit.elementToCircuitElement) {
+    // Correlate each path to its element by GEOMETRY (pin0→pin1 world
+    // endpoints), not by emit order — matching the production consumer's key.
+    const pathByGeo = new Map<string, ComponentCurrentPath>();
+    for (const p of paths) pathByGeo.set(pathGeoKey(p.pin0, p.pin1), p);
+    for (const [eIdx, ce] of fix.circuit.elementToCircuitElement) {
       const I = Math.abs(fix.coordinator.readElementCurrent(eIdx) ?? 0);
-      if (pIdx >= paths.length) break;
-      if (I > 1e-9) {
-        expect(Math.abs(paths[pIdx].current - I) / I).toBeLessThan(0.01);
-      }
-      pIdx++;
+      if (I <= 1e-9) continue;
+      const path = pathForTwoTerminal(pathByGeo, ce);
+      expect(path).toBeDefined();
+      expect(Math.abs(path!.current - I) / I).toBeLessThan(0.01);
     }
   });
 });

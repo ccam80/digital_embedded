@@ -345,12 +345,15 @@ export function executeGraphicCard(
   // Pack control signals and low bits of addr into output slot (D)
   // for change detection by the engine post-step hook
   const outputIdx = layout.outputOffset(index);
+  const dataBits = (layout.getProperty(index, "dataBits") as number) ?? 24;
+  const mask = dataBits >= 32 ? 0xFFFFFFFF : (((1 << dataBits) - 1) >>> 0);
   state[wt[outputIdx]] =
-    ((addr & 0xFFFF) << 0) |
-    (str << 16) |
-    (clk << 17) |
-    (ld << 18) |
-    (bank << 19);
+    (((addr & 0xFFFF) << 0) |
+      (str << 16) |
+      (clk << 17) |
+      (ld << 18) |
+      (bank << 19)) &
+    mask;
 }
 
 // ---------------------------------------------------------------------------

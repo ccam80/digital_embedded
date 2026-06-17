@@ -179,6 +179,7 @@ describe("D_FF Cat 10 named-model preset (analog netlist swap)", () => {
     const coord = facade.compile(buildDForModel(facade, model));
     facade.setSignal(coord, "D", 1);
     pulseClock(facade, coord, "C");
+    facade.step(coord);   // let A2D bridge propagate settled analog Q into digital domain
     return {
       q:  Number(facade.readSignal(coord, "Q")),
       qb: Number(facade.readSignal(coord, "QB")),
