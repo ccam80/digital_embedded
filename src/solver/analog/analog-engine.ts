@@ -248,6 +248,7 @@ export class MNAEngine implements AnalogEngine {
         nodeCount: compiled.nodeCount,
         elements: compiled.elements,
         elementsByFamily: compiled.elementsByFamily,
+        timeRef: compiled.timeRef,
       },
       this._params,
       (t) => this._timestep.addBreakpoint(t),

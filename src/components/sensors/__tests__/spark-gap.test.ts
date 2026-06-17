@@ -268,11 +268,11 @@ describe("SparkGap parameter hot-load (T1)", () => {
     // Fire the gap, then raise iHold above the steady-state holding current
     // I_steady = Vsrc/(rs+rOn). At Vsrc=10, rs=100, rOn=5 -> I_steady ~ 0.0952 A.
     // Raising iHold to 0.5 A puts I_steady < iHold -> extinction transition.
+    // No tStop: streaming mode so phase 2 (post-iHold hot-load) is not tStop-gated.
     const fix = buildFixture({
       build: (_r, facade) => buildSparkGapCircuit(facade, {
         vSource: 1500, rSeries: 100, vBreakdown: 1000, rOn: 5, rOff: 1e10, iHold: 0.01,
       }),
-      params: { tStop: 1e-3, maxTimeStep: 1e-4 },
     });
     const sg = findSparkGap(fix.circuit.elements);
     expect(fix.pool.state1[sg._stateBase + SLOT_CONDUCTING]).toBe(1);

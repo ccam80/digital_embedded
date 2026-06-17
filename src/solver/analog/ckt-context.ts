@@ -50,7 +50,6 @@ export class LoadCtxImpl implements LoadContext {
   matrix!: SparseSolver;
   rhs!: Float64Array;
   rhsOld!: Float64Array;
-  time!: number;
   dt!: number;
   cktStep!: number;
   cktFinalTime!: number;
@@ -81,9 +80,18 @@ export class LoadCtxImpl implements LoadContext {
    *- the getters below see post-rotation arrays automatically.
    */
   private _statePool: StatePool;
+  /** The one circuit clock (cktdefs.h:95 CKTtime), written in place by the
+   *  engine step loop. The time getter below is the live read every device
+   *  load gets via ctx.time — exactly as ngspice loads read ckt->CKTtime. */
+  private readonly _timeRef: { value: number };
 
-  constructor(statePool: StatePool, init: Omit<LoadContext, "state0" | "state1" | "state2" | "state3">) {
+  constructor(
+    statePool: StatePool,
+    timeRef: { value: number },
+    init: Omit<LoadContext, "state0" | "state1" | "state2" | "state3" | "time">,
+  ) {
     this._statePool = statePool;
+    this._timeRef = timeRef;
     Object.assign(this, init);
   }
 
@@ -101,6 +109,11 @@ export class LoadCtxImpl implements LoadContext {
   get state1(): Float64Array { return this._statePool.states[1]; }
   get state2(): Float64Array { return this._statePool.states[2]; }
   get state3(): Float64Array { return this._statePool.states[3]; }
+
+  // cite cktdefs.h:95 — `double CKTtime`, the one transient clock written by
+  // dctran.c each accepted step. digiTS writes timeRef.value in the engine
+  // step loop; every device load reads it live through ctx.time.
+  get time(): number { return this._timeRef.value; }
 }
 
 // ---------------------------------------------------------------------------
@@ -216,6 +229,9 @@ export interface CKTCircuitInput {
   readonly nodeCount: number;
   readonly elements: readonly AnalogElement[];
   readonly elementsByFamily: ReadonlyMap<DeviceFamily, readonly AnalogElement[]>;
+  /** The one circuit clock (ngspice CKTtime). The engine writes timeRef.value
+   *  each step; LoadContext.time is a live getter onto it. */
+  readonly timeRef: { value: number };
   readonly statePool?: StatePool | null;
 }
 
@@ -768,7 +784,7 @@ export class CKTCircuitContext {
     addBreakpoint: (t: number) => void,
     solver: SparseSolver,
   ) {
-    const { nodeCount, elements, elementsByFamily } = circuit;
+    const { nodeCount, elements, elementsByFamily, timeRef } = circuit;
 
     this.nodeCount = nodeCount;
     this.elements = elements;
@@ -840,13 +856,12 @@ export class CKTCircuitContext {
     // device-side IC seeding branches (e.g. bjtload.c:258-264).
     const initialCktMode = (MODEDCOP | MODEINITFLOAT) | (params.uic ? MODEUIC : 0);
     this.cktMode = initialCktMode;
-    this.loadCtx = new LoadCtxImpl(new StatePool(0), {
+    this.loadCtx = new LoadCtxImpl(new StatePool(0), timeRef, {
       cktMode: initialCktMode,
       solver: this._solver,
       matrix: this._solver,
       rhs: this.rhs,
       rhsOld: this.rhsOld,
-      time: 0,
       dt: 0,
       // ngspice CKTstep / CKTfinalTime — circuit-global transient constants
       // read by the independent-source waveform order-guard defaults

@@ -674,9 +674,9 @@ export class ComparisonSession {
     // Seed the digiTS compiled circuit with the author-supplied ICs so the
     // transient-boot DCOP (MODETRANOP) honours them on the digiTS side too.
     // _ourTopology.nodeLabels was captured above, so the NAME->id resolution
-    // can run here. Nodesets stay ngspice-only (the digiTS nodeset apply is the
-    // recon's target), but ICs are seeded into BOTH engines so the harness
-    // drives the same transient-boot stimulus on each side. The compiled
+    // can run here. Both nodesets and ICs are seeded into BOTH engines so the
+    // harness drives the same transient-boot stimulus and nodeset guess on each
+    // side. The compiled
     // circuit's `ics` field is declared readonly but is a mutable Map written
     // via cast in its constructor; ckt-load reads it through ctx.ics at setup.
     const resolvedIcsForOurs = this._resolveIcNames();
@@ -685,6 +685,14 @@ export class ComparisonSession {
         compiled.ics ??
         ((compiled as { ics?: Map<number, number> }).ics = new Map<number, number>());
       for (const [nodeId, value] of resolvedIcsForOurs) icMap.set(nodeId, value);
+    }
+
+    const resolvedNodesetsForOurs = this._resolveNodesetNames();
+    if (resolvedNodesetsForOurs && resolvedNodesetsForOurs.size > 0) {
+      const nsMap =
+        compiled.nodesets ??
+        ((compiled as { nodesets?: Map<number, number> }).nodesets = new Map<number, number>());
+      for (const [nodeId, value] of resolvedNodesetsForOurs) nsMap.set(nodeId, value);
     }
 
     // elementIndex → canonical device type, used by captureElementStates to

@@ -68,9 +68,11 @@ const MIN_RESISTANCE = 1e-12;
 
 export const SPARK_GAP_SCHEMA = defineStateSchema("SparkGapElement", [
   { name: "CONDUCTING", doc: "Conducting state: 1 = conducting, 0 = blocking" },
+  { name: "LAST_G",     doc: "Conductance stamped at the previous NR iteration; used for self-consistent current estimate" },
 ]) satisfies StateSchema;
 
 const SLOT_CONDUCTING = 0;
+const SLOT_LAST_G     = 1;
 
 // ---------------------------------------------------------------------------
 // Model parameter declarations
@@ -113,13 +115,17 @@ function extinctionResistance(absI: number, iHold: number, rOn: number, rOff: nu
 
 /**
  * Apply hysteresis state transition and return updated conducting flag (0 or 1).
+ * lastG is the conductance stamped in the previous NR iteration; using it as
+ * the current estimate (absI = absV * lastG) keeps the extinction check
+ * consistent with the Jacobian already presented to the solver, preventing
+ * binary G oscillation when iHold falls between the two equilibrium currents.
  */
-function applyHysteresis(conductingOld: number, absV: number, vBreakdown: number, iHold: number, rOn: number): number {
+function applyHysteresis(conductingOld: number, absV: number, vBreakdown: number, iHold: number, lastG: number): number {
   if (!conductingOld) {
     return absV > vBreakdown ? 1 : 0;
   }
-  // In conducting state: current is V / rOn
-  const absI = absV / Math.max(rOn, MIN_RESISTANCE);
+  // Current estimate consistent with the conductance stamped last iteration.
+  const absI = absV * lastG;
   return absI < iHold ? 0 : 1;
 }
 
@@ -188,13 +194,19 @@ export class SparkGapElement extends PoolBackedAnalogElement {
   }
 
   /**
-   * Compute effective resistance given the current conducting state and terminal voltage.
+   * Compute effective resistance given the current conducting state, terminal voltage,
+   * and the conductance stamped in the previous NR iteration.
+   *
+   * lastG is used as the self-consistent current estimate in the conducting branch:
+   *   absI = absV * lastG  (= absV / R_prev_iter)
+   * This avoids the fixed-rOn estimate that oscillates across iHold when iHold
+   * is hot-loaded between the two equilibrium currents.
    */
-  private resistanceFromState(conducting: number, absV: number): number {
+  private resistanceFromState(conducting: number, absV: number, lastG: number): number {
     if (!conducting) {
       return firingResistance(absV, this._vBreakdown, this._rOff, this._rOn);
     }
-    const absI = absV / Math.max(this._rOn, MIN_RESISTANCE);
+    const absI = absV * lastG;
     return extinctionResistance(absI, this._iHold, this._rOn, this._rOff);
   }
 
@@ -213,7 +225,16 @@ export class SparkGapElement extends PoolBackedAnalogElement {
     const vTerm = voltages[nPos] - voltages[nNeg];
     const absV = Math.abs(vTerm);
 
-    const R = this.resistanceFromState(conductingOld, absV);
+    // lastG: conductance stamped in the previous NR iteration (s0 carries the
+    // value written by the prior load() call within this attempt).  On the very
+    // first NR iteration of a step s0 holds the rotated-in previous accepted
+    // state, which initialises LAST_G to 0; fall back to 1/rOn in that case so
+    // the first iterate behaves as before and subsequent iterates are
+    // self-consistent.
+    const lastGRaw = s0[base + SLOT_LAST_G];
+    const lastG = lastGRaw > 0 ? lastGRaw : 1 / Math.max(this._rOn, MIN_RESISTANCE);
+
+    const R = this.resistanceFromState(conductingOld, absV, lastG);
     const G = 1 / Math.max(R, MIN_RESISTANCE);
 
     ctx.solver.stampElement(this._hPP,  G);
@@ -222,8 +243,10 @@ export class SparkGapElement extends PoolBackedAnalogElement {
     ctx.solver.stampElement(this._hNN,  G);
 
     // ngspice CKTstate0 idiom - bjtload.c:744-746, dioload.c:325-326
-    const conductingNew = applyHysteresis(conductingOld, absV, this._vBreakdown, this._iHold, this._rOn);
+    const conductingNew = applyHysteresis(conductingOld, absV, this._vBreakdown, this._iHold, lastG);
     s0[base + SLOT_CONDUCTING] = conductingNew;
+    // Store the conductance just stamped for use as lastG in the next NR iteration.
+    s0[base + SLOT_LAST_G] = G;
   }
 
   getPinCurrents(rhs: Float64Array): number[] {
@@ -232,9 +255,13 @@ export class SparkGapElement extends PoolBackedAnalogElement {
     const vPos = rhs[nPos];
     const vNeg = rhs[nNeg];
     const s1 = this._pool.states[1];
-    const conducting = s1[this._stateBase + SLOT_CONDUCTING];
+    const base = this._stateBase;
+    const conducting = s1[base + SLOT_CONDUCTING];
     const absV = Math.abs(vPos - vNeg);
-    const G = 1 / Math.max(this.resistanceFromState(conducting, absV), MIN_RESISTANCE);
+    // Use the last accepted LAST_G from s1 for a consistent current estimate.
+    const lastGRaw = s1[base + SLOT_LAST_G];
+    const lastG = lastGRaw > 0 ? lastGRaw : 1 / Math.max(this._rOn, MIN_RESISTANCE);
+    const G = 1 / Math.max(this.resistanceFromState(conducting, absV, lastG), MIN_RESISTANCE);
     const I = G * (vPos - vNeg);
     return [I, -I];
   }
