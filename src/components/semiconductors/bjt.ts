@@ -64,13 +64,13 @@ export const { paramDefs: BJT_PARAM_DEFS, defaults: BJT_NPN_DEFAULTS } = defineM
   secondary: {
     NF:  { default: 1,      description: "Forward emission coefficient" },
     BR:  { default: 1,      description: "Reverse current gain" },
-    VAF: { default: Infinity, unit: "V", description: "Forward Early voltage" },
-    IKF: { default: Infinity, unit: "A", description: "Forward knee current" },
-    IKR: { default: Infinity, unit: "A", description: "Reverse knee current" },
+    VAF: { default: 0, unit: "V", description: "Forward Early voltage" },
+    IKF: { default: 0, unit: "A", description: "Forward knee current" },
+    IKR: { default: 0, unit: "A", description: "Reverse knee current" },
     ISE: { default: 0,      unit: "A", description: "B-E leakage saturation current" },
     ISC: { default: 0,      unit: "A", description: "B-C leakage saturation current" },
     NR:  { default: 1,      description: "Reverse emission coefficient" },
-    VAR: { default: Infinity, unit: "V", description: "Reverse Early voltage" },
+    VAR: { default: 0, unit: "V", description: "Reverse Early voltage" },
     NE:  { default: 1.5,    description: "B-E leakage emission coefficient" },
     NC:  { default: 2,      description: "B-C leakage emission coefficient" },
     TNOM: { default: 300.15, unit: "K", description: "Nominal temperature", spiceConverter: kelvinToCelsius },
@@ -93,13 +93,13 @@ export const { defaults: BJT_PNP_DEFAULTS } = defineModelParams({
   secondary: {
     NF:  { default: 1,      description: "Forward emission coefficient" },
     BR:  { default: 1,      description: "Reverse current gain" },
-    VAF: { default: Infinity, unit: "V", description: "Forward Early voltage" },
-    IKF: { default: Infinity, unit: "A", description: "Forward knee current" },
-    IKR: { default: Infinity, unit: "A", description: "Reverse knee current" },
+    VAF: { default: 0, unit: "V", description: "Forward Early voltage" },
+    IKF: { default: 0, unit: "A", description: "Forward knee current" },
+    IKR: { default: 0, unit: "A", description: "Reverse knee current" },
     ISE: { default: 0,      unit: "A", description: "B-E leakage saturation current" },
     ISC: { default: 0,      unit: "A", description: "B-C leakage saturation current" },
     NR:  { default: 1,      description: "Reverse emission coefficient" },
-    VAR: { default: Infinity, unit: "V", description: "Reverse Early voltage" },
+    VAR: { default: 0, unit: "V", description: "Reverse Early voltage" },
     NE:  { default: 1.5,    description: "B-E leakage emission coefficient" },
     NC:  { default: 2,      description: "B-C leakage emission coefficient" },
     TNOM: { default: 300.15, unit: "K", description: "Nominal temperature", spiceConverter: kelvinToCelsius },
@@ -130,13 +130,13 @@ export const { paramDefs: BJT_SPICE_L1_PARAM_DEFS, defaults: BJT_SPICE_L1_NPN_DE
     IBC: { default: 0,      unit: "A", spiceName: "ibc", description: "B-C saturation current (quasi-saturation split)" },
     NF:  { default: 1,      description: "Forward emission coefficient" },
     BR:  { default: 1,      description: "Reverse current gain" },
-    VAF: { default: Infinity, unit: "V", description: "Forward Early voltage" },
-    IKF: { default: Infinity, unit: "A", description: "Forward knee current" },
-    IKR: { default: Infinity, unit: "A", description: "Reverse knee current" },
+    VAF: { default: 0, unit: "V", description: "Forward Early voltage" },
+    IKF: { default: 0, unit: "A", description: "Forward knee current" },
+    IKR: { default: 0, unit: "A", description: "Reverse knee current" },
     ISE: { default: 0,      unit: "A", description: "B-E leakage saturation current" },
     ISC: { default: 0,      unit: "A", description: "B-C leakage saturation current" },
     NR:  { default: 1,      description: "Reverse emission coefficient" },
-    VAR: { default: Infinity, unit: "V", description: "Reverse Early voltage" },
+    VAR: { default: 0, unit: "V", description: "Reverse Early voltage" },
     NE:  { default: 1.5,    description: "B-E leakage emission coefficient" },
     NC:  { default: 2,      description: "B-C leakage emission coefficient" },
     RB:  { default: 0,      unit: "Ω", description: "Zero-bias base resistance" },
@@ -154,7 +154,7 @@ export const { paramDefs: BJT_SPICE_L1_PARAM_DEFS, defaults: BJT_SPICE_L1_NPN_DE
     FC:  { default: 0.5,    description: "Forward-bias capacitance coefficient" },
     TF:  { default: 0,      unit: "s", description: "Forward transit time" },
     XTF: { default: 0,      description: "Transit time bias dependence coefficient" },
-    VTF: { default: Infinity, unit: "V", description: "Transit time dependency on Vbc" },
+    VTF: { default: 0, unit: "V", description: "Transit time dependency on Vbc" },
     ITF: { default: 0,      unit: "A", description: "Transit time dependency on Ic" },
     PTF: { default: 0,      unit: "°", description: "Excess phase at freq=1/(2π·TF)" },
     TR:  { default: 0,      unit: "s", description: "Reverse transit time" },
@@ -246,13 +246,13 @@ export const { defaults: BJT_SPICE_L1_PNP_DEFAULTS } = defineModelParams({
     IBC: { default: 0,      unit: "A", spiceName: "ibc", description: "B-C saturation current (quasi-saturation split)" },
     NF:  { default: 1,      description: "Forward emission coefficient" },
     BR:  { default: 1,      description: "Reverse current gain" },
-    VAF: { default: Infinity, unit: "V", description: "Forward Early voltage" },
-    IKF: { default: Infinity, unit: "A", description: "Forward knee current" },
-    IKR: { default: Infinity, unit: "A", description: "Reverse knee current" },
+    VAF: { default: 0, unit: "V", description: "Forward Early voltage" },
+    IKF: { default: 0, unit: "A", description: "Forward knee current" },
+    IKR: { default: 0, unit: "A", description: "Reverse knee current" },
     ISE: { default: 0,      unit: "A", description: "B-E leakage saturation current" },
     ISC: { default: 0,      unit: "A", description: "B-C leakage saturation current" },
     NR:  { default: 1,      description: "Reverse emission coefficient" },
-    VAR: { default: Infinity, unit: "V", description: "Reverse Early voltage" },
+    VAR: { default: 0, unit: "V", description: "Reverse Early voltage" },
     NE:  { default: 1.5,    description: "B-E leakage emission coefficient" },
     NC:  { default: 2,      description: "B-C leakage emission coefficient" },
     RB:  { default: 0,      unit: "Ω", description: "Zero-bias base resistance" },
@@ -270,7 +270,7 @@ export const { defaults: BJT_SPICE_L1_PNP_DEFAULTS } = defineModelParams({
     FC:  { default: 0.5,    description: "Forward-bias capacitance coefficient" },
     TF:  { default: 0,      unit: "s", description: "Forward transit time" },
     XTF: { default: 0,      description: "Transit time bias dependence coefficient" },
-    VTF: { default: Infinity, unit: "V", description: "Transit time dependency on Vbc" },
+    VTF: { default: 0, unit: "V", description: "Transit time dependency on Vbc" },
     ITF: { default: 0,      unit: "A", description: "Transit time dependency on Ic" },
     PTF: { default: 0,      unit: "°", description: "Excess phase at freq=1/(2π·TF)" },
     TR:  { default: 0,      unit: "s", description: "Reverse transit time" },
@@ -2380,7 +2380,11 @@ export function createSpiceL1BjtElement(
           const ps   = tp.tSubpot;
           const xms  = tp.tjunctionExpSub;
           const xtf  = params.XTF;
-          const ovtf = params.VTF === Infinity ? 0 : 1 / (1.44 * params.VTF);
+          // cite: bjttemp.c:51-54 — transitTimeVBCFactor is 1/(VTF·1.44) when
+          // VTF (BJTtransitTimeFVBC) is nonzero, else 0. VTF==0 disables the
+          // Vbc dependence of the transit time (ngspice default).
+          const ovtf = (Number.isFinite(params.VTF) && params.VTF !== 0)
+            ? 1 / (1.44 * params.VTF) : 0;
           // cite: bjttemp.c:128-129 — ttransitTimeHighCurrentF is area-folded.
           const xjtf = tp.ttransitTimeHighCurrentF;
 
