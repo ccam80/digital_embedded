@@ -194,6 +194,10 @@ class ResistorAnalogElement extends AnalogElement {
   // line this is the netlisted value; otherwise updateConduct() derives it from
   // the geometry ((L−2·short)/(W−2·narrow)·rsh) or the model default.
   private _resistance: number;
+  // Resistance value present in the property bag (NaN if none). Honoured by
+  // updateConduct's not-given path so a seeded/explicit value wins over the
+  // degenerate 1 mΩ clamp; the clamp is reserved for a value-less resistor.
+  private _bagRes: number;
   // DC/transient conductance — ngspice here->RESconduct. Carries the RESm fold
   // (restemp.c:104 RESconduct = RESm/(resist·factor·scale)).
   private _G: number;
@@ -287,7 +291,13 @@ class ResistorAnalogElement extends AnalogElement {
     // only when the netlist actually supplied `<x>`, matching the cap pilot
     // (capacitor.ts:293-333) and inductor (inductor.ts:396-439).
     this._resGiven = props.isModelParamGiven("resistance");
-    const rawRes = this._resGiven ? props.getModelParam<number>("resistance") : RESISTOR_DEFAULTS["resistance"]!;
+    // The resistance value carried in the property bag, or NaN when the bag has
+    // none. createSeededBag seeds the model default, so a normally-constructed
+    // resistor always has a value here even when *Given is false; only a
+    // deliberately value-less leaf (e.g. a composite ideal-wire) lacks one.
+    // updateConduct honours this value over the degenerate 1 mΩ clamp.
+    this._bagRes = props.hasModelParam("resistance") ? props.getModelParam<number>("resistance") : NaN;
+    const rawRes = Number.isFinite(this._bagRes) ? this._bagRes : RESISTOR_DEFAULTS["resistance"]!;
     this._resistance = Math.max(rawRes, MIN_RESISTANCE);
 
     // Per-instance parameters.
@@ -436,8 +446,16 @@ class ResistorAnalogElement extends AnalogElement {
       } else if (this._modResGiven) {
         // restemp.c:67-68 — model default resistance.
         this._resistance = this._modRes;
+      } else if (Number.isFinite(this._bagRes)) {
+        // A resistance value is present in the bag- the seeded instance default
+        // or a value set without *Given. Honour it. digiTS always seeds a
+        // default, so unlike ngspice (which errors when R is omitted) the
+        // degenerate clamp below is reserved for a genuinely value-less resistor
+        // (resistance absent from the bag, e.g. a composite ideal-wire leaf).
+        this._resistance = Math.max(this._bagRes, MIN_RESISTANCE);
       } else {
-        // restemp.c:69-74 — degenerate: warn and clamp to 1 mOhm.
+        // restemp.c:69-74 — no resistance, geometry, or model R: degenerate
+        // clamp to 1 mOhm with a warning.
         if (spillWarning) {
           console.warn(`${this.label}: resistance to low, set to 1 mOhm`);
         }
