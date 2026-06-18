@@ -873,7 +873,7 @@ export const SwitchSPSTDefinition: StandaloneComponentDefinition = {
   modelRegistry: {
     "behavioral": {
       kind: "inline",
-      factory: (pinNodes, props, _getTime) =>
+      factory: (pinNodes, props) =>
         createSwitchSPSTElement(pinNodes, props),
       paramDefs: ANALOG_SWITCH_PARAM_DEFS,
       params: ANALOG_SWITCH_DEFAULTS,
@@ -908,7 +908,7 @@ export const SwitchSPDTDefinition: StandaloneComponentDefinition = {
   modelRegistry: {
     "behavioral": {
       kind: "inline",
-      factory: (pinNodes, props, _getTime) =>
+      factory: (pinNodes, props) =>
         createSwitchSPDTElement(pinNodes, props),
       paramDefs: ANALOG_SWITCH_PARAM_DEFS,
       params: ANALOG_SWITCH_DEFAULTS,

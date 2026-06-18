@@ -178,7 +178,7 @@ export const ComparatorPushPullDriverDefinition: ComponentDefinition = {
       kind: "inline",
       paramDefs: COMPARATOR_PUSHPULL_DRIVER_PARAM_DEFS,
       params: {},
-      factory: (pinNodes: ReadonlyMap<string, number>, props: PropertyBag, _getTime: () => number): AnalogElement =>
+      factory: (pinNodes: ReadonlyMap<string, number>, props: PropertyBag): AnalogElement =>
         new ComparatorPushPullDriverElement(pinNodes, props),
     },
   },

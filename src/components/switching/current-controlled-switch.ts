@@ -502,7 +502,6 @@ export const CurrentControlledSwitchDefinition: StandaloneComponentDefinition = 
       factory: (
         pinNodes: ReadonlyMap<string, number>,
         props: PropertyBag,
-        _getTime: () => number,
       ): AnalogElement => new CurrentControlledSwitchAnalogElement(pinNodes, props),
       spice: { device: "CSW", deckNodeTokens: ["out+", "out-"] },
     },

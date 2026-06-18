@@ -147,7 +147,6 @@ export interface MnaModel {
   factory: (
     pinNodes: ReadonlyMap<string, number>,
     props: PropertyBag,
-    getTime: () => number,
   ) => AnalogElement;
 }
 

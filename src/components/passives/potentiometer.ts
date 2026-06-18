@@ -257,7 +257,6 @@ class AnalogPotentiometerElement extends AnalogElement {
 function createPotentiometerElement(
   pinNodes: ReadonlyMap<string, number>,
   props: PropertyBag,
-  _getTime: () => number,
 ): AnalogElement {
   const R = props.getModelParam<number>("resistance");
   const position = props.getModelParam<number>("position");

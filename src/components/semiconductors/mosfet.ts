@@ -1963,18 +1963,14 @@ function _createMosfetElementWithPolarity(
 export function createMosfetElement(
   pinNodes: ReadonlyMap<string, number>,
   props: PropertyBag,
-  _getTime: () => number = () => 0,
 ): AnalogElement {
-  void _getTime;
   return _createMosfetElementWithPolarity(1, pinNodes, props);
 }
 
 export function createPmosfetElement(
   pinNodes: ReadonlyMap<string, number>,
   props: PropertyBag,
-  _getTime: () => number = () => 0,
 ): AnalogElement {
-  void _getTime;
   return _createMosfetElementWithPolarity(-1, pinNodes, props);
 }
 

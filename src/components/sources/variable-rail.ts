@@ -228,7 +228,6 @@ class VariableRailAnalogImpl extends AnalogElement implements VariableRailAnalog
 export function makeVariableRailElement(
   pinNodes: ReadonlyMap<string, number>,
   props: PropertyBag,
-  _getTime: () => number,
 ): VariableRailAnalogElement {
   return new VariableRailAnalogImpl(pinNodes, props);
 }

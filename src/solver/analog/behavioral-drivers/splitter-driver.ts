@@ -163,7 +163,7 @@ export const BehavioralSplitterDriverDefinition: ComponentDefinition = {
         { key: "outputCount", default: 1 },
       ],
       params: { inputCount: 1, outputCount: 1 },
-      factory: (pinNodes: ReadonlyMap<string, number>, props: PropertyBag, _getTime: () => number) =>
+      factory: (pinNodes: ReadonlyMap<string, number>, props: PropertyBag) =>
         new BehavioralSplitterDriverElement(pinNodes, props),
     },
   },

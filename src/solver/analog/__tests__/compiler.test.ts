@@ -158,7 +158,7 @@ function buildTestRegistry(): ComponentRegistry {
     ...makeBaseDef("AnalogVs"),
     models: {},
     modelRegistry: {
-      behavioral: { kind: 'inline' as const, factory: ((pinNodes, _props, _getTime) => {
+      behavioral: { kind: 'inline' as const, factory: ((pinNodes, _props) => {
         const [n0, n1] = [...pinNodes.values()];
         return makeTestVsElement(n0 ?? 0, n1 ?? 0, -1);
       }) as AnalogFactory, paramDefs: [], params: {} },
@@ -169,7 +169,7 @@ function buildTestRegistry(): ComponentRegistry {
     ...makeBaseDef("AnalogR"),
     models: {},
     modelRegistry: {
-      behavioral: { kind: 'inline' as const, factory: ((pinNodes, _props, _getTime) => {
+      behavioral: { kind: 'inline' as const, factory: ((pinNodes, _props) => {
         const [n0, n1] = [...pinNodes.values()];
         return makeTestResistorElement(n0 ?? 0, n1 ?? 0);
       }) as AnalogFactory, paramDefs: [], params: {} },
@@ -181,7 +181,7 @@ function buildTestRegistry(): ComponentRegistry {
     defaultModel: 'behavioral',
     models: {},
     modelRegistry: {
-      behavioral: { kind: 'inline' as const, factory: ((pinNodes, _props, _getTime) => {
+      behavioral: { kind: 'inline' as const, factory: ((pinNodes, _props) => {
         const [n0, n1] = [...pinNodes.values()];
         return makeTestInductorElement(n0 ?? 0, n1 ?? 0, -1);
       }) as AnalogFactory, paramDefs: [], params: {} },
@@ -200,7 +200,7 @@ function buildTestRegistry(): ComponentRegistry {
     defaultModel: 'behavioral',
     models: {},
     modelRegistry: {
-      behavioral: { kind: 'inline' as const, factory: ((pinNodes, _props, _getTime) => {
+      behavioral: { kind: 'inline' as const, factory: ((pinNodes, _props) => {
         const [n0] = [...pinNodes.values()];
         return makeTestResistorElement(n0 ?? 0, 0);
       }) as AnalogFactory, paramDefs: [], params: {} },
@@ -212,7 +212,7 @@ function buildTestRegistry(): ComponentRegistry {
     defaultModel: 'behavioral',
     models: {},
     modelRegistry: {
-      behavioral: { kind: 'inline' as const, factory: ((pinNodes, _props, _getTime) => {
+      behavioral: { kind: 'inline' as const, factory: ((pinNodes, _props) => {
         const [n0] = [...pinNodes.values()];
         return makeTestResistorElement(n0 ?? 0, 0);
       }) as AnalogFactory, paramDefs: [], params: {} },
@@ -413,7 +413,7 @@ describe("AnalogCompiler", () => {
     const registry = new ComponentRegistry();
 
     const factorySpy = vi.fn(
-      (pinNodes: ReadonlyMap<string, number>, _props: PropertyBag, _getTime: () => number) => {
+      (pinNodes: ReadonlyMap<string, number>, _props: PropertyBag) => {
         const [n0, n1] = [...pinNodes.values()];
         return makeTestVsElement(n0 ?? 0, n1 ?? 0, -1);
       },
@@ -453,16 +453,12 @@ describe("AnalogCompiler", () => {
 
     expect(factorySpy).toHaveBeenCalledOnce();
 
-    const [pinNodes, , getTime] = factorySpy.mock.calls[0]!;
+    const [pinNodes] = factorySpy.mock.calls[0]!;
 
     // pos terminal should map to a non-ground node (>0); neg should be 0 (ground)
     const nodeValues = [...(pinNodes as ReadonlyMap<string, number>).values()];
     expect(nodeValues).toContain(0);
     expect(nodeValues.some((n: number) => n > 0)).toBe(true);
-
-    // getTime must be a function returning a number
-    expect(typeof getTime).toBe("function");
-    expect(getTime()).toBe(0);
   });
 
   it("rejects_non_analog_circuit", () => {
@@ -546,7 +542,7 @@ function buildPinLoadingTestRegistry(
     defaultModel: "behavioral",
     models: {},
     modelRegistry: {
-      behavioral: { kind: "inline" as const, factory: ((pinNodes, _props, _getTime) => {
+      behavioral: { kind: "inline" as const, factory: ((pinNodes, _props) => {
         const [n0, n1] = [...pinNodes.values()];
         return makeTestResistorElement(n0 ?? 0, n1 ?? 0);
       }) as AnalogFactory, paramDefs: [], params: {} },
@@ -566,7 +562,7 @@ function buildPinLoadingTestRegistry(
     defaultModel: "behavioral",
     models: { digital: { executeFn: noopExecuteFn } },
     modelRegistry: {
-      behavioral: { kind: "inline" as const, factory: ((pinNodes, props, _getTime) => {
+      behavioral: { kind: "inline" as const, factory: ((pinNodes, props) => {
         onFactory?.(props, pinNodes);
         const [n0, , n2] = [...pinNodes.values()];
         return makeTestResistorElement(n0 ?? 1, n2 ?? 3);

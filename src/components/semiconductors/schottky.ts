@@ -59,9 +59,8 @@ export const { paramDefs: SCHOTTKY_PARAM_DEFS, defaults: SCHOTTKY_PARAM_DEFAULTS
 export function createSchottkyElement(
   pinNodes: ReadonlyMap<string, number>,
   props: PropertyBag,
-  getTime: () => number,
 ): AnalogElement {
-  return createDiodeElement(pinNodes, props, getTime);
+  return createDiodeElement(pinNodes, props);
 }
 
 // ---------------------------------------------------------------------------

@@ -232,7 +232,6 @@ class DcCurrentSourceAnalogImpl extends AnalogElement {
 export function makeDcCurrentSource(
   pinNodes: ReadonlyMap<string, number>,
   props: PropertyBag,
-  _getTime: () => number,
 ): AnalogElement {
   return new DcCurrentSourceAnalogImpl(pinNodes, props);
 }

@@ -172,7 +172,6 @@ class OtaAnalogElement extends AnalogElement {
   constructor(
     pinNodes: ReadonlyMap<string, number>,
     props: PropertyBag,
-    _getTime: () => number,
   ) {
     super(pinNodes);
     this.p = {
@@ -401,8 +400,8 @@ export const OTADefinition: StandaloneComponentDefinition = {
   modelRegistry: {
     "behavioral": {
       kind: "inline",
-      factory: (pinNodes, props, getTime) =>
-        new OtaAnalogElement(pinNodes, props, getTime),
+      factory: (pinNodes, props) =>
+        new OtaAnalogElement(pinNodes, props),
       paramDefs: OTA_PARAM_DEFS,
       params: OTA_DEFAULTS,
     },

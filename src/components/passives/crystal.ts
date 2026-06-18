@@ -319,7 +319,6 @@ function crystalCircuitFactory(props: PropertyBag): CrystalCircuitElement {
 const crystalWrapperHook: AnalogWrapperHookFactory = (
   _pinNodes,
   props,
-  _getTime,
   subElementsByName,
 ) => {
   let frequency = props.getModelParam<number>("frequency");

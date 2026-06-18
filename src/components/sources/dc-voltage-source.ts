@@ -268,12 +268,11 @@ class DcVoltageSourceAnalogElement extends AnalogElement {
 /**
  * Constructs a DC voltage source analog element.
  *
- * Canonical inline-factory pattern per ssA.13. Three-arg form per ssA.3.
+ * Canonical inline-factory pattern per ssA.13.
  */
 export function makeDcVoltageSource(
   pinNodes: ReadonlyMap<string, number>,
   props: PropertyBag,
-  _getTime: () => number,
 ): AnalogElement {
   return new DcVoltageSourceAnalogElement(pinNodes, props.getModelParam<number>("voltage"));
 }

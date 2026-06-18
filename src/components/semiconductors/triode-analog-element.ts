@@ -390,7 +390,7 @@ export const TriodeAnalogDefinition: ComponentDefinition = {
       kind: "inline",
       paramDefs: TRIODE_ANALOG_PARAM_DEFS,
       params: TRIODE_ANALOG_DEFAULTS,
-      factory: (pinNodes: ReadonlyMap<string, number>, props: PropertyBag, _getTime: () => number): AnalogElement =>
+      factory: (pinNodes: ReadonlyMap<string, number>, props: PropertyBag): AnalogElement =>
         new TriodeAnalogElement(pinNodes, props),
     },
   },

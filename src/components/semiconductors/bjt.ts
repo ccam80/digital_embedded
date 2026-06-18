@@ -1376,7 +1376,6 @@ function _createBjtElementWithPolarity(
 export function createBjtL0Element(
   pinNodes: ReadonlyMap<string, number>,
   props: PropertyBag,
-  _getTime: () => number,
 ): PoolBackedAnalogElement {
   return _createBjtElementWithPolarity(1, pinNodes, props);
 }
@@ -1384,7 +1383,6 @@ export function createBjtL0Element(
 export function createPnpBjtL0Element(
   pinNodes: ReadonlyMap<string, number>,
   props: PropertyBag,
-  _getTime: () => number,
 ): PoolBackedAnalogElement {
   return _createBjtElementWithPolarity(-1, pinNodes, props);
 }
@@ -2921,7 +2919,7 @@ export function createSpiceL1BjtElement(
 // ---------------------------------------------------------------------------
 
 export function createBjtL1Element(polarity: 1 | -1, isLateral: boolean): AnalogFactory {
-  return (pinNodes, props, _getTime) =>
+  return (pinNodes, props) =>
     createSpiceL1BjtElement(polarity, isLateral, pinNodes, props);
 }
 

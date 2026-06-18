@@ -16,13 +16,15 @@
  */
 
 import type { DigCircuit, DigVisualElement, DigWire, DigValue } from "./dig-schema.js";
-import type { AttributeMapping, StandaloneComponentDefinition } from "../core/registry.js";
+import type { AttributeMapping } from "../core/registry.js";
 import type { ComponentRegistry } from "../core/registry.js";
+import { constructElement } from "../core/registry.js";
 import { resolveComponentDef } from "../core/resolve-component.js";
 import type { CircuitElement } from "../core/element.js";
 import type { CircuitMetadata, CustomShapeData, CustomDrawable } from "../core/circuit.js";
 import { Circuit, Wire } from "../core/circuit.js";
 import { PropertyBag } from "../core/properties.js";
+import type { PropertyValue } from "../core/properties.js";
 import type { Rotation } from "../core/pin.js";
 import { propagateWireBitWidths } from "../core/wire-propagation.js";
 import { applyAttributeMappings } from "./attribute-map.js";
@@ -163,13 +165,18 @@ export function createElementFromDig(
     );
   }
 
-  const props = applyAllMappings(ve, def.attributeMap);
+  // Map the .dig attributes to a flat prop record, then hand off to the single
+  // construction path (core/registry.ts constructElement) so model selection +
+  // param seeding match every other load path. applyAllMappings may route some
+  // attributes to the model-param partition; flatten both partitions so
+  // constructElement re-partitions and seeds the model's registry defaults.
+  const bag = applyAllMappings(ve, def.attributeMap);
+  const props: Record<string, PropertyValue> = {};
+  for (const [k, v] of bag.entries()) props[k] = v;
+  const givenModelParams: Record<string, PropertyValue> = {};
+  for (const k of bag.getModelParamKeys()) givenModelParams[k] = bag.getModelParam(k);
 
-  // Move model param keys from _map to _mparams based on the definition's
-  // modelRegistry paramDefs, so the compiler sees them in the correct partition.
-  migrateModelParams(props, def);
-
-  const element = def.factory(props);
+  const element = constructElement(def, { props, givenModelParams });
 
   element.position = { x: ve.pos.x / DIG_SIZE, y: ve.pos.y / DIG_SIZE };
 
@@ -184,39 +191,6 @@ export function createElementFromDig(
   }
 
   return element;
-}
-
-/**
- * Move model parameter keys from the PropertyBag's `_map` to `_mparams`.
- *
- * Looks up the component definition's modelRegistry to find paramDefs, then
- * for each paramDef key that exists in `_map` as a number, moves it to
- * `_mparams` via setModelParam. This ensures the compiler reads model params
- * from the correct partition.
- */
-function migrateModelParams(bag: PropertyBag, def: StandaloneComponentDefinition): void {
-  const registry = def.modelRegistry;
-  if (!registry) return;
-
-  // Collect all param keys from all model entries
-  const paramKeys = new Set<string>();
-  for (const entry of Object.values(registry)) {
-    if (entry.paramDefs) {
-      for (const pd of entry.paramDefs) paramKeys.add(pd.key);
-    }
-  }
-
-  if (paramKeys.size === 0) return;
-
-  for (const key of paramKeys) {
-    if (bag.has(key)) {
-      const val = bag.get(key);
-      if (typeof val === 'number') {
-        bag.setModelParam(key, val);
-        bag.delete(key);
-      }
-    }
-  }
 }
 
 /**

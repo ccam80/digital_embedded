@@ -1307,18 +1307,14 @@ function _createJfet2ElementWithType(
 export function createJfet2NElement(
   pinNodes: ReadonlyMap<string, number>,
   props: PropertyBag,
-  _getTime: () => number = () => 0,
 ): AnalogElement {
-  void _getTime;
   return _createJfet2ElementWithType(1, pinNodes, props);
 }
 
 export function createJfet2PElement(
   pinNodes: ReadonlyMap<string, number>,
   props: PropertyBag,
-  _getTime: () => number = () => 0,
 ): AnalogElement {
-  void _getTime;
   return _createJfet2ElementWithType(-1, pinNodes, props);
 }
 

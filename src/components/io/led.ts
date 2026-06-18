@@ -164,14 +164,13 @@ export function executeLed(
 function createLedAnalogElementViaDiode(
   pinNodes: ReadonlyMap<string, number>,
   props: PropertyBag,
-  getTime: () => number,
 ): AnalogElement {
   // Inject K=0 (cathode → ground); remap "in" → "A".
   const remappedPinNodes = new Map<string, number>([
     ["A", pinNodes.get("in")!],
     ["K", 0],
   ]);
-  return createDiodeElement(remappedPinNodes, props, getTime);
+  return createDiodeElement(remappedPinNodes, props);
 }
 
 // ---------------------------------------------------------------------------

@@ -245,7 +245,7 @@ function makeAnalogDef(
     defaultModel: 'behavioral',
     models: {},
     modelRegistry: {
-      behavioral: { kind: 'inline' as const, factory: (pinNodes: ReadonlyMap<string, number>, _props: PropertyBagType, _getTime: () => number) => mnaFactory(pinNodes), paramDefs: [], params: {} },
+      behavioral: { kind: 'inline' as const, factory: (pinNodes: ReadonlyMap<string, number>, _props: PropertyBagType) => mnaFactory(pinNodes), paramDefs: [], params: {} },
     },
   };
 }
@@ -272,7 +272,7 @@ function makeGroundDef(): StandaloneComponentDefinition {
     defaultModel: 'behavioral',
     models: {},
     modelRegistry: {
-      behavioral: { kind: 'inline' as const, factory: (_pn: ReadonlyMap<string, number>, _props: PropertyBagType, _getTime: () => number) => new CompileTestGroundStubEl(new Map<string, number>()), paramDefs: [], params: {} },
+      behavioral: { kind: 'inline' as const, factory: (_pn: ReadonlyMap<string, number>, _props: PropertyBagType) => new CompileTestGroundStubEl(new Map<string, number>()), paramDefs: [], params: {} },
     },
   };
 }

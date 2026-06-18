@@ -236,7 +236,7 @@ export const DACDriverDefinition: ComponentDefinition = {
       paramDefs: DAC_DRIVER_PARAM_DEFS,
       params: DAC_DRIVER_DEFAULTS,
       branchCount: 1,
-      factory: (pinNodes: ReadonlyMap<string, number>, props: PropertyBag, _getTime: () => number): AnalogElement =>
+      factory: (pinNodes: ReadonlyMap<string, number>, props: PropertyBag): AnalogElement =>
         new DACDriverElement(pinNodes, props),
     },
   },

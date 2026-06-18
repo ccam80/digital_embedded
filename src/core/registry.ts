@@ -24,7 +24,6 @@ import type { Diagnostic } from "../compile/types.js";
 export type AnalogFactory = (
   pinNodes: ReadonlyMap<string, number>,
   props: PropertyBag,
-  getTime: () => number,
 ) => AnalogElement;
 
 // ---------------------------------------------------------------------------
@@ -66,7 +65,6 @@ export interface AnalogWrapperHook {
 export type AnalogWrapperHookFactory = (
   pinNodes: ReadonlyMap<string, number>,
   props: PropertyBag,
-  getTime: () => number,
   subElementsByName: ReadonlyMap<string, AnalogElement>,
 ) => AnalogWrapperHook;
 
@@ -456,7 +454,7 @@ export interface ComponentDefinition {
    *     sub-elements at construction so it can address them.
    *
    * Invoked once per parent-instance inside expandCompositeInstance, after
-   * sub-elements are built, with (pinNodes, props, getTime, subElementsByName).
+   * sub-elements are built, with (pinNodes, props, subElementsByName).
    * Returning an empty object is valid (no hooks fire). Only meaningful with
    * a `kind: "netlist"` model entry. Applies to both user-facing and
    * internal-only definitions.
@@ -756,7 +754,7 @@ export class ComponentRegistry {
     if (!isStandalone(def)) {
       throw new Error(`ComponentRegistry: "${name}" is internal-only and cannot be instantiated as a top-level element`);
     }
-    return def.factory(createSeededBag(def));
+    return constructElement(def, {});
   }
 
   /**
@@ -786,15 +784,99 @@ export class ComponentRegistry {
 // ---------------------------------------------------------------------------
 
 /**
- * Create a PropertyBag pre-seeded with model param defaults from the
- * definition's default model entry.
+ * Create a PropertyBag pre-seeded with model param defaults from a model
+ * entry and with the `model` property set to that entry's key.
+ *
+ * `modelKey` selects which `modelRegistry` entry seeds the params (e.g. a
+ * named preset like "2N3904"); when omitted it falls back to `defaultModel`.
+ * Seeded params are NOT marked given- they are registry defaults that the
+ * serializer omits and a caller's explicit overrides supersede.
  */
-export function createSeededBag(def: ComponentDefinition): PropertyBag {
+export function createSeededBag(def: ComponentDefinition, modelKey?: string): PropertyBag {
   const bag = new PropertyBag();
-  const entry = def.modelRegistry?.[def.defaultModel ?? ""];
+  const key = modelKey ?? def.defaultModel ?? "";
+  const entry = def.modelRegistry?.[key];
   if (entry?.params) bag.replaceModelParams({ ...entry.params });
-  if (def.defaultModel) bag.set("model", def.defaultModel);
+  if (key) bag.set("model", key);
   return bag;
+}
+
+/**
+ * Collect every model-param key declared across all of a definition's model
+ * entries. Used to partition incoming flat props into the model-param vs
+ * static partitions of the PropertyBag.
+ */
+export function collectModelParamKeys(def: ComponentDefinition): Set<string> {
+  const keys = new Set<string>();
+  if (!def.modelRegistry) return keys;
+  for (const entry of Object.values(def.modelRegistry)) {
+    if (entry.paramDefs) for (const pd of entry.paramDefs) keys.add(pd.key);
+  }
+  return keys;
+}
+
+/**
+ * Neutral element specification consumed by `constructElement`. Every circuit
+ * load/build path (declarative build, .dig, .dts, .ctz, UI placement) maps its
+ * own parsed form into this shape and hands it to the single construction
+ * path- this is the "fan back in" point after format-specific parsing.
+ *
+ * `props` is flat: it may contain both model-param keys and static property
+ * keys (including `model`). `constructElement` partitions them using the
+ * definition's model registry, so callers do NOT pre-sort.
+ */
+export interface ElementSpec {
+  /** Explicit model-registry key. Falls back to `props.model`, then `defaultModel`. */
+  model?: string;
+  /** Flat property record: model-param keys + static keys + optional `model`. */
+  props?: Record<string, PropertyValue>;
+  /**
+   * Model params that are explicitly user-given and must land in the model-
+   * param partition marked given, regardless of whether the key appears in the
+   * definition's paramDefs. Used by serialized-form loaders (.dig / .dts) that
+   * already know which params were authored vs defaulted. Applied after `props`.
+   */
+  givenModelParams?: Record<string, PropertyValue>;
+}
+
+/**
+ * THE single element-construction path. Resolves the model, seeds registry
+ * defaults for that model, sets the `model` property, then overlays the
+ * caller's explicit props- numeric model-param keys as given overrides
+ * (`setModelParam`), everything else as static properties (`set`).
+ *
+ * Every load/build entry point must route through this so that model
+ * selection and param seeding are identical regardless of origin. Callers
+ * apply position/rotation/mirror to the returned element themselves.
+ */
+export function constructElement(def: StandaloneComponentDefinition, spec: ElementSpec): CircuitElement {
+  const props = spec.props ?? {};
+  const modelKey =
+    spec.model ??
+    (typeof props.model === "string" ? props.model : undefined) ??
+    def.defaultModel;
+  const bag = createSeededBag(def, modelKey);
+
+  const paramKeys = collectModelParamKeys(def);
+  for (const [key, value] of Object.entries(props)) {
+    if (key === "model") continue; // already resolved into the seeded bag
+    // Always land the prop in the static partition: structural keys (e.g.
+    // inputCount, bitWidth, selectorBits) are read via getOrDefault and many
+    // are ALSO declared as model params. Numeric model-param keys are
+    // additionally mirrored into the model-param partition as given overrides.
+    bag.set(key, value);
+    if (paramKeys.has(key) && typeof value === "number") {
+      bag.setModelParam(key, value);
+    }
+  }
+
+  if (spec.givenModelParams) {
+    for (const [key, value] of Object.entries(spec.givenModelParams)) {
+      bag.setModelParam(key, value); // always given, paramDefs membership not required
+    }
+  }
+
+  return def.factory(bag);
 }
 
 // ---------------------------------------------------------------------------

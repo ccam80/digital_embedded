@@ -264,6 +264,7 @@ import { DACDriverDefinition } from "./active/dac-driver.js";
 import { ADCDriverDefinition } from "./active/adc-driver.js";
 import { ComparatorPushPullDriverDefinition } from "./active/comparator-pushpull-driver.js";
 import { HystDefinition } from "./active/hyst.js";
+import { DacBridgeDefinition } from "./active/dac-bridge.js";
 
 // Op-amp macromodel building blocks (internalOnly — Boyle/PSpice OpAmp form)
 import { BoyleInputStageDefinition } from "./active/boyle-input-stage.js";
@@ -556,6 +557,7 @@ export function createDefaultRegistry(
   registry.register(ADCDriverDefinition);
   registry.register(ComparatorPushPullDriverDefinition);
   registry.register(HystDefinition);
+  registry.register(DacBridgeDefinition);
 
   // Op-amp macromodel building blocks (internalOnly)
   registry.register(BoyleInputStageDefinition);

@@ -306,7 +306,7 @@ describe("spice-import-dialog: compile integration", () => {
   } {
     let capturedModelParams: Record<string, number> | undefined;
 
-    const npnFactory: AnalogFactory = (pinNodes, props, _getTime) => {
+    const npnFactory: AnalogFactory = (pinNodes, props) => {
       capturedModelParams = props.getModelParamKeys().length > 0
         ? Object.fromEntries(props.getModelParamKeys().map(k => [k, props.getModelParam<number>(k)]))
         : undefined;

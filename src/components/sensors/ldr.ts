@@ -166,7 +166,6 @@ export class LDRElement extends AnalogElement {
 export function createLDRElement(
   pinNodes: ReadonlyMap<string, number>,
   props: PropertyBag,
-  _getTime: () => number,
 ): AnalogElement {
   const rDark = props.getModelParam<number>("rDark");
   const luxRef = props.getModelParam<number>("luxRef");

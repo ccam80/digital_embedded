@@ -85,14 +85,14 @@ function getDacCircuitElement(fix: ReturnType<typeof buildFixture>): CircuitElem
 
 describe("DAC initialization (T1)", () => {
   it("init_out_resolves_to_full_scale_after_warm_start", () => {
-    // All bits HIGH → code = 255 → V_OUT = V_REF · 255/255 = V_REF (5V).
-    // Closed-form: 5.0V.
+    // All bits HIGH → code = 255 → V_OUT = V_REF · 255/256 ≈ 4.98047V
+    // (full-scale code is one LSB below V_REF under the 2^N divisor).
     const fix = buildFixture({
       build: buildDacCircuit({ inputBits: Array(BITS).fill(true) }),
     });
     const out = getDacOutNode(fix);
     const vOut = fix.engine.getNodeVoltage(out);
-    expect(vOut).toBeCloseTo(V_REF, 2);
+    expect(vOut).toBeCloseTo((V_REF * 255) / 256, 2);
   });
 
   it("init_out_resolves_to_zero_after_warm_start_all_low", () => {
@@ -109,20 +109,20 @@ describe("DAC initialization (T1)", () => {
 // ===========================================================================
 // Category 2 — DC operating point analytical (T1)
 // ---------------------------------------------------------------------------
-// V_OUT = V_REF · code / (2^N - 1) for the unipolar DAC.
+// V_OUT = V_REF · code / 2^N for the unipolar DAC.
 // Closed-form expected values verified against dcOperatingPoint().
 // ===========================================================================
 
 describe("DAC DCOP analytical (T1)", () => {
   it("dcop_full_scale", () => {
-    // code = 255 → V_OUT = 5.0V.
+    // code = 255 → V_OUT = 5 · 255/256 ≈ 4.98047V.
     const fix = buildFixture({
       build: buildDacCircuit({ inputBits: Array(BITS).fill(true) }),
     });
     const result = fix.coordinator.dcOperatingPoint();
     expect(result).not.toBeNull();
     expect(result!.converged).toBe(true);
-    expect(fix.engine.getNodeVoltage(getDacOutNode(fix))).toBeCloseTo(V_REF, 2);
+    expect(fix.engine.getNodeVoltage(getDacOutNode(fix))).toBeCloseTo((V_REF * 255) / 256, 2);
   });
 
   it("dcop_zero_code", () => {
@@ -137,13 +137,13 @@ describe("DAC DCOP analytical (T1)", () => {
   });
 
   it("dcop_midscale_msb_only", () => {
-    // D7 (MSB) = 1, rest = 0 → code = 128 → V_OUT = 5 · 128/255 ≈ 2.510V.
+    // D7 (MSB) = 1, rest = 0 → code = 128 → V_OUT = 5 · 128/256 = 2.5V.
     const bits = Array(BITS).fill(false);
     bits[BITS - 1] = true;
     const fix = buildFixture({ build: buildDacCircuit({ inputBits: bits }) });
     const result = fix.coordinator.dcOperatingPoint();
     expect(result!.converged).toBe(true);
-    expect(fix.engine.getNodeVoltage(getDacOutNode(fix))).toBeCloseTo((V_REF * 128) / 255, 2);
+    expect(fix.engine.getNodeVoltage(getDacOutNode(fix))).toBeCloseTo((V_REF * 128) / 256, 2);
   });
 
   it("dcop_monotonic_ramp", () => {
@@ -161,14 +161,14 @@ describe("DAC DCOP analytical (T1)", () => {
   });
 
   it("dcop_lsb_step_size", () => {
-    // LSB step = V_REF / (2^N - 1) = 5/255 ≈ 0.019608V. Verified at three
+    // LSB step = V_REF / 2^N = 5/256 ≈ 0.019531V. Verified at three
     // consecutive code transitions.
     const sample = (code: number): number => {
       const fix = buildFixture({ build: buildDacCircuit({ inputBits: codeToBits(code) }) });
       fix.coordinator.dcOperatingPoint();
       return fix.engine.getNodeVoltage(getDacOutNode(fix));
     };
-    const expectedLsb = V_REF / 255;
+    const expectedLsb = V_REF / 256;
     expect(sample(1) - sample(0)).toBeCloseTo(expectedLsb, 3);
     expect(sample(2) - sample(1)).toBeCloseTo(expectedLsb, 3);
     expect(sample(128) - sample(127)).toBeCloseTo(expectedLsb, 3);
@@ -238,38 +238,40 @@ describe("DAC parameter hot-load (T1)", () => {
 
   it("hotload_rOut_sags_output_under_load", () => {
     // Contract: rOut = 1000Ω with 1MΩ load. Closed form:
-    // V_OUT = V_target · R_load / (R_load + rOut) = 5 · 1e6 / (1e6 + 1e3) ≈ 4.9950V.
+    // V_OUT = V_target · R_load / (R_load + rOut), with full-scale target
+    // V_target = V_REF · 255/256 ≈ 4.98047V → V_OUT ≈ 4.97549V.
     const { fix, ce, out } = setupHotLoadFix();
     fix.coordinator.setComponentProperty(ce, "rOut", 1e3);
     fix.coordinator.step();
     const vAfter = fix.engine.getNodeVoltage(out);
-    const expected = V_REF * 1e6 / (1e6 + 1e3);
+    const expected = (V_REF * 255 / 256) * 1e6 / (1e6 + 1e3);
     expect(vAfter).toBeCloseTo(expected, 3);
   });
 
   it("hotload_rIn_changes_input_loading_network", () => {
     // Contract: rIn changes the per-data-pin input loading resistance.
-    // With all bits driven by ideal VSRCs at V_REF, V_OUT stays at V_REF
-    // before and after the hot-load (no DC attenuation through rIn).
+    // With all bits driven by ideal VSRCs at V_REF, V_OUT stays at full-scale
+    // (V_REF · 255/256) before and after the hot-load (no DC attenuation through rIn).
     const { fix, ce, out } = setupHotLoadFix();
     const vBefore = fix.engine.getNodeVoltage(out);
     fix.coordinator.setComponentProperty(ce, "rIn", 1e5);
     fix.coordinator.step();
     const vAfter = fix.engine.getNodeVoltage(out);
     expect(vAfter).toBeCloseTo(vBefore, 2);
-    expect(vAfter).toBeCloseTo(V_REF, 2);
+    expect(vAfter).toBeCloseTo((V_REF * 255) / 256, 2);
   });
 
   it("hotload_cIn_changes_input_loading_capacitance", () => {
     // Contract: cIn changes per-data-pin input loading capacitance.
-    // At DC the capacitor is open; V_OUT stays at V_REF before and after.
+    // At DC the capacitor is open; V_OUT stays at full-scale (V_REF · 255/256)
+    // before and after.
     const { fix, ce, out } = setupHotLoadFix();
     const vBefore = fix.engine.getNodeVoltage(out);
     fix.coordinator.setComponentProperty(ce, "cIn", 1e-9);
     fix.coordinator.step();
     const vAfter = fix.engine.getNodeVoltage(out);
     expect(vAfter).toBeCloseTo(vBefore, 2);
-    expect(vAfter).toBeCloseTo(V_REF, 2);
+    expect(vAfter).toBeCloseTo((V_REF * 255) / 256, 2);
   });
 });
 
@@ -282,12 +284,12 @@ describe("DAC parameter hot-load (T1)", () => {
 
 describe("DAC bridge / digital interaction (T1)", () => {
   it("digital_high_inputs_drive_full_scale_analog", () => {
-    // All D_i at V_REF (5V) → code = 255 → V_OUT = V_REF.
+    // All D_i at V_REF (5V) → code = 255 → V_OUT = V_REF · 255/256 ≈ 4.98047V.
     const fix = buildFixture({
       build: buildDacCircuit({ inputBits: Array(BITS).fill(true) }),
     });
     fix.coordinator.step();
-    expect(fix.engine.getNodeVoltage(getDacOutNode(fix))).toBeCloseTo(V_REF, 2);
+    expect(fix.engine.getNodeVoltage(getDacOutNode(fix))).toBeCloseTo((V_REF * 255) / 256, 2);
   });
 
   it("digital_low_inputs_drive_zero_analog", () => {
@@ -300,12 +302,12 @@ describe("DAC bridge / digital interaction (T1)", () => {
   });
 
   it("digital_msb_only_drives_mid_analog", () => {
-    // D7 (MSB) only HIGH → code = 128 → V_OUT = V_REF · 128/255 ≈ 2.510V.
+    // D7 (MSB) only HIGH → code = 128 → V_OUT = V_REF · 128/256 = 2.5V.
     const bits = Array(BITS).fill(false);
     bits[BITS - 1] = true;
     const fix = buildFixture({ build: buildDacCircuit({ inputBits: bits }) });
     fix.coordinator.step();
-    expect(fix.engine.getNodeVoltage(getDacOutNode(fix))).toBeCloseTo((V_REF * 128) / 255, 2);
+    expect(fix.engine.getNodeVoltage(getDacOutNode(fix))).toBeCloseTo((V_REF * 128) / 256, 2);
   });
 
   it("vref_scales_analog_output_proportionally", () => {

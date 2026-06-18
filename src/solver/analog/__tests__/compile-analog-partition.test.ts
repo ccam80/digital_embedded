@@ -176,7 +176,7 @@ function buildRegistry(factorySpy?: ReturnType<typeof vi.fn>): ComponentRegistry
     models: {},
   });
 
-  const andFactory = factorySpy ?? vi.fn((pinNodes: ReadonlyMap<string, number>, _props: PropertyBag, _getTime: () => number) => makeStubElement([...pinNodes.values()]));
+  const andFactory = factorySpy ?? vi.fn((pinNodes: ReadonlyMap<string, number>, _props: PropertyBag) => makeStubElement([...pinNodes.values()]));
 
   registry.register({
     ...makeBaseDef("BehavioralAnd"),
@@ -185,7 +185,7 @@ function buildRegistry(factorySpy?: ReturnType<typeof vi.fn>): ComponentRegistry
     modelRegistry: {
       behavioral: {
         kind: "inline" as const,
-        factory: (pinNodes: ReadonlyMap<string, number>, props: PropertyBag, getTime: () => number) => andFactory(pinNodes, props, getTime),
+        factory: (pinNodes: ReadonlyMap<string, number>, props: PropertyBag) => andFactory(pinNodes, props),
         paramDefs: [],
         params: {},
       },

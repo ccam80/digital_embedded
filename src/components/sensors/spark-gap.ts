@@ -256,7 +256,6 @@ export class SparkGapElement extends PoolBackedAnalogElement {
 export function createSparkGapElement(
   pinNodes: ReadonlyMap<string, number>,
   props: PropertyBag,
-  _getTime: () => number,
 ): SparkGapElement {
   const p: Record<string, number> = {
     vBreakdown: props.getModelParam<number>("vBreakdown"),

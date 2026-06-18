@@ -434,7 +434,7 @@ export const FuseDefinition: StandaloneComponentDefinition = {
   modelRegistry: {
     "behavioral": {
       kind: "inline",
-      factory: (pinNodes, props, getTime) => createAnalogFuseElement(pinNodes, props, getTime),
+      factory: (pinNodes, props) => createAnalogFuseElement(pinNodes, props),
       paramDefs: ANALOG_FUSE_PARAM_DEFS,
       params: ANALOG_FUSE_DEFAULTS,
     },

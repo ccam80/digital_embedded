@@ -466,7 +466,7 @@ export const SwitchDTDefinition: StandaloneComponentDefinition = {
   modelRegistry: {
     "behavioral": {
       kind: "inline",
-      factory: (pinNodes, props, _getTime) => new SwitchDTAnalogElement(pinNodes, props),
+      factory: (pinNodes, props) => new SwitchDTAnalogElement(pinNodes, props),
       paramDefs: [],
       params: {},
     },

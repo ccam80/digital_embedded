@@ -19,6 +19,7 @@
 import { Circuit, Wire } from "../core/circuit.js";
 import { AbstractCircuitElement } from "../core/element.js";
 import type { ComponentRegistry } from "../core/registry.js";
+import { constructElement } from "../core/registry.js";
 import { resolveComponentDef } from "../core/resolve-component.js";
 import type { Diagnostic } from "../compile/types.js";
 import type { RenderContext, Rect } from "../core/renderer-interface.js";
@@ -343,18 +344,15 @@ export function mapCtzToCircuit(
     if (digiTsType !== undefined) {
       const def = resolveComponentDef(digiTsType, circuit, registry);
       if (def !== undefined) {
-        // Build a PropertyBag from CTZ properties
-        const entries: Array<[string, import("../core/properties.js").PropertyValue]> = [];
+        // Map CTZ properties to a flat record, then hand off to the single
+        // construction path (core/registry.ts constructElement) so model
+        // selection + param seeding match every other load path.
+        const props: Record<string, import("../core/properties.js").PropertyValue> = {};
         for (const [key, val] of Object.entries(comp.properties)) {
           const num = parseFloat(val);
-          if (!isNaN(num)) {
-            entries.push([key, num]);
-          } else {
-            entries.push([key, val]);
-          }
+          props[key] = isNaN(num) ? val : num;
         }
-        const props = new PropertyBag(entries);
-        const element = def.factory(props);
+        const element = constructElement(def, { props });
         element.position = position;
         circuit.addElement(element);
       } else {

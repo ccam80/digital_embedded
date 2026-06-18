@@ -250,7 +250,6 @@ class AnalogProbeElement extends AnalogElement {
 function probeAnalogFactory(
   pinNodes: ReadonlyMap<string, number>,
   _props: PropertyBag,
-  _getTime: () => number,
 ): AnalogElement {
   const el = new AnalogProbeElement(pinNodes);
   return el;

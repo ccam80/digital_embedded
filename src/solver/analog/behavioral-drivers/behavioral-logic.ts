@@ -80,7 +80,7 @@ export const BehavioralLogicDefinition: ComponentDefinition = {
       // deck tokens — controllers are V(node) references resolved from the
       // expression, not node tokens.
       spice: { device: "ASRC", deckNodeTokens: ["out+", "out-"] },
-      factory: (pinNodes: ReadonlyMap<string, number>, props: PropertyBag, _getTime: () => number) => {
+      factory: (pinNodes: ReadonlyMap<string, number>, props: PropertyBag) => {
         const expression = props.getOrDefault<string>("expression", "0");
         const el = new BIAnalogElement(pinNodes, buildBSourceTree(expression));
         el.seedParams(props);

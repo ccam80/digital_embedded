@@ -119,8 +119,10 @@ export class OpAmpElement extends AbstractCircuitElement {
 
     // Triangle body  stays COMPONENT color
     ctx.setColor("COMPONENT");
-    ctx.drawLine(0.375, -2, 0.375, 2);
-    ctx.drawLine(0.375, 2, 3.625, 0);
+    ctx.drawPolygon(
+      [{ x: 0.375, y: -2 }, { x: 0.375, y: 2 }, { x: 3.625, y: 0 }],
+      false,
+    );
 
     // +/- labels inside triangle body
     ctx.setColor("COMPONENT");
@@ -308,12 +310,11 @@ class OpampElement extends AnalogElement {
  *   - When rOut > 0: internal node vint; RES(vint,out) + VCVS(in+,in-,vint,gnd)
  *   - When rOut == 0: VCVS(in+,in-,out,gnd) directly
  *
- * Factory signature: 3-param per A6.3 (pinNodes, props, getTime).
+ * Factory signature: (pinNodes, props).
  */
 function createOpAmpElement(
   pinNodes: ReadonlyMap<string, number>,
   props: PropertyBag,
-  _getTime: () => number,
 ): AnalogElement {
   const p: Record<string, number> = {
     gain: props.getModelParam<number>("gain") ?? 1e6,
@@ -374,8 +375,8 @@ export const OpAmpDefinition: StandaloneComponentDefinition = {
   modelRegistry: {
     "behavioral": {
       kind: "inline",
-      factory: (pinNodes, props, getTime) =>
-        createOpAmpElement(pinNodes, props, getTime),
+      factory: (pinNodes, props) =>
+        createOpAmpElement(pinNodes, props),
       paramDefs: OPAMP_PARAM_DEFS,
       params: OPAMP_DEFAULTS,
     },

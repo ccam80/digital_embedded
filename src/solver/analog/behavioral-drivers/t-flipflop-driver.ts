@@ -118,7 +118,7 @@ export const BehavioralTFlipflopDriverDefinition: ComponentDefinition = {
         { key: "forceToggle", default: 0 },
       ],
       params: {},
-      factory: (pinNodes: ReadonlyMap<string, number>, props: PropertyBag, _getTime: () => number) =>
+      factory: (pinNodes: ReadonlyMap<string, number>, props: PropertyBag) =>
         new BehavioralTFlipflopDriverElement(pinNodes, props),
     },
   },

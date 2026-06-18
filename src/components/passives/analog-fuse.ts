@@ -327,7 +327,6 @@ function buildAnalogFuseElement(
 export function createAnalogFuseElement(
   pinNodes: ReadonlyMap<string, number>,
   props: PropertyBag,
-  _getTime: () => number,
 ): PoolBackedAnalogElement {
   return buildAnalogFuseElement(
     pinNodes,

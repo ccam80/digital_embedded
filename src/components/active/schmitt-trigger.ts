@@ -127,7 +127,7 @@ function buildSchmittNetlist(props: PropertyBag, inverting: boolean): MnaSubcirc
  * invokes hook.setParam before its binding-map dispatch.
  */
 function makeSchmittHook(inverting: boolean): AnalogWrapperHookFactory {
-  return (_pinNodes, props, _getTime, subElementsByName) => {
+  return (_pinNodes, props, subElementsByName) => {
     let vTH = props.getModelParam<number>("vTH");
     let vTL = props.getModelParam<number>("vTL");
     let vOH = props.getModelParam<number>("vOH");

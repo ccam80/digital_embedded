@@ -636,7 +636,6 @@ class ResistorAnalogElement extends AnalogElement {
 function createResistorElement(
   pinNodes: ReadonlyMap<string, number>,
   props: PropertyBag,
-  _getTime: () => number,
 ): AnalogElement {
   const el = new ResistorAnalogElement(pinNodes, props);
   return el;

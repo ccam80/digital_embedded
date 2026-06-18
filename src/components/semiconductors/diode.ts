@@ -576,7 +576,6 @@ export function dioTemp(p: DioTempInput, T: number, geom: DioGeom, reltol: numbe
 export function createDiodeElement(
   pinNodes: ReadonlyMap<string, number>,
   props: PropertyBag,
-  _getTime: () => number,
 ): PoolBackedAnalogElement {
   let nodeAnode = -1;
   let nodeCathode = -1;

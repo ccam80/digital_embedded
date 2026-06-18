@@ -555,7 +555,6 @@ class ZenerAnalogElement extends PoolBackedAnalogElement {
 export function createZenerElement(
   pinNodes: ReadonlyMap<string, number>,
   props: PropertyBag,
-  _getTime: () => number,
 ): ZenerAnalogElement {
   return new ZenerAnalogElement(pinNodes, props);
 }

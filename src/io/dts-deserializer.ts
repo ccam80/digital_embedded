@@ -8,6 +8,7 @@
 import { Circuit, Wire } from '../core/circuit.js';
 import type { CircuitMetadata } from '../core/circuit.js';
 import type { ComponentRegistry, ModelEntry } from '../core/registry.js';
+import { constructElement } from '../core/registry.js';
 import { resolveComponentDef } from '../core/resolve-component.js';
 import { createLiveDefinition } from '../components/subcircuit/subcircuit.js';
 import type { ShapeMode } from '../components/subcircuit/shape-renderer.js';
@@ -249,8 +250,16 @@ function createElement(
     );
   }
 
-  const props = restoreProperties(savedEl.properties);
-  const element = def.factory(props);
+  // Map the serialized form to the single construction path (core/registry.ts
+  // constructElement). Static keys (incl `model`) ride in `props`; the restored
+  // `_modelParams` are explicitly user-given and ride in `givenModelParams`.
+  const restored = restoreProperties(savedEl.properties);
+  const props: Record<string, PropertyValue> = {};
+  for (const [k, v] of restored.entries()) props[k] = v;
+  const givenModelParams: Record<string, PropertyValue> = {};
+  for (const k of restored.getModelParamKeys()) givenModelParams[k] = restored.getModelParam(k);
+
+  const element = constructElement(def, { props, givenModelParams });
 
   element.position = { x: savedEl.position.x, y: savedEl.position.y };
   element.rotation = degreesToRotation(savedEl.rotation);
@@ -260,13 +269,16 @@ function createElement(
     const { model: modelKey, params: deltaParams } = savedEl.modelParamDeltas;
     const entry = circuitModels[savedEl.type]?.[modelKey];
     if (entry !== undefined) {
-      // Named-model defaults seed the bag (not given); delta keys are user
-      // overrides (marked given via setModelParam).
+      // Circuit-embedded named-model defaults seed the bag (not given); delta
+      // keys are user overrides (marked given via setModelParam). This targets
+      // models carried in the .dts itself (e.g. imported SPICE models), which
+      // are not in the component definition's registry.
+      const bag = element.getProperties();
       const decodedDeltas = decodeModelParams(deltaParams);
       const merged: Record<string, number> = { ...entry.params, ...decodedDeltas };
-      props.replaceModelParams(merged, { preserveGivenness: true });
+      bag.replaceModelParams(merged, { preserveGivenness: true });
       for (const [k, v] of Object.entries(decodedDeltas)) {
-        props.setModelParam(k, v);
+        bag.setModelParam(k, v);
       }
     }
   }

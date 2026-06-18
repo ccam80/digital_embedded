@@ -120,7 +120,7 @@ export const BehavioralJKAsyncFlipflopDriverDefinition: ComponentDefinition = {
       kind: "inline",
       paramDefs: [],
       params: {},
-      factory: (pinNodes: ReadonlyMap<string, number>, props: PropertyBag, _getTime: () => number) =>
+      factory: (pinNodes: ReadonlyMap<string, number>, props: PropertyBag) =>
         new BehavioralJKAsyncFlipflopDriverElement(pinNodes, props),
     },
   },

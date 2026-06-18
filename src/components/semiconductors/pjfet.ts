@@ -875,7 +875,6 @@ class PJfetAnalogElement extends PoolBackedAnalogElement {
 export function createPJfetElement(
   pinNodes: ReadonlyMap<string, number>,
   props: PropertyBag,
-  _getTime: () => number,
 ): AnalogElement {
   return new PJfetAnalogElement(pinNodes, props);
 }

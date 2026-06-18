@@ -381,7 +381,7 @@ export const CCCSDefinition: StandaloneComponentDefinition = {
   modelRegistry: {
     "behavioral": {
       kind: "inline",
-      factory: (pinNodes, props, _getTime) => {
+      factory: (pinNodes, props) => {
         const expression = props.getOrDefault<string>("expression", "I(sense)");
         const isLinearDefault = expression === "I(sense)";
         // The base expression is the unscaled transfer function: I(sense) for

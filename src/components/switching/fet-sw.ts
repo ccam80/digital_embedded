@@ -141,7 +141,7 @@ export const FetSWDefinition: ComponentDefinition = {
       kind: "inline",
       paramDefs: FET_SW_PARAM_DEFS,
       params: {},
-      factory: (pinNodes: ReadonlyMap<string, number>, props: PropertyBag, _getTime: () => number): AnalogElement =>
+      factory: (pinNodes: ReadonlyMap<string, number>, props: PropertyBag): AnalogElement =>
         new FetSWElement(pinNodes, props),
     },
   },

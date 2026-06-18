@@ -356,7 +356,7 @@ export const VCCSDefinition: StandaloneComponentDefinition = {
   modelRegistry: {
     "behavioral": {
       kind: "inline",
-      factory: (pinNodes, props, _getTime) => {
+      factory: (pinNodes, props) => {
         const expression = props.getOrDefault<string>("expression", "V(ctrl)");
         const isLinear = expression === "V(ctrl)";
         // Unscaled base expression; the transconductance and the parallel

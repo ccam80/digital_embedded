@@ -386,7 +386,7 @@ export const SwitchDefinition: StandaloneComponentDefinition = {
   modelRegistry: {
     "behavioral": {
       kind: "inline",
-      factory: (pinNodes, props, _getTime) => new SwitchAnalogElement(pinNodes, props),
+      factory: (pinNodes, props) => new SwitchAnalogElement(pinNodes, props),
       paramDefs: [],
       params: {},
     },

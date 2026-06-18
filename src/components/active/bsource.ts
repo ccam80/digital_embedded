@@ -659,7 +659,7 @@ export const BVDefinition: StandaloneComponentDefinition = {
   modelRegistry: {
     behavioral: {
       kind: "inline",
-      factory: (pinNodes, props, _getTime) => {
+      factory: (pinNodes, props) => {
         const exprText = props.getOrDefault<string>("expression", "0");
         const tree = buildBSourceTree(exprText);
         const el = new BVAnalogElement(pinNodes, tree);
@@ -696,7 +696,7 @@ export const BIDefinition: StandaloneComponentDefinition = {
   modelRegistry: {
     behavioral: {
       kind: "inline",
-      factory: (pinNodes, props, _getTime) => {
+      factory: (pinNodes, props) => {
         const exprText = props.getOrDefault<string>("expression", "0");
         const tree = buildBSourceTree(exprText);
         const el = new BIAnalogElement(pinNodes, tree);

@@ -122,7 +122,6 @@ export function buildDigitalOutputPinLoadedNetlist(
 const digitalOutputPinLoadedHook: AnalogWrapperHookFactory = (
   _pinNodes,
   props,
-  _getTime,
   subElementsByName,
 ) => {
   let vOH = props.getModelParam<number>("vOH");

@@ -435,7 +435,6 @@ function expandCompositeInstance(
   parentTypeId: string,
   registry: ComponentRegistry,
   runtimeModelMap: Record<string, Record<string, ModelEntry>> | undefined,
-  getTime: () => number,
   allocateNode: NodeAllocator,
   compositeInternalIds: ReadonlyMap<string, number>,
   hookFactory?: import("../../core/registry.js").AnalogWrapperHookFactory,
@@ -544,7 +543,7 @@ function expandCompositeInstance(
     // allocator's node-ID range.
     let childEl: AnalogElement;
     if (leafEntry.kind === "inline") {
-      childEl = leafEntry.factory(subPinNodes, subProps, getTime);
+      childEl = leafEntry.factory(subPinNodes, subProps);
       childEl.label = childLabel;
       subElements.push(childEl);
       allLeaves.push(childEl);
@@ -585,7 +584,6 @@ function expandCompositeInstance(
         subEl.typeId,
         registry,
         runtimeModelMap,
-        getTime,
         allocateNode,
         compositeInternalIds,
         leafDef?.analogWrapperHook,
@@ -635,7 +633,7 @@ function expandCompositeInstance(
   }
 
   const hook = hookFactory !== undefined && outerProps !== undefined
-    ? hookFactory(outerPinNodes, outerProps, getTime, subElementsByName)
+    ? hookFactory(outerPinNodes, outerProps, subElementsByName)
     : undefined;
 
   const wrapper = new SubcircuitWrapperElement({
@@ -1433,7 +1431,6 @@ export function compileAnalogPartition(
   const elementResolvedPins = new Map<number, ResolvedPin[]>();
 
   const timeRef = { value: 0 };
-  const getTime = (): number => timeRef.value;
 
   for (const meta of elementMeta) {
     const { pc, route } = meta;
@@ -1598,7 +1595,7 @@ export function compileAnalogPartition(
     if (route.kind === 'stamp') {
       const analogFactory = route.model.factory;
       if (!analogFactory) continue;
-      core = analogFactory(pinNodes, props, getTime);
+      core = analogFactory(pinNodes, props);
       core.label = resolvedLabel;
     } else {
       // The composite's netlist + subcktParams + parentLabel were resolved
@@ -1630,7 +1627,6 @@ export function compileAnalogPartition(
         pc.element.typeId,
         registry,
         runtimeModelMap,
-        getTime,
         allocateCompositeNode,
         compositeInternalIds,
         hookFactory,

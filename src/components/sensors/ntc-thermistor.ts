@@ -316,7 +316,6 @@ export class NTCThermistorElement extends PoolBackedAnalogElement {
 export function createNTCThermistorElement(
   pinNodes: ReadonlyMap<string, number>,
   props: PropertyBag,
-  _getTime: () => number,
 ): NTCThermistorElement {
   const r0 = props.getModelParam<number>("r0");
   const beta = props.getModelParam<number>("beta");

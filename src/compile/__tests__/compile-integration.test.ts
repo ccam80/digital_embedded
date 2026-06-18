@@ -189,7 +189,7 @@ function makeAnalogDef(
     defaultModel: 'behavioral',
     models: {},
     modelRegistry: {
-      behavioral: { kind: 'inline' as const, factory: (pinNodes: ReadonlyMap<string, number>, _props: PropertyBagType, _getTime: () => number) => factoryFn(pinNodes), branchCount: branchCount ? 1 : 0, paramDefs: [], params: {} },
+      behavioral: { kind: 'inline' as const, factory: (pinNodes: ReadonlyMap<string, number>, _props: PropertyBagType) => factoryFn(pinNodes), branchCount: branchCount ? 1 : 0, paramDefs: [], params: {} },
     },
   };
 }
@@ -897,7 +897,7 @@ describe('compileUnified- model resolution', () => {
     const twoIn = [inputPin(0, 0, 'a'), inputPin(0, 1, 'b'), outputPin(2, 0, 'out')];
     const behavioralEntry: ModelEntry = {
       kind: 'inline',
-      factory: (pinNodes: ReadonlyMap<string, number>, _props: PropertyBag, _getTime: () => number) => {
+      factory: (pinNodes: ReadonlyMap<string, number>, _props: PropertyBag) => {
         const [n0, n1] = [...pinNodes.values()];
         return makeResistorElement(n0 ?? 0, n1 ?? 0);
       },

@@ -85,7 +85,7 @@ export const BehavioralDriverInvDriverDefinition: ComponentDefinition = {
       kind: "inline",
       paramDefs: [],
       params: {},
-      factory: (pinNodes: ReadonlyMap<string, number>, props: PropertyBag, _getTime: () => number) =>
+      factory: (pinNodes: ReadonlyMap<string, number>, props: PropertyBag) =>
         new BehavioralDriverInvDriverElement(pinNodes, props),
     },
   },

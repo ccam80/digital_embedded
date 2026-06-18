@@ -380,7 +380,7 @@ export const ADCDriverDefinition: ComponentDefinition = {
         { key: "vOL",     default: 0 },
       ],
       params: { bits: 8, bipolar: 0, sar: 1, rOut: 100, vOH: 5, vOL: 0 },
-      factory: (pinNodes: ReadonlyMap<string, number>, props: PropertyBag, _getTime: () => number) =>
+      factory: (pinNodes: ReadonlyMap<string, number>, props: PropertyBag) =>
         new ADCDriverElement(pinNodes, props),
     },
   },

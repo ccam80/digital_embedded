@@ -696,7 +696,6 @@ export class AnalogCapacitorElement extends PoolBackedAnalogElement {
 function createCapacitorElement(
   pinNodes: ReadonlyMap<string, number>,
   props: PropertyBag,
-  _getTime: () => number,
 ): PoolBackedAnalogElement {
   return new AnalogCapacitorElement(pinNodes, props);
 }

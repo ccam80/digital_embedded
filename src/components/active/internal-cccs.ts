@@ -126,7 +126,7 @@ export const InternalCccsDefinition: ComponentDefinition = {
       kind: "inline",
       paramDefs: INTERNAL_CCCS_PARAM_DEFS,
       params: {},
-      factory: (pinNodes: ReadonlyMap<string, number>, props: PropertyBag, _getTime: () => number): AnalogElement =>
+      factory: (pinNodes: ReadonlyMap<string, number>, props: PropertyBag): AnalogElement =>
         new InternalCccsElement(pinNodes, props),
     },
   },

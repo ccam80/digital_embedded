@@ -6,7 +6,7 @@
  * Separated from palette.ts so the logic layer is testable without DOM.
  */
 
-import { createSeededBag, type StandaloneComponentDefinition } from "@/core/registry";
+import { constructElement, type StandaloneComponentDefinition } from "@/core/registry";
 import type { ComponentCategory } from "@/core/registry";
 import type { ComponentPalette, PaletteNode } from "./palette.js";
 import type { ColorScheme, Point } from "@/core/renderer-interface";
@@ -451,7 +451,7 @@ export class PaletteUI {
     }
 
     try {
-      const element = def.factory(createSeededBag(def));
+      const element = constructElement(def, {});
       const bb = element.getBoundingBox();
       const maxDim = Math.max(bb.width, bb.height, 1);
       const scale = (size * dpr * 0.8) / maxDim;

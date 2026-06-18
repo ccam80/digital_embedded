@@ -153,7 +153,7 @@ export const BehavioralFETDriverDefinition: ComponentDefinition = {
       kind: "inline",
       paramDefs: BEHAVIORAL_FET_DRIVER_PARAM_DEFS,
       params: {},
-      factory: (pinNodes: ReadonlyMap<string, number>, props: PropertyBag, _getTime: () => number): AnalogElement =>
+      factory: (pinNodes: ReadonlyMap<string, number>, props: PropertyBag): AnalogElement =>
         new BehavioralFETDriverElement(pinNodes, props),
     },
   },

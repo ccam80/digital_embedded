@@ -349,7 +349,6 @@ class NJFETElement extends PoolBackedAnalogElement {
   constructor(
     pinNodes: ReadonlyMap<string, number>,
     props: PropertyBag,
-    _getTime: () => number,
   ) {
     super(pinNodes);
     this._tempGiven = props.isModelParamGiven("TEMP");
@@ -1054,9 +1053,8 @@ class NJFETElement extends PoolBackedAnalogElement {
 export function createNJfetElement(
   pinNodes: ReadonlyMap<string, number>,
   props: PropertyBag,
-  _getTime: () => number,
 ): AnalogElement {
-  return new NJFETElement(pinNodes, props, _getTime);
+  return new NJFETElement(pinNodes, props);
 }
 
 // ---------------------------------------------------------------------------

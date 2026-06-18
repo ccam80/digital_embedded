@@ -275,8 +275,8 @@ const CMOS_INVERTER_NETLIST: MnaSubcircuitNetlist = {
   ports: ["In_1", "out", "VDD", "GND"],
   params: { WP: 20e-6, WN: 10e-6, L: 1e-6 },
   elements: [
-    { typeId: "PMOS", branchCount: 0, params: { W: "WP", L: "L" } },
-    { typeId: "NMOS", branchCount: 0, params: { W: "WN", L: "L" } },
+    { typeId: "PMOS", modelRef: "spice-l1", branchCount: 0, params: { W: "WP", L: "L" } },
+    { typeId: "NMOS", modelRef: "spice-l1", branchCount: 0, params: { W: "WN", L: "L" } },
   ],
   internalNetCount: 0,
   // Nets 0..3 = ports [in, out, VDD, GND]

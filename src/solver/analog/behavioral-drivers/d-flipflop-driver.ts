@@ -112,7 +112,7 @@ export const BehavioralDFlipflopDriverDefinition: ComponentDefinition = {
       kind: "inline",
       paramDefs: [],
       params: {},
-      factory: (pinNodes: ReadonlyMap<string, number>, props: PropertyBag, _getTime: () => number) =>
+      factory: (pinNodes: ReadonlyMap<string, number>, props: PropertyBag) =>
         new BehavioralDFlipflopDriverElement(pinNodes, props),
     },
   },

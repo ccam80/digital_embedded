@@ -159,7 +159,7 @@ export const BehavioralRegisterDriverDefinition: ComponentDefinition = {
         { key: "bitWidth", default: 8 },
       ],
       params: { bitWidth: 8 },
-      factory: (pinNodes: ReadonlyMap<string, number>, props: PropertyBag, _getTime: () => number) =>
+      factory: (pinNodes: ReadonlyMap<string, number>, props: PropertyBag) =>
         new BehavioralRegisterDriverElement(pinNodes, props),
     },
   },

@@ -22,7 +22,6 @@ class StubAnalogElement extends AnalogElement {
 export const STUB_ANALOG_FACTORY: AnalogFactory = (
   pinNodes,
   _props,
-  _getTime,
 ) => new StubAnalogElement(pinNodes);
 
 /**

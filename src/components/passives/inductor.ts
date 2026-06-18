@@ -965,7 +965,6 @@ export class AnalogInductorElement extends PoolBackedAnalogElement {
 function createInductorElement(
   pinNodes: ReadonlyMap<string, number>,
   props: PropertyBag,
-  _getTime: () => number,
 ): AnalogElement {
   return new AnalogInductorElement(pinNodes, props);
 }

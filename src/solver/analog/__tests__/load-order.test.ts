@@ -32,7 +32,6 @@ describe("ngspiceLoadOrder per-factory ordinals", () => {
     const el = getFactory(ResistorDefinition)(
       new Map([["pos", 1], ["neg", 2]]),
       props,
-      () => 0,
     );
     expect(el.ngspiceLoadOrder).toBe(NGSPICE_LOAD_ORDER.RES);
     expect(el.ngspiceLoadOrder).toBe(40);
@@ -44,7 +43,6 @@ describe("ngspiceLoadOrder per-factory ordinals", () => {
     const el = getFactory(CapacitorDefinition)(
       new Map([["pos", 1], ["neg", 2]]),
       props,
-      () => 0,
     );
     expect(el.ngspiceLoadOrder).toBe(NGSPICE_LOAD_ORDER.CAP);
     expect(el.ngspiceLoadOrder).toBe(17);
@@ -56,7 +54,6 @@ describe("ngspiceLoadOrder per-factory ordinals", () => {
     const el = makeDcVoltageSource(
       new Map([["pos", 1], ["neg", 0]]),
       props,
-      () => 0,
     );
     expect(el.ngspiceLoadOrder).toBe(NGSPICE_LOAD_ORDER.VSRC);
     expect(el.ngspiceLoadOrder).toBe(48);

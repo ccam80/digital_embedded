@@ -1696,18 +1696,14 @@ function _createVdmosElementWithType(
 export function createVdmosNElement(
   pinNodes: ReadonlyMap<string, number>,
   props: PropertyBag,
-  _getTime: () => number = () => 0,
 ): AnalogElement {
-  void _getTime;
   return _createVdmosElementWithType(1, pinNodes, props);
 }
 
 export function createVdmosPElement(
   pinNodes: ReadonlyMap<string, number>,
   props: PropertyBag,
-  _getTime: () => number = () => 0,
 ): AnalogElement {
-  void _getTime;
   return _createVdmosElementWithType(-1, pinNodes, props);
 }
 

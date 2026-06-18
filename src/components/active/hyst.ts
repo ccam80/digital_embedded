@@ -315,7 +315,7 @@ export const HystDefinition: ComponentDefinition = {
       // hyst (...)`. XSPICE code-model device family; in/out mint deck nodes in
       // this order (gnd is the implicit ground reference, node 0 when embedded).
       spice: { device: "XSPICE", deckNodeTokens: ["in", "out"] },
-      factory: (pinNodes: ReadonlyMap<string, number>, props: PropertyBag, _getTime: () => number): AnalogElement =>
+      factory: (pinNodes: ReadonlyMap<string, number>, props: PropertyBag): AnalogElement =>
         new HystElement(pinNodes, props),
     },
   },

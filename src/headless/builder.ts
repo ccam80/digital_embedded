@@ -4,9 +4,10 @@
 
 import { Circuit, Wire } from '../core/circuit.js';
 import type { ComponentRegistry, StandaloneComponentDefinition, AttributeMapping } from '../core/registry.js';
+import { constructElement } from '../core/registry.js';
 import { resolveComponentDef } from '../core/resolve-component.js';
 import type { PropertyValue } from '../core/properties.js';
-import { PropertyBag, PropertyType } from '../core/properties.js';
+import { PropertyType } from '../core/properties.js';
 import type { Pin } from '../core/pin.js';
 import { pinWorldPosition } from '../core/pin.js';
 import type { CircuitElement } from '../core/element.js';
@@ -201,48 +202,21 @@ export class CircuitBuilder {
     // Translate XML-convention keys (e.g. "Bits") to internal keys (e.g. "bitWidth")
     const resolvedProps = this.translateProps(definition, props || {});
 
-    // Build property bag from defaults and caller props
-    const bag = new PropertyBag();
-    for (const [key, value] of Object.entries(resolvedProps)) {
-      bag.set(key, value);
-    }
-
-    // Seed model param defaults from the default model entry, then overlay
-    // any caller-specified values that were placed in _map.
-    const defaultModelKey = definition.defaultModel ?? "";
-    const defaultEntry = definition.modelRegistry?.[defaultModelKey];
-    if (defaultEntry?.params) {
-      bag.replaceModelParams({ ...defaultEntry.params });
-    }
-    if (definition.modelRegistry) {
-      const paramKeys = new Set<string>();
-      for (const entry of Object.values(definition.modelRegistry)) {
-        if (entry.paramDefs) {
-          for (const pd of entry.paramDefs) paramKeys.add(pd.key);
-        }
-      }
-      for (const key of paramKeys) {
-        if (bag.has(key)) {
-          const val = bag.get(key);
-          if (typeof val === 'number') {
-            bag.setModelParam(key, val);
-          }
-        }
-      }
-    }
-
     // Auto-position unless caller specified position
     // Position stored as [x, y] number array (PropertyValue supports number[])
-    if (!bag.has('position')) {
-      bag.set('position', [0, this.elementPositionCounter * AUTO_POSITION_Y_STEP]);
+    if (resolvedProps['position'] === undefined) {
+      resolvedProps['position'] = [0, this.elementPositionCounter * AUTO_POSITION_Y_STEP];
     }
 
-    const element = definition.factory(bag);
+    // Single construction path: seeds the resolved model's params, sets the
+    // `model` property, and partitions overrides into model-param vs static-
+    // identical to every other load path (see core/registry.ts constructElement).
+    const element = constructElement(definition, { props: resolvedProps });
 
-    // Factories create elements at (0,0)- apply the position from the bag.
-    const pos = bag.has('position') ? bag.get<number[]>('position') : undefined;
-    if (pos && pos.length >= 2) {
-      element.position = { x: pos[0], y: pos[1] };
+    // Factories create elements at (0,0)- apply the position from the props.
+    const pos = resolvedProps['position'];
+    if (Array.isArray(pos) && pos.length >= 2) {
+      element.position = { x: pos[0] as number, y: pos[1] as number };
     }
 
     circuit.elements.push(element);

@@ -109,7 +109,7 @@ export const FGNFETBlownDriverDefinition: ComponentDefinition = {
       kind: "inline",
       paramDefs: FGNFET_BLOWN_DRIVER_PARAM_DEFS,
       params: FGNFET_BLOWN_DRIVER_DEFAULTS,
-      factory: (pinNodes: ReadonlyMap<string, number>, props: PropertyBag, _getTime: () => number): AnalogElement =>
+      factory: (pinNodes: ReadonlyMap<string, number>, props: PropertyBag): AnalogElement =>
         new FGNFETBlownDriverElement(pinNodes, props),
     },
   },

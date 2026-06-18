@@ -135,7 +135,6 @@ class GroundAnalogElement extends AnalogElement {
 function createGroundAnalogElement(
   pinNodes: ReadonlyMap<string, number>,
   _props: PropertyBag,
-  _getTime: () => number,
 ): AnalogElement {
   return new GroundAnalogElement(pinNodes);
 }

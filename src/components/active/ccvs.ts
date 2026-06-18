@@ -377,7 +377,7 @@ export const CCVSDefinition: StandaloneComponentDefinition = {
   modelRegistry: {
     "behavioral": {
       kind: "inline",
-      factory: (pinNodes, props, _getTime) => {
+      factory: (pinNodes, props) => {
         const expression = props.getOrDefault<string>("expression", "I(sense)");
         const isLinear = expression === "I(sense)";
         // Unscaled base expression; the transresistance is applied live at

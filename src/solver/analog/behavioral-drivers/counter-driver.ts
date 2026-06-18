@@ -183,7 +183,7 @@ export const BehavioralCounterDriverDefinition: ComponentDefinition = {
         { key: "bitWidth", default: 4 },
       ],
       params: { bitWidth: 4 },
-      factory: (pinNodes: ReadonlyMap<string, number>, props: PropertyBag, _getTime: () => number) =>
+      factory: (pinNodes: ReadonlyMap<string, number>, props: PropertyBag) =>
         new BehavioralCounterDriverElement(pinNodes, props),
     },
   },

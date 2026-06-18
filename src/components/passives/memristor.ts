@@ -388,7 +388,6 @@ export class MemristorCircuitElement extends AbstractCircuitElement {
 export function createMemristorElement(
   pinNodes: ReadonlyMap<string, number>,
   props: PropertyBag,
-  _getTime: () => number,
 ): PoolBackedAnalogElement {
   return new MemristorElement(pinNodes, props);
 }

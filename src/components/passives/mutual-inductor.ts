@@ -304,7 +304,6 @@ export const MutualInductorDefinition: ComponentDefinition = {
       factory: (
         pinNodes: ReadonlyMap<string, number>,
         props: PropertyBag,
-        _getTime: () => number,
       ): AnalogElement => new MutualInductorElement(pinNodes, props),
       spice: { device: "MUT", deckNodeTokens: [] },
     },

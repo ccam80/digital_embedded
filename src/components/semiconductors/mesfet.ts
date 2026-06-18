@@ -899,7 +899,6 @@ class PMESFETElement extends MesfetAnalogElement {
 export function createNMesfetElement(
   pinNodes: ReadonlyMap<string, number>,
   props: PropertyBag,
-  _getTime: () => number,
 ): AnalogElement {
   return new NMESFETElement(pinNodes, props);
 }
@@ -907,7 +906,6 @@ export function createNMesfetElement(
 export function createPMesfetElement(
   pinNodes: ReadonlyMap<string, number>,
   props: PropertyBag,
-  _getTime: () => number,
 ): AnalogElement {
   return new PMESFETElement(pinNodes, props);
 }

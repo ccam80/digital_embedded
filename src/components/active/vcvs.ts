@@ -377,7 +377,7 @@ export const VCVSDefinition: StandaloneComponentDefinition = {
   modelRegistry: {
     "behavioral": {
       kind: "inline",
-      factory: (pinNodes, props, _getTime) => {
+      factory: (pinNodes, props) => {
         const expression = props.getOrDefault<string>("expression", "V(ctrl)");
         const gain = props.getModelParam<number>("gain");
         const isLinear = expression === "V(ctrl)";
@@ -396,7 +396,7 @@ export const VCVSDefinition: StandaloneComponentDefinition = {
     },
     "comparator": {
       kind: "inline",
-      factory: (pinNodes, _props, _getTime) => {
+      factory: (pinNodes, _props) => {
         const { expr, deriv } = makeVcvsComparatorExpression();
         return new VCVSAnalogElement(pinNodes, expr, deriv, "V(ctrl)", "voltage");
       },

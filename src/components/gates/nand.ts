@@ -135,10 +135,10 @@ const CMOS_NAND2_NETLIST: MnaSubcircuitNetlist = {
   ports: ["In_1", "In_2", "out", "VDD", "GND"],
   params: { WP: 20e-6, WN: 10e-6, L: 1e-6 },
   elements: [
-    { typeId: "PMOS", branchCount: 0, params: { W: "WP", L: "L" } },
-    { typeId: "PMOS", branchCount: 0, params: { W: "WP", L: "L" } },
-    { typeId: "NMOS", branchCount: 0, params: { W: "WN", L: "L" } },
-    { typeId: "NMOS", branchCount: 0, params: { W: "WN", L: "L" } },
+    { typeId: "PMOS", modelRef: "spice-l1", branchCount: 0, params: { W: "WP", L: "L" } },
+    { typeId: "PMOS", modelRef: "spice-l1", branchCount: 0, params: { W: "WP", L: "L" } },
+    { typeId: "NMOS", modelRef: "spice-l1", branchCount: 0, params: { W: "WN", L: "L" } },
+    { typeId: "NMOS", modelRef: "spice-l1", branchCount: 0, params: { W: "WN", L: "L" } },
   ],
   internalNetCount: 1,
   // Nets 0..4 = ports [In_1, In_2, out, VDD, GND], net 5 = series_node

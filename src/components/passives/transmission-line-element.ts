@@ -435,7 +435,6 @@ class TransmissionLineAnalogElement extends AnalogElement {
 export function createTransmissionLineElement(
   pinNodes: ReadonlyMap<string, number>,
   props: PropertyBag,
-  _getTime: () => number,
 ): AnalogElement {
   const lossPerMeter = props.getModelParam<number>("lossPerMeter");
   if (lossPerMeter > 0) {

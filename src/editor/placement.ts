@@ -14,7 +14,7 @@
 import type { Point } from "@/core/renderer-interface";
 import type { CircuitElement } from "@/core/element";
 import type { Rotation } from "@/core/pin";
-import { createSeededBag, type StandaloneComponentDefinition } from "@/core/registry";
+import { constructElement, type StandaloneComponentDefinition } from "@/core/registry";
 import type { Circuit } from "@/core/circuit";
 import { snapToGrid } from "@/editor/coordinates";
 import type { ClipboardData } from "@/editor/edit-operations";
@@ -158,8 +158,7 @@ export class PlacementMode {
       throw new Error("PlacementMode: cannot place when not active");
     }
 
-    const props = createSeededBag(this._definition);
-    const element = this._definition.factory(props);
+    const element = constructElement(this._definition, {});
     element.position = { x: this._position.x, y: this._position.y };
     element.rotation = this._rotation;
     element.mirror = this._mirror;
@@ -336,8 +335,7 @@ export class PlacementMode {
    */
   private _buildGhost(): CircuitElement {
     const def = this._definition!;
-    const props = createSeededBag(def);
-    const element = def.factory(props);
+    const element = constructElement(def, {});
     element.position = { x: this._position.x, y: this._position.y };
     element.rotation = this._rotation;
     element.mirror = this._mirror;

@@ -154,7 +154,7 @@ export const Timer555LatchDriverDefinition: ComponentDefinition = {
         { key: "rOut", default: 100 },
       ],
       params: {},
-      factory: (pinNodes: ReadonlyMap<string, number>, props: PropertyBag, _getTime: () => number) =>
+      factory: (pinNodes: ReadonlyMap<string, number>, props: PropertyBag) =>
         new Timer555LatchDriverElement(pinNodes, props),
     },
   },
