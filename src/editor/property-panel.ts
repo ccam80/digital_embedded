@@ -526,13 +526,7 @@ export class PropertyPanel {
       }
 
       const oldValue = bag.hasModelParam(pd.key) ? bag.getModelParam<number>(pd.key) : defaultValue;
-      // Commit when the value changed OR the param is not yet user-given. The
-      // seeded default sits in _mparams un-given, so a param left at (or typed
-      // back to) its default would otherwise never be marked given — leaving
-      // consumers that gate on isModelParamGiven (e.g. resistor.ts, which falls
-      // to a 1 mΩ degenerate value when resistance is not given) on the wrong
-      // branch. setModelParam marks it given, establishing the user's intent.
-      if (parsed !== oldValue || !bag.isModelParamGiven(pd.key)) {
+      if (parsed !== oldValue) {
         bag.setModelParam(pd.key, parsed);
         inputEl.value = pd.unit ? formatSI(parsed, "", 3).trim() : String(parsed);
         inputEl.style.borderColor =

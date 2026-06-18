@@ -40,7 +40,7 @@ const MIN_RESISTANCE = 1e-9;
 
 export const { paramDefs: RESISTOR_PARAM_DEFS, defaults: RESISTOR_DEFAULTS } = defineModelParams({
   primary: {
-    resistance: { default: 1000, unit: "Ω", description: "Resistance in ohms. Minimum clamped to 1e-9 Ω.", min: 1e-9 },
+    resistance: { default: 1000, unit: "Ω", positional: true, description: "Resistance in ohms. Minimum clamped to 1e-9 Ω.", min: 1e-9 },
   },
   secondary: {
     // Model-card geometry / temperature parameters — ngspice RESmodel fields.
