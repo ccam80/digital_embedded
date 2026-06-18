@@ -797,21 +797,6 @@ export function createSeededBag(def: ComponentDefinition, modelKey?: string): Pr
   const key = modelKey ?? def.defaultModel ?? "";
   const entry = def.modelRegistry?.[key];
   if (entry?.params) bag.replaceModelParams({ ...entry.params });
-  // Positional params are the instance-line VALUE (resistance, capacitance,
-  // inductance- the bare value on an R/C/L card). ngspice always carries them
-  // on the instance line, so they are given by construction: a placed/built
-  // component has a concrete value for them even before any user edit. Marking
-  // them given keeps consumers that gate on isModelParamGiven (e.g. resistor
-  // updateConduct's degenerate fallback) on the correct branch. Non-positional
-  // model params (BJT IS/BF, diode IS, ...) stay un-given- registry defaults
-  // the serializer omits until the user overrides them.
-  if (entry?.paramDefs && entry.params) {
-    for (const pd of entry.paramDefs) {
-      if (pd.positional && entry.params[pd.key] !== undefined) {
-        bag.setModelParam(pd.key, entry.params[pd.key]);
-      }
-    }
-  }
   if (key) bag.set("model", key);
   return bag;
 }
