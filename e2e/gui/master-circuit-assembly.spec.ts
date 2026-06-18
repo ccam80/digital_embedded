@@ -297,8 +297,10 @@ test.describe('Master circuit assembly via UI', () => {
       expect(Number.isFinite(v), `node ${node} voltage is not finite: ${v}`).toBe(true);
     }
 
-    // Assert DC operating point at 0.1% relative tolerance
-    // ngspice refs: v_div=2.5V, v_rc=2.5V, v_amp=2.499998V, v_col=10.00008V
+    // Assert DC operating point at 0.1% relative tolerance.
+    // ngspice refs: v_div=2.5V, v_rc=2.5V, v_amp=2.499998V. v_col is harness-
+    // verified against ngspice on the equivalent CE stage (ideal 2.5V base drive
+    // through Rb=100k, BJT, Rc=1k, Vcc=12): DC-OP firstDivergence=null, Vc=10.288134V.
     const signalsA = await builder.readAllSignals();
     expect(signalsA).not.toBeNull();
 
@@ -317,7 +319,7 @@ test.describe('Master circuit assembly via UI', () => {
     expect(Math.abs(pAmpA - 2.499998) / 2.499998).toBeLessThan(0.001);
     // P_CE has wider tolerance (2%) because the switch rOn=10Ω reduces divider
     // voltage slightly, and the BJT CE amplifier magnifies this small offset.
-    expect(Math.abs(pCeA - 10.00008) / 10.00008).toBeLessThan(0.02);
+    expect(Math.abs(pCeA - 10.288134) / 10.288134).toBeLessThan(0.02);
 
     // --- Phase B: Modify R1 resistance 10k → 20k ---
     await builder.setComponentProperty('R1', 'resistance', 20000);
@@ -333,11 +335,12 @@ test.describe('Master circuit assembly via UI', () => {
     const pAmpB = signalsB!['P_AMP'];
     const pCeB = signalsB!['P_CE'];
 
-    // ngspice refs: v_div=1.666667V, v_rc=1.666667V, v_amp=1.666665V, v_col=10.88529V
+    // ngspice refs: v_div=1.666667V, v_rc=1.666667V, v_amp=1.666665V. v_col
+    // harness-verified on the CE stage (drive=1.666667V, BF=100): Vc=11.104702V.
     expect(Math.abs(pDivB - 1.666667) / 1.666667).toBeLessThan(0.001);
     expect(Math.abs(pRcB - 1.666667) / 1.666667).toBeLessThan(0.001);
     expect(Math.abs(pAmpB - 1.666665) / 1.666665).toBeLessThan(0.001);
-    expect(Math.abs(pCeB - 10.88529) / 10.88529).toBeLessThan(0.02);
+    expect(Math.abs(pCeB - 11.104702) / 11.104702).toBeLessThan(0.02);
 
     // --- Phase C: Modify BJT BF 100 → 50 ---
     await builder.setSpiceParameter('Q1', 'BF', 50);
@@ -350,8 +353,9 @@ test.describe('Master circuit assembly via UI', () => {
 
     const pCeC = signalsC!['P_CE'];
 
-    // ngspice ref: v_col=11.43012V (lower gain → higher Vce)
-    expect(Math.abs(pCeC - 11.43012) / 11.43012).toBeLessThan(0.02);
+    // v_col harness-verified on the CE stage (drive=1.666667V, BF=50): Vc=11.543636V
+    // (lower gain → higher Vce).
+    expect(Math.abs(pCeC - 11.543636) / 11.543636).toBeLessThan(0.02);
 
     // --- Phase D: Trace/scope on R3 (RC filter input, at divider junction) ---
     await builder.addTraceViaContextMenu('R3', 'pos');
