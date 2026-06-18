@@ -1,35 +1,35 @@
 ﻿/**
- * Spark Gap - voltage-triggered variable resistance with hysteresis.
+ * Spark Gap - voltage-triggered latched switch with hysteresis.
  *
- * Behaviour:
- *   - Blocking state: R = rOff (1GOhm+) until |V| > vBreakdown
- *   - Conducting state: R = rOn (1-10Ohm) until |I| < iHold
- *   - Hysteresis: once fired, stays conducting until holding current drops
+ * Discrete two-state latch modelled on ngspice's SW device
+ * (ref/ngspice/src/spicelib/devices/sw/swload.c):
+ *   - Blocking state:    G = 1/rOff until |V| > vBreakdown (fire)
+ *   - Conducting state:  G = 1/rOn  until |I| < iHold (extinguish)
+ *   - Hysteresis: once fired, the latch holds conducting until the implicit
+ *     holding current |I| = |V|·G drops below iHold.
  *
- * Smooth resistance transition:
- *   To avoid step discontinuities that prevent NR convergence, the resistance
- *   blends continuously via a tanh soft transition:
+ * Self-controlled adaptation of swload.c: SW is externally controlled (fires on
+ * another branch's V); the spark gap fires on its OWN |V| > vBreakdown and
+ * extinguishes on its OWN |I| < iHold. Both thresholds fold into the swload.c
+ * MODEINITFLOAT latch shape (latchState), keyed off the prior-iterate terminal
+ * voltage from rhsOld.
  *
- *   Firing transition (blocking -> conducting):
- *     R_fire(V) = rOff + (rOn - rOff) * 0.5 * (1 + tanh((|V| - vBreakdown) / w_v))
- *     where w_v = 0.05 * vBreakdown
- *
- *   Extinction transition (conducting -> blocking):
- *     R_ext(I) = rOn + (rOff - rOn) * 0.5 * (1 + tanh((iHold - |I|) / w_i))
- *     where w_i = 0.05 * iHold
- *
- *   The effective resistance is the blend appropriate to the current state.
- *   State variable CONDUCTING switches based on thresholds to avoid chattering.
+ * Per-iteration stamp is the constant conductance of the latched state
+ * (swload.c:135-145), LINEAR, so each latched state converges in one iteration.
+ * The latch settles within the step via the CKTnoncon++ re-iteration
+ * (swload.c:94-97): load() records whether the latch flipped this pass in the
+ * FLIPPED slot, and checkConvergence() returns false (forcing another NR
+ * iteration) until the latch stops moving.
  *
  * MNA topology:
  *   pinNodes["pos"] = n_pos
  *   pinNodes["neg"] = n_neg
  *   branchIndex    = -1
  *
- * Unified load() pipeline:
- *   load(ctx)        stamps linearized conductance at the current operating point
- *                     every NR iteration; resistance is computed from the hysteretic
- *                     CONDUCTING state read from s1; bottom-of-load updates s0.
+ * State-vector vintages (state-pool.ts:112-119 rotateStateVectors rotates only
+ * at accepted-step boundaries): state0 carries the prior NR *iterate's* latch
+ * (CKTstate0, swload.c:34), state1 carries the prior accepted *step's* latch
+ * (CKTstate1).
  */
 
 import { PoolBackedAnalogElement } from "../../solver/analog/element.js";
@@ -67,12 +67,12 @@ const MIN_RESISTANCE = 1e-12;
 // ---------------------------------------------------------------------------
 
 export const SPARK_GAP_SCHEMA = defineStateSchema("SparkGapElement", [
-  { name: "CONDUCTING", doc: "Conducting state: 1 = conducting, 0 = blocking" },
-  { name: "LAST_G",     doc: "Conductance stamped at the previous NR iteration; used for self-consistent current estimate" },
+  { name: "CONDUCTING", doc: "Latch state: 1 = conducting, 0 = blocking (swload.c CKTstate0[SWswitchstate])" },
+  { name: "FLIPPED",    doc: "1 if the latch flipped this NR pass; drives checkConvergence (swload.c:94 CKTnoncon++)" },
 ]) satisfies StateSchema;
 
 const SLOT_CONDUCTING = 0;
-const SLOT_LAST_G     = 1;
+const SLOT_FLIPPED    = 1;
 
 // ---------------------------------------------------------------------------
 // Model parameter declarations
@@ -90,43 +90,34 @@ export const { paramDefs: SPARK_GAP_PARAM_DEFS, defaults: SPARK_GAP_DEFAULTS } =
 });
 
 // ---------------------------------------------------------------------------
-// Smooth resistance helpers
+// Latch state transition
 // ---------------------------------------------------------------------------
 
 /**
- * Smooth firing transition: blocks at low V, conducts at high V.
- * Blends from rOff -> rOn as |V| crosses vBreakdown.
+ * Discrete latch transition (swload.c:66-97 MODEINITFLOAT), self-controlled.
+ *
+ * Returns the new latch state (0 or 1) from the prior-iterate state and the
+ * prior-iterate terminal voltage:
+ *   - fire (return 1) when |V| > vBreakdown        (swload.c:70-71 upper threshold)
+ *   - else, when conducting, extinguish (return 0) when the implicit holding
+ *     current |I| = |V|·gLatched < iHold           (swload.c:72-73 lower threshold)
+ *   - else hold the prior state                    (swload.c:75 hold old_current_state)
+ *
+ * gLatched is the constant conductance the prior-iterate state stamps
+ * (1/rOn when conducting, 1/rOff when blocking), used as the self-consistent
+ * current estimate.
  */
-function firingResistance(absV: number, vBreakdown: number, rOff: number, rOn: number): number {
-  const w = 0.05 * Math.max(vBreakdown, 1e-6);
-  const blend = 0.5 * (1 + Math.tanh((absV - vBreakdown) / w));
-  return rOff + (rOn - rOff) * blend;
-}
-
-/**
- * Smooth extinction transition: conducts at high I, blocks at low I.
- * Blends from rOn -> rOff as |I| drops below iHold.
- */
-function extinctionResistance(absI: number, iHold: number, rOn: number, rOff: number): number {
-  const w = 0.05 * Math.max(iHold, 1e-12);
-  const blend = 0.5 * (1 + Math.tanh((iHold - absI) / w));
-  return rOn + (rOff - rOn) * blend;
-}
-
-/**
- * Apply hysteresis state transition and return updated conducting flag (0 or 1).
- * lastG is the conductance stamped in the previous NR iteration; using it as
- * the current estimate (absI = absV * lastG) keeps the extinction check
- * consistent with the Jacobian already presented to the solver, preventing
- * binary G oscillation when iHold falls between the two equilibrium currents.
- */
-function applyHysteresis(conductingOld: number, absV: number, vBreakdown: number, iHold: number, lastG: number): number {
-  if (!conductingOld) {
-    return absV > vBreakdown ? 1 : 0;
-  }
-  // Current estimate consistent with the conductance stamped last iteration.
-  const absI = absV * lastG;
-  return absI < iHold ? 0 : 1;
+function latchState(
+  conductingOld: number,
+  absV: number,
+  vBreakdown: number,
+  iHold: number,
+  gLatched: number,
+): number {
+  if (absV > vBreakdown) return 1;
+  const absI = absV * gLatched;
+  if (conductingOld && absI < iHold) return 0;
+  return conductingOld;
 }
 
 // ---------------------------------------------------------------------------
@@ -194,59 +185,54 @@ export class SparkGapElement extends PoolBackedAnalogElement {
   }
 
   /**
-   * Compute effective resistance given the current conducting state, terminal voltage,
-   * and the conductance stamped in the previous NR iteration.
-   *
-   * lastG is used as the self-consistent current estimate in the conducting branch:
-   *   absI = absV * lastG  (= absV / R_prev_iter)
-   * This avoids the fixed-rOn estimate that oscillates across iHold when iHold
-   * is hot-loaded between the two equilibrium currents.
+   * Constant conductance of a latched state (swload.c:135-145):
+   *   1/rOn when conducting, 1/rOff when blocking.
    */
-  private resistanceFromState(conducting: number, absV: number, lastG: number): number {
-    if (!conducting) {
-      return firingResistance(absV, this._vBreakdown, this._rOff, this._rOn);
-    }
-    const absI = absV * lastG;
-    return extinctionResistance(absI, this._iHold, this._rOn, this._rOff);
+  private conductanceForState(conducting: number): number {
+    return 1 / Math.max(conducting ? this._rOn : this._rOff, MIN_RESISTANCE);
   }
 
   load(ctx: LoadContext): void {
     const base = this._stateBase;
-    const s1 = this._pool.states[1];
     const s0 = this._pool.states[0];
 
-    const conductingOld = s1[base + SLOT_CONDUCTING];
+    // Prior NR iterate's latch (swload.c:34 old_current_state = CKTstate0). Within
+    // a step's NR loop, state0 carries the previous iterate's latch; at the first
+    // iteration state0 has just been rotated to equal the prior accepted step.
+    const conductingOld = s0[base + SLOT_CONDUCTING];
+
     const nPos = this.pinNodes.get("pos")!;
     const nNeg = this.pinNodes.get("neg")!;
-    // ngspice DEVload idiom - read CKTrhsOld (prior NR iterate), not CKTrhs.
-    // bjtload.c:208-209, dioload.c:139-140 read rhsOld so Jacobian-linearised
-    // stamps use the last committed iter's voltages, stable across NR.
+    // swload.c:37-39: control quantity from CKTrhsOld (prior NR iterate), not CKTrhs.
     const voltages = ctx.rhsOld;
-    const vTerm = voltages[nPos] - voltages[nNeg];
-    const absV = Math.abs(vTerm);
+    const absV = Math.abs(voltages[nPos] - voltages[nNeg]);
 
-    // lastG: conductance stamped in the previous NR iteration (s0 carries the
-    // value written by the prior load() call within this attempt).  On the very
-    // first NR iteration of a step s0 holds the rotated-in previous accepted
-    // state, which initialises LAST_G to 0; fall back to 1/rOn in that case so
-    // the first iterate behaves as before and subsequent iterates are
-    // self-consistent.
-    const lastGRaw = s0[base + SLOT_LAST_G];
-    const lastG = lastGRaw > 0 ? lastGRaw : 1 / Math.max(this._rOn, MIN_RESISTANCE);
+    // Constant conductance the prior-iterate state stamps, used as the
+    // self-consistent current estimate in the latch's extinction test.
+    const gLatched = this.conductanceForState(conductingOld);
 
-    const R = this.resistanceFromState(conductingOld, absV, lastG);
-    const G = 1 / Math.max(R, MIN_RESISTANCE);
+    const conductingNew = latchState(conductingOld, absV, this._vBreakdown, this._iHold, gLatched);
 
+    // Stamp the constant conductance of the new latched state (swload.c:135-145,
+    // two-valued and LINEAR per iteration).
+    const G = this.conductanceForState(conductingNew);
     ctx.solver.stampElement(this._hPP,  G);
     ctx.solver.stampElement(this._hPN, -G);
     ctx.solver.stampElement(this._hNP, -G);
     ctx.solver.stampElement(this._hNN,  G);
 
-    // ngspice CKTstate0 idiom - bjtload.c:744-746, dioload.c:325-326
-    const conductingNew = applyHysteresis(conductingOld, absV, this._vBreakdown, this._iHold, lastG);
+    // Write the new latch (swload.c:132 CKTstate0) and record whether it flipped
+    // this pass (swload.c:94), so checkConvergence forces a re-iterate on a flip.
     s0[base + SLOT_CONDUCTING] = conductingNew;
-    // Store the conductance just stamped for use as lastG in the next NR iteration.
-    s0[base + SLOT_LAST_G] = G;
+    s0[base + SLOT_FLIPPED] = conductingNew !== conductingOld ? 1 : 0;
+  }
+
+  /**
+   * swload.c:94-97 CKTnoncon++: while the latch is still flipping, the step has
+   * not converged. Returns true (converged) only once the latch holds.
+   */
+  checkConvergence(_ctx: LoadContext): boolean {
+    return this._pool.states[0][this._stateBase + SLOT_FLIPPED] === 0;
   }
 
   getPinCurrents(rhs: Float64Array): number[] {
@@ -257,11 +243,7 @@ export class SparkGapElement extends PoolBackedAnalogElement {
     const s1 = this._pool.states[1];
     const base = this._stateBase;
     const conducting = s1[base + SLOT_CONDUCTING];
-    const absV = Math.abs(vPos - vNeg);
-    // Use the last accepted LAST_G from s1 for a consistent current estimate.
-    const lastGRaw = s1[base + SLOT_LAST_G];
-    const lastG = lastGRaw > 0 ? lastGRaw : 1 / Math.max(this._rOn, MIN_RESISTANCE);
-    const G = 1 / Math.max(this.resistanceFromState(conducting, absV, lastG), MIN_RESISTANCE);
+    const G = this.conductanceForState(conducting);
     const I = G * (vPos - vNeg);
     return [I, -I];
   }
