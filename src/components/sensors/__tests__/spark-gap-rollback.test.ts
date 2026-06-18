@@ -225,18 +225,27 @@ describe("SparkGap parameter hot-load (T1)", () => {
   });
 
   it("hotload_iHold_above_steady_current_extinguishes_gap", () => {
-    // Pre: VS=2000V, vBreakdown=100, rOn=5, RS=100, iHold=0.01.
-    // Steady-state conducting current = VS/(RS+rOn) = 2000/105 ≈ 19.05 A.
-    // Post: iHold=100 (well above 19.05 A) → extinction; CONDUCTING goes 1 → 0.
+    // Fire at VS=2000 (> vBreakdown=100), then drop the source BELOW breakdown so
+    // the gap stays lit by hysteresis but extinction is stable. A discrete latched
+    // gap cannot stably extinguish while a source above vBreakdown is applied — it
+    // re-strikes (continuous arc) — so the extinction scenario lowers the source
+    // first, mirroring spark-gap.test.ts hotload_iHold_raise_above_steady_current.
     const fix = buildFixture({
       build: (_r, facade) => buildSparkGapCircuit(facade, {
-        vSource: 2000, rSeries: 100, vBreakdown: 100, iHold: 0.01,
+        vSource: 2000, rSeries: 100, vBreakdown: 100, rOn: 5, iHold: 0.01,
       }),
     });
     const sgIdx = findSparkGapIndex(fix);
     const sg = fix.circuit.elements[sgIdx]!;
     expect(fix.pool.state1[sg._stateBase + SLOT_CONDUCTING]).toBe(1);
 
+    // Drop VS to 10 V (< vBreakdown=100); gap stays conducting by hysteresis
+    // (I = 10/(100+5) ≈ 0.095 A > iHold 0.01).
+    fix.coordinator.setSourceByLabel("vs", "voltage", 10);
+    for (let i = 0; i < 20; i++) fix.coordinator.step();
+    expect(fix.pool.state1[sg._stateBase + SLOT_CONDUCTING]).toBe(1);
+
+    // Raise iHold above the steady current → stable extinction (source < breakdown).
     fix.coordinator.setComponentProperty(fix.element("sg"), "iHold", 100);
     for (let i = 0; i < 20; i++) fix.coordinator.step();
 
