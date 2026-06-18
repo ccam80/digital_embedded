@@ -312,10 +312,6 @@ test.describe('Master circuit assembly via UI', () => {
     expect(pAmpA).toBeDefined();
     expect(pCeA).toBeDefined();
 
-    // TEMP(debug): pause before numerical assertions so the live circuit can be
-    // inspected in the headed browser (P_CE base-drive investigation).
-    await builder.page.pause();
-
     expect(Math.abs(pDivA - 2.500000) / 2.500000).toBeLessThan(0.001);
     expect(Math.abs(pRcA - 2.500000) / 2.500000).toBeLessThan(0.001);
     expect(Math.abs(pAmpA - 2.499998) / 2.499998).toBeLessThan(0.001);
@@ -564,12 +560,9 @@ test.describe('Master circuit assembly via UI', () => {
     expect(peaks!.nodeCount).toBeGreaterThanOrEqual(1);
 
     // --- Phase E: Pin electrical / rOut override on GA output ---
-    // TEMP(debug): pause BEFORE closing the viewer so the panel-covered state
-    // (Phase D scope panel obscuring GA) can be verified in the headed browser.
-    await builder.page.pause();
-    // Fold-in fix: close the viewer panel opened by Phase D so it doesn't cover
-    // GA (parity with Master 2's Phase E, line 371). Without this the property
-    // popup double-click lands on the panel and the popup never opens.
+    // Close the viewer panel opened by Phase D so it doesn't cover GA (parity
+    // with Master 2's Phase E, line 371). Without this the property popup
+    // double-click lands on the panel and the popup never opens.
     await builder.page.locator('#btn-viewer-close').click();
     await builder.page.waitForTimeout(200);
     await builder.setPinElectricalParam('GA', 'Rout', 75);
