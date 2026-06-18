@@ -303,16 +303,18 @@ export function buildCaptureSession(
     return { source: "ngspice", topology: buildTopologySnapshot(topology, 0), steps };
   }
 
-  // ngspice fires ni_fire_outer_cb once per transient solve decision (dctran.c:369
-  // accept / 945 LTE reject / 813 nrFail / 960 finalFailure; optran.c mirrors these
-  // for the pseudo-transient OP). The events arrive in solve order off the same
-  // ni_iter / dctran walk that produces the captured iterations, so a single ordered
-  // cursor hands each event-firing solve its verdict (flushAttempt). The cursor keys
-  // on solve order alone; a reject-redo's CKTtime rewind (CKTtime -= CKTdelta, where
-  // T+δ−δ drifts ~ulp) preserves that order, keeping the cursor aligned through it.
-  // CKTmode bits (cktdefs.h): a solve fires ni_fire_outer_cb when it is a transient
-  // step (MODETRAN) or the transient operating point (MODETRANOP); DC-OP convergence
-  // solves (gmin / source stepping, MODEDCOP) are silent.
+  // ngspice fires ni_fire_outer_cb exactly once per transient solve decision
+  // (dctran.c:369 accept / 945 LTE reject / 813 nrFail / 960 finalFailure;
+  // optran.c mirrors these for the pseudo-transient OP). The events arrive in
+  // fire order — one per tranNR solve, in the same order the tranNR attempts are
+  // captured (both come off the same ni_iter / dctran walk). They are therefore
+  // consumed positionally: a single ordered cursor hands each tranNR attempt the
+  // next event in flushAttempt. No time key is used, so a reject-redo's
+  // floating-point CKTtime rewind (CKTtime -= CKTdelta, where T+δ−δ != T) cannot
+  // split the drifted accept onto a separate key and orphan its solve.
+  // ngspice CKTmode bits (cktdefs.h): a solve fires ni_fire_outer_cb iff it is a
+  // transient step (MODETRAN) or the transient operating point (MODETRANOP). DC-OP
+  // convergence solves (gmin / source stepping, MODEDCOP) fire none.
   const MODETRAN = 0x1, MODETRANOP = 0x20;
   let outerIdx = 0;
   const nextOuterOutcome = (): { outcome: NRAttemptOutcome; ev: RawNgspiceOuterEvent } | null => {
@@ -330,20 +332,21 @@ export function buildCaptureSession(
   let currentStep: PendingStep | null = null;
   let prevIteration = -1;
   let prevPhase: NRPhase | null = null;
-  // Structural step-boundary signal: flushAttempt sets this true when the tranNR
-  // solve it just closed was `accepted`. A transient step is (optional rejects) +
-  // one accept, and the accept closes it, so the next tranNR solve after an accepted
-  // one opens a new step. A reject leaves the flag false, holding the redo's
-  // rewound-time solve inside the current step.
+  // Structural step-boundary signal: set true inside flushAttempt when the
+  // tranNR attempt it just closed was `accepted`. A transient step is
+  // (optional rejects)+one accept, and the accept closes it — so the NEXT
+  // tranNR attempt after an accepted one opens a new step. A reject-redo's
+  // rewound-time accept does NOT trip this until it is itself accepted, so the
+  // drifted accept stays inside the current step instead of opening a new one.
   let prevTranAttemptAccepted = false;
   // The transient analysis fires exactly ONE operating-point accept (dctran.c
-  // nextTime, for the converged OP before the first step). CKTop reaches the OP via
-  // the MODETRANOP ladder — directly (one solve) or via gmin / source stepping (many
-  // MODETRANOP|MODEINITFLOAT sub-solves) — and that single accept fires on the first
-  // MODETRANOP solve, the rest silent. When the OP settles via the OPtran
-  // pseudo-transient, its sub-solves carry MODEDCOP and the OP accept arrives on a
-  // MODETRAN ramp solve. So the OP accept is consumed once, on the first MODETRANOP
-  // solve of the run.
+  // nextTime, fired for the converged OP before the first step). When CKTop reaches
+  // the OP via the MODETRANOP ladder — directly (one solve) or via gmin / source
+  // stepping (many MODETRANOP|MODEINITFLOAT sub-solves) — only that single accept
+  // fires; the stepping sub-solves are silent. (When the OP needs the OPtran
+  // pseudo-transient fallback its sub-solves are tagged MODEDCOP and fire nothing,
+  // and no MODETRANOP accept fires at all.) So the OP accept is consumed once, by
+  // the first MODETRANOP solve; later MODETRANOP solves are silent.
   let opEventConsumed = false;
 
   const flushAttempt = (step: PendingStep, outcome: NRAttemptOutcome, isSolveEnd: boolean): void => {
@@ -353,14 +356,15 @@ export function buildCaptureSession(
       return;
     }
     // Which solves fire a ni_fire_outer_cb event (the authoritative accept/reject
-    // verdict): every transient step (MODETRAN), plus the first MODETRANOP solve of
-    // the run (the single OP accept, see opEventConsumed). MODEDCOP convergence solves
-    // and the trailing MODETRANOP stepping sub-solves are silent. The counts balance
-    // exactly: standard 176 MODETRAN + 1 MODETRANOP = 177 events; transformer
-    // 1117 MODETRAN + 1-of-22 MODETRANOP = 1118; OPtran 107 MODETRAN + 0 = 107. The
-    // event lands on the solve's FINAL attempt — the one flushed at an iteration reset
-    // (isSolveEnd), past the mid-solve phase handoffs (InitJct→Fix→Float,
-    // tranInit/tranPredictor→tranNR). Consumption is positional in solve order.
+    // verdict): every transient step (MODETRAN), plus exactly the first MODETRANOP
+    // solve of the run (the single OP accept, see opEventConsumed). MODEDCOP DC-OP
+    // convergence solves and the trailing MODETRANOP stepping sub-solves are silent.
+    // Verified against captured solve/event class counts: standard 176 MODETRAN +
+    // 1 MODETRANOP == 177 events; transformer 1117 MODETRAN + 1-of-22 MODETRANOP ==
+    // 1118; OPtran 107 MODETRAN + 0 == 107. The event lands on the solve's FINAL
+    // attempt — the one flushed at an iteration reset (isSolveEnd), not a mid-solve
+    // phase handoff (InitJct→Fix→Float, tranInit/tranPredictor→tranNR). Positional
+    // consumption in solve order: no time key, no dt==0 special case.
     let acceptedEvent: RawNgspiceOuterEvent | null = null;
     const m = pa.firstRaw.cktMode;
     let firesEvent = false;
@@ -378,16 +382,16 @@ export function buildCaptureSession(
         );
       }
       outcome = ov.outcome;
-      // A step closes on an accepted *transient* step (MODETRAN). The MODETRANOP
-      // operating point accepts too and folds into step 0, where our engine captures
-      // the OP.
+      // A step closes only on an accepted *transient* step (MODETRAN). The
+      // MODETRANOP operating point accepts too, but our engine captures the OP
+      // inside step 0, so it folds in rather than opening a new step.
       prevTranAttemptAccepted = outcome === "accepted" && (m & MODETRAN) !== 0;
       if (outcome === "accepted") acceptedEvent = ov.ev;
     }
     const lastIter = pa.iterations[pa.iterations.length - 1]!;
     // Populate lteDt on the accepted transient solve's last iteration from the
-    // accepted event's nextDelta (the LTE-proposed next timestep), taken from the
-    // event whose verdict this solve just consumed.
+    // accepted event's nextDelta (the LTE-proposed next timestep). Sourced from
+    // the very event whose verdict we just consumed, so no time-keyed lookup.
     if (
       acceptedEvent !== null &&
       typeof acceptedEvent.nextDelta === "number" &&
@@ -557,25 +561,25 @@ export function buildCaptureSession(
         // prevTranAttemptAccepted when that verdict is an accepted transient step.
         flushAttempt(currentStep, outcome, isIterReset);
 
-        // Structural step boundary: a new step opens when the attempt just flushed
-        // was an accepted tranNR solve (prevTranAttemptAccepted) — the accept closes
-        // the transient step, so the attempt now starting belongs to the next step.
-        // A reject-redo keeps the flag false, holding the redo's (rewound-time)
-        // attempt in the current step.
+        // Structural step boundary (no time tolerance): a new step opens only
+        // when the attempt just flushed was an accepted tranNR solve
+        // (prevTranAttemptAccepted) — the accept closes the transient step, so
+        // the attempt now starting belongs to the next step. A reject-redo
+        // leaves the flag false, so the redo's (rewound-time) attempt stays in
+        // the current step instead of splitting onto its own record.
         //
-        // The dcop ladder and the first transient solve share one step: dctran.c runs
-        // the DC operating point and the first transient solve back-to-back at CKTtime
-        // == 0 within one CKT step, and our engine captures the dcop ladder + the
-        // first transient NR solve under a single step() call (step 0). The dcop
-        // ladder sub-solves and the tranInit/tranPredictor → tranNR handoff are
-        // intra-step attempt boundaries.
-        //
-        // A DC-OP run (op / optran) holds the entire operating-point solve in one
-        // step, matching our engine's single coordinator.dcOperatingPoint() capture:
-        // the OPtran pseudo-transient ramp settles the OP, and its accepts share the
-        // cktMode of a .tran step (tranInit/tranPredictor/tranNR), so analysis context
-        // governs the boundary — a .tran run splits on each accepted transient step,
-        // a DC-OP run keeps them all in step 0 (analysisMode gate below).
+        // The dcop→tran handoff is NOT a step boundary: dctran.c runs the DC
+        // operating point and the first transient solve back-to-back at CKTtime
+        // == 0 within one CKT step, and our engine captures the dcop ladder +
+        // the first transient NR solve under a SINGLE step() call (step 0). The
+        // dcop ladder sub-solves and the tranInit/tranPredictor → tranNR handoff
+        // are likewise intra-step attempt boundaries, not new steps.
+        // In a DC-OP run (op / optran) the entire operating-point solve folds into
+        // ONE step, matching our engine's single coordinator.dcOperatingPoint()
+        // capture: the OPtran pseudo-transient ramp settles the OP and its accepts
+        // are cktMode-identical to .tran steps (tranInit/tranPredictor/tranNR), so
+        // nothing structural separates them — only the analysis context does. A
+        // real .tran run is the only one that splits on a transient accept.
         if (prevTranAttemptAccepted && analysisMode === "transient") {
           flushStep(currentStep);
           currentStep = { stepStartTime: stepStartTimeOfRaw, attempts: [], pendingAttempt: null };
@@ -750,11 +754,12 @@ export class NgspiceBridge {
 
   private _iterations: RawNgspiceIterationEx[] = [];
   private _outerEvents: RawNgspiceOuterEvent[] = [];
-  // Which analysis produced the current capture. A DC operating point (op / optran)
-  // settles via a pseudo-transient ramp whose solves share the cktMode of a real
-  // .tran step (MODETRAN tranInit/tranPredictor/tranNR); the analysis context is what
-  // tells the two apart. The grouping reads this to keep an entire OP solve in one
-  // step, matching our engine's single coordinator.dcOperatingPoint() capture.
+  // Which analysis produced the current capture. A DC operating point (op /
+  // optran) settles via a pseudo-transient ramp whose solves are cktMode-identical
+  // to a real .tran step (MODETRAN tranInit/tranPredictor/tranNR); only the
+  // analysis context tells the two apart. The grouping uses this to fold an entire
+  // OP solve into one step (matching our engine's single coordinator.dcOperatingPoint)
+  // instead of splitting the ramp into one step per accept.
   private _analysisMode: "dcop" | "transient" = "transient";
   private _acPoints: RawNgspiceAcPoint[] = [];
   private _rawTopology: RawNgspiceTopology | null = null;
