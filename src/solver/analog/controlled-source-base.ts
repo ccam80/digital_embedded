@@ -213,6 +213,12 @@ export abstract class ControlledSourceElement extends AnalogElement {
    */
   load(ctx: LoadContext): void {
     this._bindContext(ctx.rhsOld);
+    // Wire the live circuit time (ngspice CKTtime) into the expression context so
+    // a custom time-dependent transfer expression (`time`, `ddt(...)`) evaluates
+    // against the current operating point's time. The default linear path holds
+    // no `time` token, so this is value-neutral there; it is the same clock the
+    // arbitrary-expression B-source (asrc) path consumes (asrcload.c → IFeval).
+    this._ctx.time = ctx.time;
     this._stampLinear(ctx.solver);
     // The compiled expression is unscaled; the live coefficient is applied here
     // so a hot-loaded gain/gm/rm/currentGain (or m) is picked up on the next NR
@@ -272,45 +278,4 @@ export abstract class ControlledSourceElement extends AnalogElement {
   setup(_ctx: SetupContext): void {
     // base: no allocation- subclasses override
   }
-}
-
-// ---------------------------------------------------------------------------
-// buildControlledSourceContext
-// ---------------------------------------------------------------------------
-
-/**
- * Create an ExpressionContext factory that binds to live engine state.
- *
- * Returns a context whose `getNodeVoltage` resolves labels via the compiled
- * circuit's `labelToNodeId` map, reading live values from `voltages`.
- * `getBranchCurrent` resolves labels via a branch-index map, reading from
- * the branch portion of the solution vector (indices >= nodeCount).
- */
-export function buildControlledSourceContext(params: {
-  labelToNodeId: Map<string, number>;
-  branchLabelToRowIdx: Map<string, number>;
-  getVoltages: () => Float64Array;
-  getTime: () => number;
-}): ExpressionContext {
-  const { labelToNodeId, branchLabelToRowIdx, getVoltages, getTime } = params;
-
-  return {
-    get time(): number {
-      return getTime();
-    },
-
-    getNodeVoltage(label: string): number {
-      const nodeId = labelToNodeId.get(label);
-      if (nodeId === undefined) return 0;
-      const voltages = getVoltages();
-      return voltages[nodeId];
-    },
-
-    getBranchCurrent(label: string): number {
-      const rowIdx = branchLabelToRowIdx.get(label);
-      if (rowIdx === undefined) return 0;
-      const voltages = getVoltages();
-      return rowIdx >= 0 && rowIdx < voltages.length ? voltages[rowIdx] : 0;
-    },
-  };
 }

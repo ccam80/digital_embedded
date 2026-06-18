@@ -2,7 +2,8 @@
  * AC Voltage Source  time-varying independent voltage source.
  *
  * Supports four waveforms: sine, square, triangle, sawtooth.
- * The waveform is evaluated at the current simulation time via getTime().
+ * The waveform is evaluated at the current simulation time, read from
+ * `LoadContext.time` (ngspice CKTtime) on each load().
  *
  * MNA stamp: same as DC voltage source (branch row for current tracking).
  *   B[nodePos, k] += 1    C[k, nodePos] += 1
@@ -1015,7 +1016,6 @@ class AcVoltageSourceAnalogImpl extends AnalogElement implements AcVoltageSource
   private _acPhase: number;
   private readonly _waveform: Waveform;
   private readonly _ext: ExtendedWaveformParams;
-  private readonly _getTime: () => number;
 
   // ngspice independent-source waveform model (sVSRCinstance, vsrcdefs.h:50-93).
   // _functionType is null when no SPICE function token is given (the
@@ -1056,9 +1056,8 @@ class AcVoltageSourceAnalogImpl extends AnalogElement implements AcVoltageSource
   _parsedExpr: ExprNode | null;
   _parseError: string | null;
 
-  constructor(pinNodes: ReadonlyMap<string, number>, props: PropertyBag, getTime: () => number) {
+  constructor(pinNodes: ReadonlyMap<string, number>, props: PropertyBag) {
     super(pinNodes);
-    this._getTime = getTime;
     this._p = {
       amplitude: props.getModelParam<number>("amplitude"),
       frequency: props.getModelParam<number>("frequency"),
@@ -1435,7 +1434,7 @@ class AcVoltageSourceAnalogImpl extends AnalogElement implements AcVoltageSource
 
   load(ctx: LoadContext): void {
     const solver = ctx.solver;
-    const t = this._getTime();
+    const t = ctx.time;
 
     // Capture the circuit-global transient constants for acceptStep() /
     // getPinCurrents(), which receive no LoadContext. CKTstep / CKTfinalTime are
@@ -1759,9 +1758,8 @@ class AcVoltageSourceAnalogImpl extends AnalogElement implements AcVoltageSource
 export function makeAcVoltageSourceElement(
   pinNodes: ReadonlyMap<string, number>,
   props: PropertyBag,
-  getTime: () => number,
 ): AcVoltageSourceAnalogElement {
-  return new AcVoltageSourceAnalogImpl(pinNodes, props, getTime);
+  return new AcVoltageSourceAnalogImpl(pinNodes, props);
 }
 
 // ---------------------------------------------------------------------------

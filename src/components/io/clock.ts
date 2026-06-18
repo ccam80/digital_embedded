@@ -259,7 +259,6 @@ class AnalogClockElementImpl
   private readonly _nodeNeg: number;
   private _halfPeriod: number;
   private _vdd: number;
-  private readonly _getTime: () => number;
 
   private _hPosBranch = -1;
   private _hNegBranch = -1;
@@ -272,7 +271,6 @@ class AnalogClockElementImpl
     branchIdx: number,
     frequency: number,
     vdd: number,
-    getTime: () => number,
   ) {
     super(new Map<string, number>([["out", nodePos]]));
     this.branchIndex = branchIdx;
@@ -280,7 +278,6 @@ class AnalogClockElementImpl
     this._nodeNeg = nodeNeg;
     this._halfPeriod = 1 / (2 * frequency);
     this._vdd = vdd;
-    this._getTime = getTime;
   }
 
   setup(ctx: SetupContext): void {
@@ -333,7 +330,7 @@ class AnalogClockElementImpl
     solver.stampElement(this._hBranchPos,  1);
     solver.stampElement(this._hBranchNeg, -1);
 
-    const v = this._valueAtTime(this._getTime());
+    const v = this._valueAtTime(ctx.time);
     stampRHS(ctx.rhs, k, v * ctx.srcFact);
   }
 
@@ -408,10 +405,10 @@ class AnalogClockElementImpl
  * Create an analog clock element that stamps a square-wave voltage source
  * via the unified load(ctx) interface.
  *
- * The clock's instantaneous value depends on the simulation time, which is
- * supplied via the getTime closure captured at construction. The engine
- * advances simulation time between accepted steps; load() reads it each
- * NR iteration and stamps V = vdd on even half-periods, V = 0 on odd ones.
+ * The clock's instantaneous value depends on the simulation time, read from
+ * `LoadContext.time` (ngspice CKTtime) each NR iteration. The engine advances
+ * simulation time between accepted steps; load() stamps V = vdd on even
+ * half-periods, V = 0 on odd ones.
  */
 export function makeAnalogClockElement(
   nodePos: number,
@@ -419,9 +416,8 @@ export function makeAnalogClockElement(
   branchIdx: number,
   frequency: number,
   vdd: number,
-  getTime: () => number,
 ): AnalogClockElement & { stampAtTime(rhs: Float64Array, t: number): void } {
-  return new AnalogClockElementImpl(nodePos, nodeNeg, branchIdx, frequency, vdd, getTime);
+  return new AnalogClockElementImpl(nodePos, nodeNeg, branchIdx, frequency, vdd);
 }
 
 // ---------------------------------------------------------------------------
@@ -450,13 +446,12 @@ export const ClockDefinition: StandaloneComponentDefinition = {
       factory(
         pinNodes: ReadonlyMap<string, number>,
         props: PropertyBag,
-        getTime: () => number,
       ): AnalogElement {
         const frequency = props.getOrDefault<number>("Frequency", 1);
         const vdd = props.getOrDefault<number>("vdd", 3.3);
         const nodePos = pinNodes.get("out")!;
         const nodeNeg = 0;
-        return makeAnalogClockElement(nodePos, nodeNeg, -1, frequency, vdd, getTime);
+        return makeAnalogClockElement(nodePos, nodeNeg, -1, frequency, vdd);
       },
       paramDefs: [],
       // Frequency / vdd are user-facing properties (see CLOCK_PROPERTY_DEFS)

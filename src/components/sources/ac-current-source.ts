@@ -3,7 +3,8 @@
  *
  * Supports the same waveform set as AcVoltageSource (sine, square, triangle,
  * sawtooth, expression, sweep, am, fm, noise). The waveform is evaluated at the
- * current simulation time via getTime().
+ * current simulation time, read from `LoadContext.time` (ngspice CKTtime) on
+ * each load(); getPinCurrents() reuses the most-recent load() time.
  *
  * MNA stamp: RHS-only (ngspice ISRCload convention). No matrix entries, no branch row.
  *   RHS[nodePos] += I(t) * srcFact   (current enters nodePos)
@@ -301,7 +302,6 @@ class AcCurrentSourceAnalogImpl extends AnalogElement {
   private _M: number;
   private readonly _waveform: Waveform;
   private readonly _ext: ExtendedWaveformParams;
-  private readonly _getTime: () => number;
 
   _parsedExpr: ExprNode | null;
   _parseError: string | null;
@@ -329,14 +329,17 @@ class AcCurrentSourceAnalogImpl extends AnalogElement {
   // (see AcVoltageSourceAnalogImpl for the rationale).
   private _cktStep = 0;
   private _cktFinalTime = 0;
+  // Most-recent load() time (ckt->CKTtime). Unlike _cktStep / _cktFinalTime this
+  // is NOT run-invariant; getPinCurrents() (which receives no LoadContext) reads
+  // it to re-sample the waveform at the current operating point's time.
+  private _lastTime = 0;
   // True when the coefficient model was derived from the editor-facing waveform
   // enum (square/triangle/sawtooth/sine) rather than an explicit SPICE funcType
   // token (mirrors AcVoltageSourceAnalogImpl; criterion #11).
   private _enumDerivedCoeffs = false;
 
-  constructor(pinNodes: ReadonlyMap<string, number>, props: PropertyBag, getTime: () => number) {
+  constructor(pinNodes: ReadonlyMap<string, number>, props: PropertyBag) {
     super(pinNodes);
-    this._getTime = getTime;
     this._p = {
       amplitude: props.getModelParam<number>("amplitude"),
       frequency: props.getModelParam<number>("frequency"),
@@ -583,10 +586,13 @@ class AcCurrentSourceAnalogImpl extends AnalogElement {
   }
 
   load(ctx: LoadContext): void {
-    const t = this._getTime();
+    const t = ctx.time;
 
     // Capture the circuit-global transient constants for acceptStep() /
-    // getPinCurrents() (mirrors AcVoltageSourceAnalogImpl).
+    // getPinCurrents() (mirrors AcVoltageSourceAnalogImpl). getPinCurrents()
+    // receives no LoadContext, so the most-recent load() time is cached here for
+    // it to re-sample the waveform at the current operating point's time.
+    this._lastTime = ctx.time;
     this._cktStep = ctx.cktStep;
     this._cktFinalTime = ctx.cktFinalTime;
 
@@ -643,7 +649,7 @@ class AcCurrentSourceAnalogImpl extends AnalogElement {
     // engine load() uses (transient time, cktMode=0 so the DC short-circuit is
     // bypassed) and reuse the srcFact captured by the last load().
     // isrcload.c:392 — the recorded current is m-scaled (ISRCcurrent = m * value).
-    const I = this._evaluate(0, this._getTime()) * this._lastSrcFact * this._M;
+    const I = this._evaluate(0, this._lastTime) * this._lastSrcFact * this._M;
     return [I, -I];
   }
 
@@ -941,9 +947,8 @@ class AcCurrentSourceAnalogImpl extends AnalogElement {
 export function makeAcCurrentSource(
   pinNodes: ReadonlyMap<string, number>,
   props: PropertyBag,
-  getTime: () => number,
 ): AnalogElement {
-  return new AcCurrentSourceAnalogImpl(pinNodes, props, getTime);
+  return new AcCurrentSourceAnalogImpl(pinNodes, props);
 }
 
 // ---------------------------------------------------------------------------
