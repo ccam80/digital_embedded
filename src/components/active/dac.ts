@@ -206,6 +206,7 @@ export class DACElement extends AbstractCircuitElement {
 
 export const buildDacNetlist = (params: PropertyBag): MnaSubcircuitNetlist => {
   const N = params.getOrDefault<number>("bits", 8);
+  const rOut = params.getModelParam<number>("rOut");
   const ports = ["VREF", "OUT", "GND"];
   for (let i = 0; i < N; i++) ports.push(`D${i}`);
 
@@ -222,6 +223,12 @@ export const buildDacNetlist = (params: PropertyBag): MnaSubcircuitNetlist => {
   const resultNets: number[] = [];
   for (let i = 0; i < N; i++) resultNets.push(3 + N + i);
 
+  // Internal Thevenin drive node: the DACDriver enforces V(nDrive)-V(GND)=target
+  // on this node, and a series Resistor (resistance=rOut) presents the finite
+  // output impedance between nDrive and the OUT port — the canonical
+  // Thevenin-output topology (cf. DigitalOutputPinLoaded's nDriveV + rOut).
+  const nDrive = 3 + 2 * N;
+
   // Each Di port → 3-port DIPL with string-bound vIH/vIL/rIn/cIn.
   for (let i = 0; i < N; i++) {
     elements.push({
@@ -234,7 +241,8 @@ export const buildDacNetlist = (params: PropertyBag): MnaSubcircuitNetlist => {
   }
 
   // DAC driver pin order: vref, out, gnd, d_0..d_{N-1} — but d_i indices are now result_nets.
-  const drvPins = [0, 1, 2];
+  // The driver's OUT now lands on the internal nDrive node (not the OUT port).
+  const drvPins = [0, nDrive, 2];
   for (let i = 0; i < N; i++) drvPins.push(resultNets[i]!);
   elements.push({
     typeId: "DACDriver",
@@ -245,7 +253,24 @@ export const buildDacNetlist = (params: PropertyBag): MnaSubcircuitNetlist => {
   });
   netlist.push(drvPins);
 
-  return { ports, elements, internalNetCount: N, internalNetLabels: resultNets.map((_, i) => `result_d_${i}`), netlist };
+  // Series output resistor: nDrive → OUT port, resistance string-bound to rOut
+  // so setComponentProperty("rOut", …) hot-loads it through the wrapper bindings.
+  elements.push({
+    typeId: "Resistor",
+    modelRef: "behavioral",
+    subElementName: "rOut",
+    params: { resistance: "rOut" },
+  });
+  netlist.push([nDrive, 1]);
+
+  return {
+    ports,
+    params: { rOut },
+    elements,
+    internalNetCount: N + 1,
+    internalNetLabels: [...resultNets.map((_, i) => `result_d_${i}`), "nDrive"],
+    netlist,
+  };
 };
 
 // ---------------------------------------------------------------------------

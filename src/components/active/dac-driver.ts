@@ -116,7 +116,7 @@ export class DACDriverElement extends PoolBackedAnalogElement {
 
   private readonly _bits: number;
   private readonly _bipolar: boolean;
-  private readonly _maxCode: number;
+  private readonly _levels: number;
   // Slot index for OUTPUT_TARGET_V (LATCHED_BIT_i are at indices 0..bits-1).
   private readonly _slotTarget: number;
 
@@ -130,7 +130,7 @@ export class DACDriverElement extends PoolBackedAnalogElement {
     super(pinNodes);
     this._bits    = props.getModelParam<number>("bits");
     this._bipolar = props.getModelParam<number>("bipolar") !== 0;
-    this._maxCode = this._bits >= 32 ? 0xFFFFFFFF : ((1 << this._bits) - 1);
+    this._levels = 2 ** this._bits;
 
     this.stateSchema = getDacSchema(this._bits);
     this.stateSize   = this.stateSchema.size;
@@ -157,7 +157,7 @@ export class DACDriverElement extends PoolBackedAnalogElement {
   }
 
   setParam(_key: string, _value: number): void {
-    // bits and bipolar are structural (drive schema size and _maxCode);
+    // bits and bipolar are structural (drive schema size and _levels);
     // not hot-loadable.
   }
 
@@ -186,10 +186,11 @@ export class DACDriverElement extends PoolBackedAnalogElement {
     // already 0 or 1, so a sub-threshold input contributes nothing to the code.
     const code = inputs.reduce((acc, v, i) => acc + v * (1 << i), 0);
 
-    // Compute target voltage.
-    // Unipolar: target = vref * code / (2^N - 1)
-    // Bipolar:  target = vref * (2 * code / (2^N - 1) - 1)  =>  shifts by -vref
-    const normalized = code / this._maxCode;
+    // Compute target voltage. The full-scale divisor is 2^N (number of levels),
+    // so code = 2^N-1 (all ones) maps to vref·(2^N-1)/2^N — one LSB below vref.
+    // Unipolar: target = vref * code / 2^N
+    // Bipolar:  target = vref * (2 * code / 2^N - 1)  =>  shifts by -vref
+    const normalized = code / this._levels;
     const target = this._bipolar
       ? vref * (2 * normalized - 1)
       : vref * normalized;
