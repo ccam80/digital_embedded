@@ -1298,18 +1298,19 @@ export class ComparisonSession {
         break;
       }
 
-      // Derive post-step time from the engine's accepted dt rather than
-      // snapshotting simTime directly. `_engine.lastDt` is the dt that was
-      // actually accepted by this step() call (see MNAEngine.step()  set
-      // via `this._lastDt = dt` immediately before _timestep.accept()),
-      // and `_engine.simTime` is updated at the end of step() to reflect
-      // post-step committed time. Using `prevSimTime + lastDt` keeps this
-      // robust to any pre/post-advance snapshot quirks in simTime and to
-      // the engine entering an ERROR state where simTime does not advance.
+      // Post-step time is the engine's actual committed clock `_engine.simTime`
+      // (MNAEngine.get simTime → `this._simTime`, analog-engine.ts:1594). That
+      // value carries the engine's real time history, including the floating-
+      // point drift a reject-redo leaves behind: a rejected step does
+      // `_simTime -= dt` (analog-engine.ts:613/633/689) before re-solving, and
+      // `((B + δ1) − δ1 + δ2) − δ2 + δ3 != B` in double precision. Reconstructing
+      // the time as a clean `prevSimTime + acceptedDt` sum would discard that
+      // drift and record a value 1 ULP off the engine's real clock, splitting
+      // the per-index step pairing against ngspice's identically-drifted CKTtime.
+      // The `nowTime > prevSimTime` guard below routes a non-advancing / ERROR
+      // step (where simTime did not advance) to the else-branch.
       const acceptedDt = this._engine.lastDt;
-      const nowTime = isFinite(acceptedDt) && acceptedDt > 0
-        ? prevSimTime + acceptedDt
-        : (this._engine.simTime ?? prevSimTime);
+      const nowTime = this._engine.simTime;
       if (nowTime > prevSimTime) {
         const lteDtValue = this._engine.getLteNextDt();
         const hasLte = isFinite(lteDtValue) && lteDtValue > 0;

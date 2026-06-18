@@ -15,7 +15,6 @@ import type { RawNgspiceIterationEx, RawNgspiceOuterEvent } from "./types.js";
 // Values from ref/ngspice/src/include/ngspice/cktdefs.h:166-182
 const MODETRAN      = 0x0001;
 const MODEDCOP      = 0x0010;
-const MODETRANOP    = 0x0020;
 // Real ngspice sets MODEINITFLOAT alongside MODEDCOP / MODETRANOP during the
 // dcopDirect / transient-OP iterations (cktop.c transitions through
 // INITJCT → INITFIX → INITFLOAT and leaves INITFLOAT set for subsequent
@@ -82,19 +81,26 @@ describe("ngspice-bridge grouping- ss6.1 state machine", () => {
     expect(session.steps[0].attempts[0].iterations.length).toBe(2);
   });
 
-  it("two distinct simTimeStart values → two steps", () => {
+  it("dcop + first transient solve at sts=0 → one step (t=0 OP accept folded)", () => {
+    // Real ngspice runs the DC-OP and the first transient solve back-to-back at
+    // simTimeStart==0 (dctran.c) and fires TWO accepts there: the operating point
+    // (dt==0) and the first real step. The dcop ladder fires no event; the OP
+    // accept (dt==0) has no tranNR attempt and is skipped (ngspice-bridge cursor),
+    // so both fold into a single step matching our engine's step 0. Steps are
+    // delimited by accepts, NOT by distinct simTimeStart values.
     const iters = [
-      makeRaw({ simTimeStart: 0,    cktMode: MODEDCOP,  iteration: 0, converged: true, dt: 0 }),
-      makeRaw({ simTimeStart: 1e-9, cktMode: MODETRAN,  iteration: 0, converged: true, dt: 1e-9 }),
+      makeRaw({ simTimeStart: 0, cktMode: MODEDCOP, iteration: 0, converged: true, dt: 0 }),
+      makeRaw({ simTimeStart: 0, cktMode: MODETRAN, iteration: 0, converged: true, dt: 1e-9 }),
     ];
-    // The transient point fires one accept (dctran.c:369); the DC-op point fires none.
     const outerEvents: RawNgspiceOuterEvent[] = [
-      { simTimeStart: 1e-9, delta: 1e-9, lteRejected: 0, nrFailed: 0, accepted: 1, finalFailure: 0, nextDelta: 1e-9 },
+      { simTimeStart: 0, delta: 0,    lteRejected: 0, nrFailed: 0, accepted: 1, finalFailure: 0, nextDelta: 1e-9 },
+      { simTimeStart: 0, delta: 1e-9, lteRejected: 0, nrFailed: 0, accepted: 1, finalFailure: 0, nextDelta: 1e-9 },
     ];
     const session = makeSession(iters, outerEvents);
-    expect(session.steps.length).toBe(2);
+    expect(session.steps.length).toBe(1);
     expect(session.steps[0].stepStartTime).toBe(0);
-    expect(session.steps[1].stepStartTime).toBe(1e-9);
+    // dcop ladder + first transient solve are both attempts of step 0.
+    expect(session.steps[0].attempts.length).toBe(2);
   });
 
   it("iteration counter reset → new attempt within same step", () => {
@@ -160,14 +166,17 @@ describe("ngspice-bridge grouping- ss6.1 state machine", () => {
     expect(session.steps[0].attempts[0].outcome).toBe("accepted");
   });
 
-  it("three transient steps → three steps with correct stepStartTimes", () => {
+  it("t=0 OP + three transient steps → three steps with correct stepStartTimes", () => {
+    // ngspice fires the t=0 operating-point accept (dt==0) and then one accept per
+    // transient step. The OP accept is skipped (no tranNR attempt); the three dt>0
+    // accepts delimit three steps, each stepStartTime at its base time.
     const iters = [
-      makeRaw({ simTimeStart: 0,    cktMode: MODETRANOP, iteration: 0, converged: true, dt: 1e-9 }),
-      makeRaw({ simTimeStart: 1e-9, cktMode: MODETRAN,   iteration: 0, converged: true, dt: 1e-9 }),
-      makeRaw({ simTimeStart: 2e-9, cktMode: MODETRAN,   iteration: 0, converged: true, dt: 1e-9 }),
+      makeRaw({ simTimeStart: 0,    cktMode: MODETRAN, iteration: 0, converged: true, dt: 1e-9 }),
+      makeRaw({ simTimeStart: 1e-9, cktMode: MODETRAN, iteration: 0, converged: true, dt: 1e-9 }),
+      makeRaw({ simTimeStart: 2e-9, cktMode: MODETRAN, iteration: 0, converged: true, dt: 1e-9 }),
     ];
-    // Each transient point fires one accept (dctran.c:369).
     const outerEvents: RawNgspiceOuterEvent[] = [
+      { simTimeStart: 0,    delta: 0,    lteRejected: 0, nrFailed: 0, accepted: 1, finalFailure: 0, nextDelta: 1e-9 },
       { simTimeStart: 0,    delta: 1e-9, lteRejected: 0, nrFailed: 0, accepted: 1, finalFailure: 0, nextDelta: 1e-9 },
       { simTimeStart: 1e-9, delta: 1e-9, lteRejected: 0, nrFailed: 0, accepted: 1, finalFailure: 0, nextDelta: 1e-9 },
       { simTimeStart: 2e-9, delta: 1e-9, lteRejected: 0, nrFailed: 0, accepted: 1, finalFailure: 0, nextDelta: 1e-9 },
