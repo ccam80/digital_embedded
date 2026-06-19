@@ -41,8 +41,6 @@
             "FC": 0.5,
             "IBV": 0.001,
             "IC": null,
-            "IKF": "_inf",
-            "IKR": "_inf",
             "IS": 1e-32,
             "ISW": 0,
             "KF": 0,

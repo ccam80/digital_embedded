@@ -44,7 +44,6 @@
           "_modelParams": {
             "IS": 1e-14,
             "N": 1,
-            "BV": "_inf",
             "IBV": 1e-3,
             "RS": 0,
             "CJO": 0,
@@ -83,7 +82,6 @@
           "_modelParams": {
             "IS": 1e-14,
             "N": 1,
-            "BV": "_inf",
             "IBV": 1e-3,
             "RS": 0,
             "CJO": 0,
@@ -122,7 +120,6 @@
           "_modelParams": {
             "IS": 1e-14,
             "N": 1,
-            "BV": "_inf",
             "IBV": 1e-3,
             "RS": 0,
             "CJO": 0,
@@ -161,7 +158,6 @@
           "_modelParams": {
             "IS": 1e-14,
             "N": 1,
-            "BV": "_inf",
             "IBV": 1e-3,
             "RS": 0,
             "CJO": 0,

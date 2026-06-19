@@ -747,7 +747,6 @@
         "properties": {
           "_modelParams": {
             "AF": 1,
-            "BV": "_inf",
             "CJO": 0,
             "EG": 1.11,
             "FC": 0.5,

@@ -187,8 +187,8 @@
         },
         "properties": {
           "_modelParams": {
-            "amplitude": 2.4919539278782377,
-            "dcOffset": 2.4919539278782377,
+            "amplitude": 2.491953927878238,
+            "dcOffset": 2.491953927878238,
             "fallTime": 1e-9,
             "frequency": 10000,
             "phase": 0,
@@ -218,7 +218,7 @@
               "vOL": 0
             }
           },
-          "amplitude": 2.4919539278782377,
+          "amplitude": 2.491953927878238,
           "frequency": 10000,
           "waveform": "square"
         },
@@ -712,7 +712,6 @@
         "properties": {
           "_modelParams": {
             "AF": 1,
-            "BV": "_inf",
             "CJO": 0,
             "EG": 1.11,
             "FC": 0.5,

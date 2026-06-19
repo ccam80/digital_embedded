@@ -216,7 +216,9 @@ class ZenerAnalogElement extends PoolBackedAnalogElement {
     // voltage from the shared DIO temperature port. At T == TNOM the saturation
     // current is unchanged (tIS == IS), so nominal-temperature behaviour is
     // bit-identical to the prior local derivation.
-    const tp = dioTemp(this._dioTempInput(), circuitTemp, ZENER_GEOM, this._reltol);
+    // bvGiven=true: BV is the zener's defining parameter (always present), so the
+    // breakdown-voltage temperature match (diotemp.c:188) always runs here.
+    const tp = dioTemp(this._dioTempInput(), circuitTemp, ZENER_GEOM, this._reltol, true);
     const vt = tp.vt;
     const nVt = params.N * vt;
     const nbvVt = params.NBV * vt;

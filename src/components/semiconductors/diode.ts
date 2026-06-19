@@ -103,11 +103,11 @@ const DIODE_PARAM_SPEC = {
     M:   { default: 0.5,              description: "Grading coefficient" },
     TT:  { default: 0,    unit: "s",  description: "Transit time" },
     FC:  { default: 0.5,              description: "Forward-bias capacitance coefficient" },
-    BV:  { default: Infinity, unit: "V", description: "Reverse breakdown voltage" },
+    BV:  { default: 0, unit: "V", description: "Reverse breakdown voltage (0 = not given; breakdown gated on DIObreakdownVoltageGiven)" },
     IBV: { default: 1e-3, unit: "A",  description: "Reverse breakdown current" },
     NBV: { default: NaN, unit: "",     description: "Breakdown emission coefficient (default=N)" },
-    IKF: { default: Infinity, unit: "A", description: "High-injection knee current (forward)" },
-    IKR: { default: Infinity, unit: "A", description: "High-injection knee current (reverse)" },
+    IKF: { default: 0, unit: "A", description: "High-injection knee current (forward); 0 = not given (DIOforwardKneeCurrentGiven)" },
+    IKR: { default: 0, unit: "A", description: "High-injection knee current (reverse); 0 = not given (DIOreverseKneeCurrentGiven)" },
     EG:  { default: 1.11, unit: "eV", description: "Activation energy" },
     XTI: { default: 3,                description: "Saturation current temperature exponent" },
     KF:  { default: 0,                description: "Flicker noise coefficient" },
@@ -389,7 +389,7 @@ export interface DioTempInput {
  * multiplier (used for the level-1 breakdown-current selection, diotemp.c:195).
  * `reltol` is CKTreltol, read by the breakdown match (diotemp.c:208).
  */
-export function dioTemp(p: DioTempInput, T: number, geom: DioGeom, reltol: number): DioTempParams {
+export function dioTemp(p: DioTempInput, T: number, geom: DioGeom, reltol: number, bvGiven: boolean): DioTempParams {
   // diotemp.c:38-39 — grading-coeff ceiling; cp_getvar default 0.9.
   const gclimit = 0.9;
 
@@ -513,9 +513,10 @@ export function dioTemp(p: DioTempInput, T: number, geom: DioGeom, reltol: numbe
     tDepSWCap = p.FCS * tJctSWPot;
   }
 
-  // diotemp.c:186-224 — breakdown voltage temperature adjust + brkdEmissionCoeff match.
+  // diotemp.c:186-224 — breakdown voltage temperature adjust + brkdEmissionCoeff
+  // match. Gated on DIObreakdownVoltageGiven (diotemp.c:188), not the BV value.
   let tBV = p.BV;
-  if (isFinite(p.BV)) {
+  if (bvGiven) {
     const tBreakdownVoltage = p.TLEV === 0
       ? p.BV - p.TCV * dt
       : p.BV * (1 - p.TCV * dt);
@@ -665,8 +666,12 @@ export function createDiodeElement(
   // (rth0), level-3 geometry givens. The DIOresistGiven gate (diotemp.c:233)
   // collapses to `RS != 0` in dioTemp — RS defaults to 0 when unspecified, so
   // `RS != 0` holds iff RS was given a nonzero value, matching the C predicate.
-  let _ikfGiven = props.isModelParamGiven("IKF") && isFinite(params.IKF);
-  let _ikrGiven = props.isModelParamGiven("IKR") && isFinite(params.IKR);
+  // BV/IKF/IKR gate purely on *Given (dioload.c:222/395/407, diotemp.c:188).
+  // Defaults are 0, so a not-given param is simply un-given- no value sentinel.
+  // The < epsmin knee disable (diosetup.c:92-100) runs in setup below.
+  let _bvGiven = props.isModelParamGiven("BV");
+  let _ikfGiven = props.isModelParamGiven("IKF");
+  let _ikrGiven = props.isModelParamGiven("IKR");
   const _swCurGiven = props.isModelParamGiven("ISW");
   const _swEmissionGiven = props.isModelParamGiven("NSW");
   const _recSatCurGiven = props.isModelParamGiven("ISR");
@@ -783,7 +788,7 @@ export function createDiodeElement(
   };
 
   // Initial temperature pass — uses params.TEMP as the device temperature.
-  applyDioTempResult(dioTemp(tempInput(), params.TEMP, geom(), _lastCtx.reltol));
+  applyDioTempResult(dioTemp(tempInput(), params.TEMP, geom(), _lastCtx.reltol, _bvGiven));
 
   const hasCapacitance = () => params.CJO > 0 || params.TT > 0 || _cmetal > 0 || _cpoly > 0;
 
@@ -870,7 +875,7 @@ export function createDiodeElement(
       // SetupContext carries no reltol; the engine's post-setup temperature pass
       // (ckttemp.c:28-33) immediately re-runs DIOtempUpdate with the live
       // CKTreltol, so this seed uses the field-default reltol.
-      applyDioTempResult(dioTemp(tempInput(), _tempGiven ? params.TEMP : ctx.temp, geom(), _lastCtx.reltol));
+      applyDioTempResult(dioTemp(tempInput(), _tempGiven ? params.TEMP : ctx.temp, geom(), _lastCtx.reltol, _bvGiven));
 
       const solver = ctx.solver;
       const posNode = this.pinNodes.get("A")!;
@@ -988,7 +993,7 @@ export function createDiodeElement(
 
         // dioload.c:219-243 — limit new junction voltage via pnjlim.
         const vdOld = s0[base + SLOT_VD];
-        if (isFinite(params.BV) && vd < Math.min(0, -tBV + 10 * vtebrk)) {
+        if (_bvGiven && vd < Math.min(0, -tBV + 10 * vtebrk)) {
           const vdBefore = vd;
           let vdtemp = -(vd + tBV);
           const r = pnjlim(vdtemp, -(vdOld + tBV), vtebrk, tVcrit);
@@ -1017,7 +1022,7 @@ export function createDiodeElement(
       let Temp: number;
       if (selfheat) {
         Temp = deviceTemp + delTemp;
-        applyDioTempResult(dioTemp(tempInput(), Temp, geom(), _lastCtx.reltol));
+        applyDioTempResult(dioTemp(tempInput(), Temp, geom(), _lastCtx.reltol, _bvGiven));
         vt = CONSTKoverQ * Temp;
         vte = params.N * vt;
         vtebrk = params.NBV * vt;
@@ -1045,7 +1050,7 @@ export function createDiodeElement(
             cdsw = csatsw * (evd - 1);
             gdsw = csatsw * evd / vtesw;
             cdsw_dT = csatsw_dT * (evd - 1) - csatsw * vd * evd / (vtesw * Temp);
-          } else if (!isFinite(params.BV) || vd >= -tBV) {
+          } else if (!_bvGiven || vd >= -tBV) {
             let argsw = 3 * vtesw / (vd * Math.E);
             argsw = argsw * argsw * argsw;
             const argsw_dT = 3 * argsw / Temp;
@@ -1092,7 +1097,7 @@ export function createDiodeElement(
           gdb = gdb + gdb_rec;
           cdb_dT = cdb_dT + cdb_rec_dT * gen_fac;
         }
-      } else if (!isFinite(params.BV) || vd >= -tBV) {
+      } else if (!_bvGiven || vd >= -tBV) {
         let arg = 3 * vte / (vd * Math.E);
         arg = arg * arg * arg;
         const darg_dT = 3 * arg / Temp;
@@ -1412,7 +1417,7 @@ export function createDiodeElement(
     computeTemperature(ctx: TempContext): void {
       _lastCtx = ctx;
       const T = _tempGiven ? params.TEMP : ctx.cktTemp;
-      applyDioTempResult(dioTemp(tempInput(), T, geom(), ctx.reltol));
+      applyDioTempResult(dioTemp(tempInput(), T, geom(), ctx.reltol, _bvGiven));
     }
 
     setParam(key: string, value: number): void {
@@ -1427,8 +1432,11 @@ export function createDiodeElement(
       }
       if (key in params) {
         params[key] = value;
-        if (key === "IKF") _ikfGiven = isFinite(value);
-        if (key === "IKR") _ikrGiven = isFinite(value);
+        // A hot-loaded value is user-given; the knees additionally disable below
+        // CKTepsmin (diosetup.c:92-100). A non-finite hot-load un-gives (disables).
+        if (key === "IKF") _ikfGiven = isFinite(value) && value >= _lastCtx.epsmin;
+        if (key === "IKR") _ikrGiven = isFinite(value) && value >= _lastCtx.epsmin;
+        if (key === "BV")  _bvGiven  = isFinite(value);
         if (geomKeys.has(key)) resolveGeometry();
         if (key === "TEMP") {
           _tempGiven = true;
