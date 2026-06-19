@@ -340,11 +340,27 @@ export function buildCaptureSession(
   // nextTime, for the converged OP before the first step). CKTop reaches the OP via
   // the MODETRANOP ladder — directly (one solve) or via gmin / source stepping (many
   // MODETRANOP|MODEINITFLOAT sub-solves) — and that single accept fires on the first
-  // MODETRANOP solve, the rest silent. When the OP settles via the OPtran
-  // pseudo-transient, its sub-solves carry MODEDCOP and the OP accept arrives on a
-  // MODETRAN ramp solve. So the OP accept is consumed once, on the first MODETRANOP
-  // solve of the run.
+  // MODETRANOP solve, the rest silent. So the OP accept is consumed once, on the first
+  // MODETRANOP solve of the run.
   let opEventConsumed = false;
+  // Boot-region fold. The operating-point solve runs with the circuit clock held at
+  // the analysis start time: CKTop's MODETRANOP gmin/source ladder, the OPtran
+  // pseudo-transient (optran.c:416 runs it as a MODETRAN ramp that fires one
+  // ni_fire_outer_cb accept per micro-step, optran.c:742/769/804), and the first real
+  // transient step all share CKTsimTimeStart == bootClock, because dctran.c:726 only
+  // advances CKTsimTimeStart at the head of the *second* real step onward. Our engine
+  // captures that whole boot under a single coordinator.step() / endStep (step 0), so
+  // the ngspice side must fold it identically: while still in the boot region every
+  // accepted MODETRAN ramp solve stays in the current step instead of opening a new
+  // one. The exit is one-way — neither engine re-enters OP/OPtran mid-sim (dctran.c's
+  // non-convergence path only rewinds time and cuts dt; our _transientDcop is gated on
+  // !_firstStep), and a real-step reject-redo rewinds CKTtime to a value still
+  // > bootClock — so once the clock advances the structural accept-verdict grouping
+  // governs unconditionally. For a circuit whose OP needs no OPtran the boot is just
+  // the dcop ladder + first transient solve, which already shared step 0, so this is a
+  // no-op there.
+  let bootClock: number | null = null;
+  let inBoot = true;
 
   const flushAttempt = (step: PendingStep, outcome: NRAttemptOutcome, isSolveEnd: boolean): void => {
     const pa = step.pendingAttempt;
@@ -510,6 +526,12 @@ export function buildCaptureSession(
     const attemptPhase = cktModeToPhase(raw.cktMode, raw.phaseFlags);
     const stepStartTimeOfRaw = raw.simTimeStart;
 
+    // Leave the boot region the first time the circuit clock advances past its
+    // held start value. Until then the OP ladder + OPtran ramp + first real step
+    // all fold into one step (see the bootClock/inBoot comment above). One-way.
+    if (bootClock === null) bootClock = stepStartTimeOfRaw;
+    if (inBoot && stepStartTimeOfRaw > bootClock) inBoot = false;
+
     // 3/4: Open the first step, or detect an attempt boundary within / between
     // steps. Iteration reset: counter goes down (raw.iteration <= prevIteration
     // when prevIteration >= 0) — covers a typical NR retry (e.g. 2→0) and gmin
@@ -570,13 +592,18 @@ export function buildCaptureSession(
         // ladder sub-solves and the tranInit/tranPredictor → tranNR handoff are
         // intra-step attempt boundaries.
         //
-        // A DC-OP run (op / optran) holds the entire operating-point solve in one
-        // step, matching our engine's single coordinator.dcOperatingPoint() capture:
-        // the OPtran pseudo-transient ramp settles the OP, and its accepts share the
-        // cktMode of a .tran step (tranInit/tranPredictor/tranNR), so analysis context
-        // governs the boundary — a .tran run splits on each accepted transient step,
-        // a DC-OP run keeps them all in step 0 (analysisMode gate below).
-        if (prevTranAttemptAccepted && analysisMode === "transient") {
+        // Two gates suppress the split for operating-point work, both matching our
+        // engine's single-step() boot capture:
+        //   - analysisMode !== "transient": a standalone .op / optran run holds the
+        //     entire OP solve in one step (its OPtran ramp accepts carry .tran
+        //     cktMode but must not open steps).
+        //   - inBoot: in a .tran run the boot OP — gmin/source ladder, the OPtran
+        //     pseudo-transient, and the first real step — all share the held
+        //     CKTsimTimeStart (bootClock); its accepts fold into step 0 until the
+        //     circuit clock advances. Without this every OPtran ramp accept would open
+        //     a spurious step, desyncing the per-step pairing against ngspice by the
+        //     OPtran ramp length.
+        if (prevTranAttemptAccepted && analysisMode === "transient" && !inBoot) {
           flushStep(currentStep);
           currentStep = { stepStartTime: stepStartTimeOfRaw, attempts: [], pendingAttempt: null };
           prevTranAttemptAccepted = false;
