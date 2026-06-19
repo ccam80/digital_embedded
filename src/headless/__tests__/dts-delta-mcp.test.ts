@@ -91,7 +91,10 @@ describe("dts-delta MCP surface — per-element modelParamDeltas round-trip", ()
     circuit.metadata.models = { NpnBJT: { "2N2222": modelEntry } };
 
     const el = makeElement("q1", { model: "2N2222" });
-    el.getProperties().replaceModelParams({ ...BJT_FINITE_PARAMS, BF: 250 });
+    // Seed the model defaults, then BF is a user override (given). modelParamDeltas
+    // captures given overrides; a not-given value re-seeds the model default.
+    el.getProperties().replaceModelParams({ ...BJT_FINITE_PARAMS });
+    el.getProperties().setModelParam("BF", 250);
     circuit.addElement(el);
 
     const json = facade.serialize(circuit);
@@ -118,7 +121,8 @@ describe("dts-delta MCP surface — per-element modelParamDeltas round-trip", ()
     circuit.metadata.models = { NpnBJT: { "2N2222": modelEntry } };
 
     const el = makeElement("q1", { model: "2N2222" });
-    el.getProperties().replaceModelParams({ ...BJT_FINITE_PARAMS, BF: 300 });
+    el.getProperties().replaceModelParams({ ...BJT_FINITE_PARAMS });
+    el.getProperties().setModelParam("BF", 300);
     circuit.addElement(el);
 
     const json = facade.serialize(circuit);
@@ -168,7 +172,8 @@ describe("dts-delta MCP surface — per-element modelParamDeltas round-trip", ()
     circuit.metadata.models = { NpnBJT: { "2N2222": modelEntry } };
 
     const el = makeElement("q1", { model: "2N2222" });
-    el.getProperties().replaceModelParams({ ...BJT_FINITE_PARAMS, BF: 150 });
+    el.getProperties().replaceModelParams({ ...BJT_FINITE_PARAMS });
+    el.getProperties().setModelParam("BF", 150);
     circuit.addElement(el);
 
     const json = facade.serialize(circuit);
@@ -192,10 +197,12 @@ describe("dts-delta MCP surface — per-element modelParamDeltas round-trip", ()
     circuit.metadata.models = { NpnBJT: { "2N2222": modelEntry } };
 
     const el1 = makeElement("q1", { model: "2N2222" });
-    el1.getProperties().replaceModelParams({ ...BJT_FINITE_PARAMS, BF: 200 });
+    el1.getProperties().replaceModelParams({ ...BJT_FINITE_PARAMS });
+    el1.getProperties().setModelParam("BF", 200);
 
     const el2 = makeElement("q2", { model: "2N2222" });
-    el2.getProperties().replaceModelParams({ ...BJT_FINITE_PARAMS, BF: 400 });
+    el2.getProperties().replaceModelParams({ ...BJT_FINITE_PARAMS });
+    el2.getProperties().setModelParam("BF", 400);
 
     circuit.addElement(el1);
     circuit.addElement(el2);

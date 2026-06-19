@@ -137,7 +137,9 @@ describe('element_modelParamDeltas_roundtrip', () => {
     };
 
     const el = makeElement('NpnBJT', 'q1', { model: '2N2222' });
-    el.getProperties().replaceModelParams({ ...baseParams, BF: 250 });
+    // BF is a user override (given); modelParamDeltas captures given overrides.
+    el.getProperties().replaceModelParams({ ...baseParams });
+    el.getProperties().setModelParam('BF', 250);
     circuit.addElement(el);
 
     const json = serializeCircuit(circuit);
@@ -165,7 +167,8 @@ describe('element_modelParamDeltas_roundtrip', () => {
     };
 
     const el = makeElement('NpnBJT', 'q1', { model: '2N2222' });
-    el.getProperties().replaceModelParams({ BF: 250, IS: 1e-14, NF: 1 });
+    el.getProperties().replaceModelParams({ BF: 200, IS: 1e-14, NF: 1 });
+    el.getProperties().setModelParam('BF', 250);
     circuit.addElement(el);
 
     const json = serializeCircuit(circuit);
@@ -194,6 +197,38 @@ describe('element_modelParamDeltas_roundtrip', () => {
     );
 
     expect('modelParamDeltas' in elements[0]).toBe(false);
+  });
+
+  it('not_given_nondefault_value_excluded_from_deltas', () => {
+    // A param whose value differs from the model default but was never user-given
+    // (here BF, set via replaceModelParams) must NOT appear in the delta: the
+    // delta is the set of user overrides, and the deserializer marks every delta
+    // key given. Emitting a not-given value would round-trip it as given
+    // (false-given). A genuine given override (IS) is still emitted.
+    const circuit = new Circuit({ name: 'No False Given' });
+    const modelEntry2N2222: ModelEntry = {
+      kind: 'inline',
+      factory: STUB_ANALOG_FACTORY,
+      paramDefs: BJT_PARAM_DEFS,
+      params: { BF: 200, IS: 1e-14, NF: 1 },
+    };
+    circuit.metadata.models = { NpnBJT: { '2N2222': modelEntry2N2222 } };
+
+    const el = makeElement('NpnBJT', 'q1', { model: '2N2222' });
+    el.getProperties().replaceModelParams({ BF: 250, IS: 1e-14, NF: 1 }); // BF=250 not given
+    el.getProperties().setModelParam('IS', 5e-14);                        // IS given override
+    circuit.addElement(el);
+
+    const json = serializeCircuit(circuit);
+    const parsed = JSON.parse(json) as Record<string, unknown>;
+    const elements = (
+      (parsed['circuit'] as Record<string, unknown>)['elements'] as Array<Record<string, unknown>>
+    );
+    const deltas = elements[0]['modelParamDeltas'] as Record<string, unknown>;
+    const params = deltas['params'] as Record<string, number>;
+
+    expect(params['IS']).toBe(5e-14);     // given override emitted
+    expect('BF' in params).toBe(false);   // not-given value NOT emitted (no false-given)
   });
 });
 

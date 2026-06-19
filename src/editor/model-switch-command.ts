@@ -43,8 +43,14 @@ export function createModelSwitchCommand(
   const bag = element.getProperties();
   const oldModelKey = bag.has("model") ? bag.get<string>("model") : "";
   const oldParamSnapshot: Record<string, PropertyValue> = {};
+  // Capture which params were user-given so undo restores the exact givenness.
+  // replaceModelParams alone seeds every key not-given; without this an undone
+  // model switch would demote a user override to a registry default (and, on a
+  // later .dts round-trip, the deltas block would re-promote it to given).
+  const oldGivenKeys: string[] = [];
   for (const key of bag.getModelParamKeys()) {
     oldParamSnapshot[key] = bag.getModelParam(key);
+    if (bag.isModelParamGiven(key)) oldGivenKeys.push(key);
   }
 
   return {
@@ -64,6 +70,10 @@ export function createModelSwitchCommand(
       const b = element.getProperties();
       b.set("model", oldModelKey);
       b.replaceModelParams(oldParamSnapshot);
+      // Re-assert the *Given flags replaceModelParams cleared.
+      for (const k of oldGivenKeys) {
+        b.setModelParam(k, oldParamSnapshot[k] as number);
+      }
     },
   };
 }

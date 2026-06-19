@@ -137,6 +137,12 @@ function elementToDtsElement(
       const defaults = entry.params;
       const deltaParams: Record<string, number | string> = {};
       for (const key of bag.getModelParamKeys()) {
+        // Givenness-faithful: a delta is a user override, so emit only params
+        // the user actually set. A non-given value (a registry/model default, or
+        // one whose *Given was wiped upstream) is re-seeded from the model on
+        // load; emitting it here would let the deserializer's setModelParam mark
+        // an un-given default as given (false-given on round-trip).
+        if (!bag.isModelParamGiven(key)) continue;
         const current = bag.getModelParam<number>(key);
         // NaN-default params (BJT ICVBE/ICVCE, diode IC, capacitor IC, etc.)
         // use NaN as the "unset" sentinel- every model's load() guards with
