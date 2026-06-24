@@ -384,33 +384,6 @@ export interface TutorialProgress {
 }
 
 // ---------------------------------------------------------------------------
-// postMessage protocol extensions for tutorials
-// ---------------------------------------------------------------------------
-
-/**
- * Messages the tutorial host can send to the simulator iframe.
- *
- * These extend the existing postMessage API documented in CLAUDE.md.
- */
-export type TutorialHostMessage =
-  | { type: 'sim-test'; testData: string }
-  | { type: 'sim-get-circuit' }
-  | { type: 'sim-highlight'; labels: string[]; color?: string; duration?: number }
-  | { type: 'sim-clear-highlight' }
-  | { type: 'sim-set-readonly-components'; labels: string[] | null }
-  | { type: 'sim-set-instructions'; markdown: string | null; position?: 'left' | 'bottom' };
-
-/**
- * Messages the simulator iframe sends back to the tutorial host.
- */
-export type TutorialIframeMessage =
-  | { type: 'sim-test-result'; passed: number; failed: number; total: number;
-      details: Array<{ passed: boolean; inputs: Record<string, number>;
-                       expected: Record<string, number>; actual: Record<string, number> }> }
-  | { type: 'sim-circuit-data'; data: string; format: 'dig-xml-base64' | 'dts-json-base64' }
-  | { type: 'sim-error'; error: string };
-
-// ---------------------------------------------------------------------------
 // Type guards- for runtime validation of JSON data
 // ---------------------------------------------------------------------------
 

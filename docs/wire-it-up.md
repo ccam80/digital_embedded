@@ -88,10 +88,18 @@ flags are false positives:
   instantiated in `app-init.ts` (embedded runner), and standalone `app/tutorial/index.html`,
   `view.html`, `edit.html` pages provide the browse/edit surfaces.
 
-**Open orphan question (separate from wire-up):** `TutorialHost`
-(`src/app/tutorial/tutorial-host.ts:100`) and its helpers (`setupCheckpointNavigation`,
-`parseUrlParams`, `buildCheckpointPath`, `buildInstructionsUrl`, `buildIframeSrc`,
-`CheckpointConfig`) are imported **only by `tutorial-host.test.ts`** — not by any HTML page
-(the tutorial pages use inline scripts) nor by `app-init.ts`. This looks like an alternate
-tutorial-host implementation superseded by `TutorialRunner`. Decide: delete as a dead
-alternate, or wire it to a tutorial page. (Tracked here, not yet actioned.)
+**Resolved — `TutorialHost` deleted (not wired up).** `TutorialHost`
+(`src/app/tutorial/tutorial-host.ts`) and its helpers implemented an abandoned
+*checkpoint-folder* tutorial model (`?tutorial=X&step=N` → fetch
+`tutorials/{name}/checkpoint-{N}/instructions.md` beside a simulator iframe, with
+"Checkpoint N" buttons). It was confirmed dead — not merely unwired — on functional grounds:
+
+- no HTML page instantiated it (only its test did); the host page it needed never existed;
+- zero `tutorials/**/checkpoint-*/instructions.md` content exists in the repo;
+- its only real dependency, `renderMarkdown`, stays alive via the live `TutorialShelf`;
+- the live manifest-driven path (`TutorialRunner`/`Bar`/`Shelf` + browse/view/edit pages)
+  provides the full tutorial feature, including markdown instructions and step navigation.
+
+Removed: `tutorial-host.ts` (whole file), its test, and the dead `TutorialHostMessage` /
+`TutorialIframeMessage` types in `types.ts`. Verified by `tsc --noEmit` (clean) + the
+remaining tutorial tests (green).

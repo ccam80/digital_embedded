@@ -178,6 +178,74 @@ function buildGlobalRefMap(): Map<ts.Symbol, RefInfo> {
           // skip
         }
       }
+      // Track runtime dynamic-import destructures:
+      //   const { foo } = await import("./mod")
+      //   import("./mod").then(({ foo }) => ...)
+      // The binding identifier `foo` resolves (via getSymbolAtLocation) to the
+      // local binding, NOT the module export, so the plain-identifier walk above
+      // never credits the export with a reference. Resolve the imported module's
+      // namespace type and record a ref against each destructured property's
+      // export symbol. (The `.then(m => m.foo)` property-access form is already
+      // covered by the identifier walk and needs no special handling.)
+      if (
+        ts.isCallExpression(node) &&
+        node.expression.kind === ts.SyntaxKind.ImportKeyword
+      ) {
+        try {
+          // import("x") has type Promise<typeof import("x")>; the type argument
+          // is the module namespace type whose properties are the module exports.
+          const importType = checker.getTypeAtLocation(node);
+          const typeArgs = checker.getTypeArguments(importType as ts.TypeReference);
+          const moduleType = typeArgs && typeArgs.length > 0 ? typeArgs[0] : undefined;
+          if (moduleType) {
+            let pattern: ts.ObjectBindingPattern | undefined;
+            const parent = node.parent;
+            if (
+              ts.isAwaitExpression(parent) &&
+              ts.isVariableDeclaration(parent.parent) &&
+              ts.isObjectBindingPattern(parent.parent.name)
+            ) {
+              pattern = parent.parent.name;
+            } else if (
+              ts.isPropertyAccessExpression(parent) &&
+              parent.name.text === "then" &&
+              ts.isCallExpression(parent.parent)
+            ) {
+              const cb = parent.parent.arguments[0];
+              if (
+                cb &&
+                (ts.isArrowFunction(cb) || ts.isFunctionExpression(cb)) &&
+                cb.parameters.length > 0 &&
+                ts.isObjectBindingPattern(cb.parameters[0].name)
+              ) {
+                pattern = cb.parameters[0].name;
+              }
+            }
+            if (pattern) {
+              for (const el of pattern.elements) {
+                if (!ts.isBindingElement(el)) continue;
+                const propName =
+                  el.propertyName && ts.isIdentifier(el.propertyName)
+                    ? el.propertyName.text
+                    : ts.isIdentifier(el.name)
+                      ? el.name.text
+                      : undefined;
+                if (!propName) continue;
+                const prop = moduleType.getProperty(propName);
+                if (prop) {
+                  const resolved =
+                    prop.flags & ts.SymbolFlags.Alias
+                      ? checker.getAliasedSymbol(prop)
+                      : prop;
+                  recordRef(resolved, fileRel, isTest);
+                }
+              }
+            }
+          }
+        } catch {
+          // skip — type resolution can fail on unresolvable specifiers
+        }
+      }
       ts.forEachChild(node, visit);
     });
   }
@@ -872,7 +940,7 @@ function collectDeadClassMethods(
 interface DeadCodeResult {
   genuinelyDead: Array<{ name: string; kind: string; file: string; line: number }>;
   unexportCandidates: Array<{ name: string; kind: string; file: string; line: number }>;
-  testOnly: Array<{ name: string; kind: string; file: string; line: number; testFiles: string[] }>;
+  testOnly: Array<{ name: string; kind: string; file: string; line: number; testFiles: string[]; usedInternally: boolean; sameFileRefs: number }>;
   deadClassMethods: DeadMethodInfo[];
   totalClassMethodsChecked: number;
   registryReachable: number;
@@ -976,6 +1044,13 @@ function runAnalysis(): DeadCodeResult {
         file: exp.file,
         line: exp.line,
         testFiles: [...testOther],
+        // usedInternally: the defining module references the symbol in production
+        // beyond its declaration (sameFileCount > 1). Distinguishes a protected
+        // test seam (prod uses it same-file; only tests import it cross-file, e.g.
+        // a *_SCHEMA resolved by slot name in tests) from a genuine orphan whose
+        // sole consumers are tests.
+        usedInternally,
+        sameFileRefs: sameFileCount,
       });
     }
     // else: used in prod → alive, skip
