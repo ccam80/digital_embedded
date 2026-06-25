@@ -203,6 +203,7 @@ function inFactory(props: PropertyBag): InElement {
 
 export const InDefinition: StandaloneComponentDefinition = {
   name: "In",
+  displayName: "Digital Input",
   typeId: -1,
   factory: inFactory,
   pinLayout: buildInPinDeclarations(1),

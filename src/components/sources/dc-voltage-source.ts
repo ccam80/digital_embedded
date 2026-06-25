@@ -283,6 +283,7 @@ export function makeDcVoltageSource(
 
 export const DcVoltageSourceDefinition: StandaloneComponentDefinition = {
   name: "DcVoltageSource",
+  displayName: "DC V Source",
   typeId: -1,
   category: ComponentCategory.SOURCES,
 

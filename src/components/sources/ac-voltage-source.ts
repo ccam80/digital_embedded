@@ -1768,6 +1768,7 @@ export function makeAcVoltageSourceElement(
 
 export const AcVoltageSourceDefinition: StandaloneComponentDefinition = {
   name: "AcVoltageSource",
+  displayName: "AC V Source",
   typeId: -1,
   category: ComponentCategory.SOURCES,
 

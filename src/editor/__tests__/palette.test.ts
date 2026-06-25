@@ -1,12 +1,17 @@
 /**
- * Tests for ComponentPalette- tree structure, filtering, recent history,
- * and collapsed state.
+ * Tests for ComponentPalette- config-driven groups, ordering, visibility,
+ * persistence, recent history, displayName, and the dynamic subcircuit group.
  */
 
 import { describe, it, expect, beforeEach } from "vitest";
-import { ComponentPalette } from "../palette.js";
+import {
+  ComponentPalette,
+  buildDefaultPaletteConfig,
+  type PaletteConfig,
+  type PaletteConfigStore,
+} from "../palette.js";
 import { ComponentRegistry, ComponentCategory } from "@/core/registry";
-import type { ComponentDefinition, StandaloneComponentDefinition } from "@/core/registry";
+import type { StandaloneComponentDefinition } from "@/core/registry";
 
 // ---------------------------------------------------------------------------
 // Test helpers
@@ -19,8 +24,9 @@ function makeRegistry(): ComponentRegistry {
 function stubDef(
   name: string,
   category: ComponentCategory,
+  displayName?: string,
 ): StandaloneComponentDefinition {
-  return {
+  const base: StandaloneComponentDefinition = {
     name,
     typeId: -1,
     category,
@@ -28,22 +34,37 @@ function stubDef(
     propertyDefs: [],
     pinLayout: [],
     attributeMap: [],
-    factory: (_props) => {
+    factory: () => {
       throw new Error("not needed in palette tests");
     },
     models: { digital: { executeFn: () => {} } },
   };
+  return displayName !== undefined ? { ...base, displayName } : base;
 }
 
 function registerDef(
   registry: ComponentRegistry,
   name: string,
   category: ComponentCategory,
-): ComponentDefinition {
-  const def = stubDef(name, category);
-  registry.register(def);
-  return registry.get(name)!;
+  displayName?: string,
+): void {
+  registry.register(stubDef(name, category, displayName));
 }
+
+/** In-memory PaletteConfigStore for persistence round-trip tests. */
+class FakeStore implements PaletteConfigStore {
+  saved: PaletteConfig | null = null;
+  constructor(private readonly initial: PaletteConfig | null = null) {}
+  load(): PaletteConfig | null {
+    return this.saved ?? this.initial;
+  }
+  save(config: PaletteConfig): void {
+    this.saved = JSON.parse(JSON.stringify(config)) as PaletteConfig;
+  }
+}
+
+const findNode = (palette: ComponentPalette, id: string) =>
+  palette.getTree().find((n) => n.id === id);
 
 // ---------------------------------------------------------------------------
 // Tests
@@ -56,7 +77,7 @@ describe("Palette", () => {
     registry = makeRegistry();
   });
 
-  it("treeGroupsByCategory", () => {
+  it("groups components by category, with a Common group on top", () => {
     registerDef(registry, "And", ComponentCategory.LOGIC);
     registerDef(registry, "Or", ComponentCategory.LOGIC);
     registerDef(registry, "In", ComponentCategory.IO);
@@ -64,142 +85,230 @@ describe("Palette", () => {
     const palette = new ComponentPalette(registry);
     const tree = palette.getTree();
 
-    expect(tree).toHaveLength(2);
+    // Common Components (resolves "In"), then category groups in seed order
+    // (I/O precedes Logic).
+    expect(tree.map((n) => n.id)).toEqual(["common", ComponentCategory.IO, ComponentCategory.LOGIC]);
 
-    const logicNode = tree.find((n) => n.category === ComponentCategory.LOGIC);
-    const ioNode = tree.find((n) => n.category === ComponentCategory.IO);
+    const logicNode = findNode(palette, ComponentCategory.LOGIC)!;
+    expect(logicNode.children.map((d) => d.name)).toEqual(["And", "Or"]);
 
-    expect(logicNode).toBeDefined();
-    expect(logicNode!.children).toHaveLength(2);
-    expect(logicNode!.children.map((d) => d.name)).toEqual(["And", "Or"]);
+    const ioNode = findNode(palette, ComponentCategory.IO)!;
+    expect(ioNode.children.map((d) => d.name)).toEqual(["In"]);
 
-    expect(ioNode).toBeDefined();
-    expect(ioNode!.children).toHaveLength(1);
-    expect(ioNode!.children[0]!.name).toBe("In");
+    // "In" is curated into the Common group as well.
+    const commonNode = findNode(palette, "common")!;
+    expect(commonNode.children.map((d) => d.name)).toContain("In");
   });
 
-  it("filterMatchesPartialName", () => {
+  it("starts Common Components expanded and category groups collapsed", () => {
     registerDef(registry, "And", ComponentCategory.LOGIC);
-    registerDef(registry, "NAnd", ComponentCategory.LOGIC);
-    registerDef(registry, "Or", ComponentCategory.LOGIC);
+    registerDef(registry, "In", ComponentCategory.IO);
 
     const palette = new ComponentPalette(registry);
-    const filtered = palette.filter("An");
-
-    expect(filtered).toHaveLength(1);
-    const logicNode = filtered[0]!;
-    expect(logicNode.category).toBe(ComponentCategory.LOGIC);
-    expect(logicNode.children.map((d) => d.name)).toContain("And");
-    expect(logicNode.children.map((d) => d.name)).toContain("NAnd");
-    expect(logicNode.children.map((d) => d.name)).not.toContain("Or");
+    for (const node of palette.getTree()) {
+      expect(node.expanded).toBe(node.id === "common");
+    }
   });
 
-  it("filterIsCaseInsensitive", () => {
-    registerDef(registry, "And", ComponentCategory.LOGIC);
-    registerDef(registry, "Or", ComponentCategory.LOGIC);
+  it("filters on displayName as well as name", () => {
+    registerDef(registry, "In", ComponentCategory.IO, "Digital Input");
+    registerDef(registry, "Out", ComponentCategory.IO, "Digital Output");
+    registerDef(registry, "Clock", ComponentCategory.IO);
 
     const palette = new ComponentPalette(registry);
-    const filtered = palette.filter("and");
 
-    expect(filtered).toHaveLength(1);
-    expect(filtered[0]!.children).toHaveLength(1);
-    expect(filtered[0]!.children[0]!.name).toBe("And");
+    const byDisplay = palette.filter("digital");
+    const names = byDisplay.flatMap((n) => n.children.map((d) => d.name));
+    expect(names).toContain("In");
+    expect(names).toContain("Out");
+    expect(names).not.toContain("Clock");
+
+    // Still matches the registry name.
+    const byName = palette.filter("clock");
+    expect(byName.flatMap((n) => n.children.map((d) => d.name))).toEqual(["Clock"]);
   });
 
-  it("recentHistoryTracksLastTen", () => {
-    // Register 12 unique component types
-    for (let i = 0; i < 12; i++) {
-      registerDef(registry, `Comp${i}`, ComponentCategory.LOGIC);
-    }
+  it("hides a component from the tree when visibility is toggled off", () => {
+    // PASSIVES is an analog category- every member seeds visible.
+    registerDef(registry, "R1", ComponentCategory.PASSIVES);
+    registerDef(registry, "R2", ComponentCategory.PASSIVES);
 
     const palette = new ComponentPalette(registry);
+    expect(findNode(palette, ComponentCategory.PASSIVES)!.children.map((d) => d.name)).toEqual(["R1", "R2"]);
 
-    // Place all 12
-    for (let i = 0; i < 12; i++) {
-      palette.recordPlacement(`Comp${i}`);
-    }
+    palette.setItemVisible(ComponentCategory.PASSIVES, "R1", false);
+    expect(findNode(palette, ComponentCategory.PASSIVES)!.children.map((d) => d.name)).toEqual(["R2"]);
+  });
+
+  it("reorders components within a group", () => {
+    registerDef(registry, "R1", ComponentCategory.PASSIVES);
+    registerDef(registry, "R2", ComponentCategory.PASSIVES);
+    registerDef(registry, "R3", ComponentCategory.PASSIVES);
+
+    const palette = new ComponentPalette(registry);
+    // Drop R3 before R1.
+    palette.moveItem(ComponentCategory.PASSIVES, "R3", "R1");
+
+    expect(findNode(palette, ComponentCategory.PASSIVES)!.children.map((d) => d.name)).toEqual(["R3", "R1", "R2"]);
+  });
+
+  it("reorders groups", () => {
+    registerDef(registry, "R1", ComponentCategory.PASSIVES);
+    registerDef(registry, "A1", ComponentCategory.ACTIVE);
+
+    const palette = new ComponentPalette(registry);
+    const before = palette.getConfigGroups().map((g) => g.id);
+    // Default seed order places ACTIVE ahead of PASSIVES.
+    expect(before.indexOf(ComponentCategory.ACTIVE)).toBeLessThan(before.indexOf(ComponentCategory.PASSIVES));
+
+    // Drop PASSIVES before ACTIVE.
+    palette.moveGroup(ComponentCategory.PASSIVES, ComponentCategory.ACTIVE);
+    const after = palette.getConfigGroups().map((g) => g.id);
+    expect(after.indexOf(ComponentCategory.PASSIVES)).toBeLessThan(after.indexOf(ComponentCategory.ACTIVE));
+  });
+
+  it("persists config across instances via the store", () => {
+    registerDef(registry, "R1", ComponentCategory.PASSIVES);
+    registerDef(registry, "R2", ComponentCategory.PASSIVES);
+
+    const store = new FakeStore();
+    const palette1 = new ComponentPalette(registry, store);
+    palette1.moveItem(ComponentCategory.PASSIVES, "R2", "R1");
+    palette1.setItemVisible(ComponentCategory.PASSIVES, "R2", false);
+    palette1.recordPlacement("R1");
+
+    // A fresh instance backed by the same store restores the saved layout.
+    const palette2 = new ComponentPalette(registry, store);
+    expect(findNode(palette2, ComponentCategory.PASSIVES)!.children.map((d) => d.name)).toEqual(["R1"]);
+    expect(palette2.getRecentHistory().map((d) => d.name)).toEqual(["R1"]);
+  });
+
+  it("resets to the factory-default layout but keeps recent history", () => {
+    registerDef(registry, "R1", ComponentCategory.PASSIVES);
+    registerDef(registry, "R2", ComponentCategory.PASSIVES);
+
+    const palette = new ComponentPalette(registry);
+    palette.moveItem(ComponentCategory.PASSIVES, "R2", "R1");
+    palette.recordPlacement("R1");
+
+    palette.resetToDefaults();
+    expect(findNode(palette, ComponentCategory.PASSIVES)!.children.map((d) => d.name)).toEqual(["R1", "R2"]);
+    expect(palette.getRecentHistory().map((d) => d.name)).toEqual(["R1"]);
+  });
+
+  it("reconciles newly-registered components into their category group", () => {
+    registerDef(registry, "R1", ComponentCategory.PASSIVES);
+    const store = new FakeStore();
+    const palette1 = new ComponentPalette(registry, store);
+    palette1.recordPlacement("R1"); // forces a save of the current config
+
+    // A component registered after the config was saved must still appear.
+    registerDef(registry, "R2", ComponentCategory.PASSIVES);
+    const palette2 = new ComponentPalette(registry, store);
+    expect(findNode(palette2, ComponentCategory.PASSIVES)!.children.map((d) => d.name)).toContain("R2");
+  });
+
+  // -------------------------------------------------------------------------
+  // Recent history
+  // -------------------------------------------------------------------------
+
+  it("tracks the last ten placements, most recent first", () => {
+    for (let i = 0; i < 12; i++) registerDef(registry, `Comp${i}`, ComponentCategory.LOGIC);
+    const palette = new ComponentPalette(registry);
+
+    for (let i = 0; i < 12; i++) palette.recordPlacement(`Comp${i}`);
 
     const history = palette.getRecentHistory();
     expect(history).toHaveLength(10);
-
-    // Most recent placements should be at the front
     expect(history[0]!.name).toBe("Comp11");
-    expect(history[1]!.name).toBe("Comp10");
     expect(history[9]!.name).toBe("Comp2");
   });
 
-  it("recentHistoryDeduplicates", () => {
+  it("deduplicates recent history, moving repeats to the front", () => {
     registerDef(registry, "And", ComponentCategory.LOGIC);
     registerDef(registry, "Or", ComponentCategory.LOGIC);
-
     const palette = new ComponentPalette(registry);
 
     palette.recordPlacement("And");
     palette.recordPlacement("Or");
-    palette.recordPlacement("And"); // duplicate- should move to front
+    palette.recordPlacement("And");
 
-    const history = palette.getRecentHistory();
-    expect(history).toHaveLength(2);
-    expect(history[0]!.name).toBe("And");
-    expect(history[1]!.name).toBe("Or");
+    expect(palette.getRecentHistory().map((d) => d.name)).toEqual(["And", "Or"]);
   });
 
-  it("collapseHidesPalette", () => {
+  // -------------------------------------------------------------------------
+  // Allowlist (embed/tutorial override)
+  // -------------------------------------------------------------------------
+
+  it("limits the settings-modal set and the tree to the allowlist", () => {
+    registerDef(registry, "R1", ComponentCategory.PASSIVES);
+    registerDef(registry, "R2", ComponentCategory.PASSIVES);
+    registerDef(registry, "A1", ComponentCategory.ACTIVE);
+
     const palette = new ComponentPalette(registry);
+    palette.setAllowlist(["R1"]);
 
+    // Modal view restricted to allowed components only.
+    const groups = palette.getConfigGroups();
+    const allNames = groups.flatMap((g) => g.items.map((i) => i.def.name));
+    expect(allNames).toEqual(["R1"]);
+
+    // Sidebar tree likewise.
+    const treeNames = palette.getTree().flatMap((n) => n.children.map((d) => d.name));
+    expect(treeNames).toEqual(["R1"]);
+
+    // Clearing the allowlist restores the full set.
+    palette.setAllowlist(null);
+    expect(palette.getConfigGroups().flatMap((g) => g.items.map((i) => i.def.name))).toContain("A1");
+  });
+
+  // -------------------------------------------------------------------------
+  // Panel collapse
+  // -------------------------------------------------------------------------
+
+  it("toggles whole-panel collapse independently of group state", () => {
+    const palette = new ComponentPalette(registry);
     expect(palette.isCollapsed()).toBe(false);
-
     palette.setCollapsed(true);
     expect(palette.isCollapsed()).toBe(true);
-
     palette.setCollapsed(false);
     expect(palette.isCollapsed()).toBe(false);
   });
 
-  it("refreshCategories makes SUBCIRCUIT category appear in getTree after a subcircuit is registered", () => {
+  // -------------------------------------------------------------------------
+  // Dynamic subcircuit group
+  // -------------------------------------------------------------------------
+
+  it("shows the SUBCIRCUIT group dynamically once a subcircuit is registered", () => {
     const palette = new ComponentPalette(registry);
+    expect(findNode(palette, ComponentCategory.SUBCIRCUIT)).toBeUndefined();
 
-    // Initially no SUBCIRCUIT category (none registered)
-    const treeBefore = palette.getTree();
-    const subcircuitBefore = treeBefore.find(n => n.category === ComponentCategory.SUBCIRCUIT);
-    expect(subcircuitBefore).toBeUndefined();
-
-    // Register a subcircuit component into the registry
     registerDef(registry, "MyAdder", ComponentCategory.SUBCIRCUIT);
-
-    // refreshCategories ensures getTree picks up the new entry
     palette.refreshCategories();
-    const treeAfter = palette.getTree();
-    const subcircuitAfter = treeAfter.find(n => n.category === ComponentCategory.SUBCIRCUIT);
-    expect(subcircuitAfter).toBeDefined();
-    expect(subcircuitAfter!.children.some(d => d.name === "MyAdder")).toBe(true);
+
+    const subNode = findNode(palette, ComponentCategory.SUBCIRCUIT);
+    expect(subNode).toBeDefined();
+    expect(subNode!.children.some((d) => d.name === "MyAdder")).toBe(true);
   });
 
-  it("refreshCategories is idempotent- calling it twice does not duplicate entries", () => {
-    registerDef(registry, "MyAdder", ComponentCategory.SUBCIRCUIT);
-    const palette = new ComponentPalette(registry);
+  // -------------------------------------------------------------------------
+  // Default config seed
+  // -------------------------------------------------------------------------
 
-    palette.refreshCategories();
-    palette.refreshCategories();
+  it("seeds the Common group first (expanded), category groups collapsed, nothing hidden", () => {
+    registerDef(registry, "Resistor", ComponentCategory.PASSIVES);
+    registerDef(registry, "Potentiometer", ComponentCategory.PASSIVES);
+    const config = buildDefaultPaletteConfig(registry);
 
-    const tree = palette.getTree();
-    const subcircuitNode = tree.find(n => n.category === ComponentCategory.SUBCIRCUIT);
-    expect(subcircuitNode).toBeDefined();
-    expect(subcircuitNode!.children.filter(d => d.name === "MyAdder")).toHaveLength(1);
-  });
+    const common = config.groups[0]!;
+    expect(common.id).toBe("common");
+    expect(common.collapsed).toBe(false);
+    expect(common.items.map((i) => i.name)).toContain("Resistor");
 
-  it("refreshCategories after second subcircuit is registered includes both entries", () => {
-    registerDef(registry, "Adder", ComponentCategory.SUBCIRCUIT);
-    const palette = new ComponentPalette(registry);
-    palette.refreshCategories();
-
-    registerDef(registry, "Alu", ComponentCategory.SUBCIRCUIT);
-    palette.refreshCategories();
-
-    const tree = palette.getTree();
-    const subcircuitNode = tree.find(n => n.category === ComponentCategory.SUBCIRCUIT);
-    expect(subcircuitNode).toBeDefined();
-    expect(subcircuitNode!.children.map(d => d.name)).toContain("Adder");
-    expect(subcircuitNode!.children.map(d => d.name)).toContain("Alu");
+    // Category groups are collapsed; every seeded item is visible.
+    const passives = config.groups.find((g) => g.id === ComponentCategory.PASSIVES)!;
+    expect(passives.collapsed).toBe(true);
+    expect(config.groups.slice(1).every((g) => g.collapsed)).toBe(true);
+    expect(config.groups.flatMap((g) => g.items).every((i) => i.visible)).toBe(true);
   });
 });

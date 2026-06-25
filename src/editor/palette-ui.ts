@@ -6,15 +6,13 @@
  * Separated from palette.ts so the logic layer is testable without DOM.
  */
 
-import { constructElement, type StandaloneComponentDefinition } from "@/core/registry";
-import type { ComponentCategory } from "@/core/registry";
+import { constructElement, displayNameOf, type StandaloneComponentDefinition } from "@/core/registry";
 import type { ComponentPalette, PaletteNode } from "./palette.js";
 import type { ColorScheme, Point } from "@/core/renderer-interface";
 import { CanvasRenderer } from "./canvas-renderer.js";
 import { PaletteDragController } from "./palette-drag.js";
+import { openPaletteSettingsModal } from "./palette-settings-modal.js";
 import type { Viewport } from "./viewport.js";
-
-export type AllowlistChangeHandler = (typeNames: string[] | null) => void;
 
 export type PlacementHandler = (def: StandaloneComponentDefinition) => void;
 
@@ -37,7 +35,6 @@ export class PaletteUI {
   private readonly _container: HTMLElement;
   private _colorScheme: ColorScheme | null;
   private _placementHandler: PlacementHandler | null = null;
-  private _allowlistChangeHandler: AllowlistChangeHandler | null = null;
   private _touchDropHandler: TouchDropHandler | null = null;
   private readonly _dragController = new PaletteDragController();
   private _canvas: HTMLCanvasElement | null = null;
@@ -78,14 +75,6 @@ export class PaletteUI {
    */
   onPlace(handler: PlacementHandler): void {
     this._placementHandler = handler;
-  }
-
-  /**
-   * Register a callback invoked when the user changes the palette allowlist
-   * via the settings dialog.
-   */
-  onAllowlistChange(handler: AllowlistChangeHandler): void {
-    this._allowlistChangeHandler = handler;
   }
 
   /**
@@ -166,9 +155,11 @@ export class PaletteUI {
 
     const gearBtn = document.createElement("button");
     gearBtn.className = "palette-settings-btn";
-    gearBtn.title = "Configure visible components";
+    gearBtn.title = "Configure palette- reorder & show/hide components";
     gearBtn.textContent = "\u2699";
-    gearBtn.addEventListener("click", () => this._openSettingsDialog());
+    gearBtn.addEventListener("click", () =>
+      openPaletteSettingsModal(this._palette, () => this.render()),
+    );
 
     wrapper.appendChild(input);
     wrapper.appendChild(gearBtn);
@@ -229,7 +220,8 @@ export class PaletteUI {
   private _buildCategoryNode(node: PaletteNode): HTMLElement {
     const categoryEl = document.createElement("div");
     categoryEl.className = "palette-category";
-    categoryEl.dataset["category"] = node.category;
+    categoryEl.dataset["group"] = node.id;
+    if (node.category !== undefined) categoryEl.dataset["category"] = node.category;
 
     const header = document.createElement("div");
     header.className = "palette-category-header";
@@ -245,7 +237,7 @@ export class PaletteUI {
     header.appendChild(label);
 
     header.addEventListener("click", () => {
-      this._palette.toggleCategory(node.category as ComponentCategory);
+      this._palette.toggleNode(node.id);
       this.render();
     });
 
@@ -276,7 +268,7 @@ export class PaletteUI {
 
     const name = document.createElement("span");
     name.className = "palette-component-name";
-    name.textContent = def.name;
+    name.textContent = displayNameOf(def);
     item.appendChild(name);
 
     // Mouse: keep existing click-to-place
@@ -474,180 +466,5 @@ export class PaletteUI {
     }
 
     return canvas;
-  }
-
-  // ---------------------------------------------------------------------------
-  // Settings dialog
-  // ---------------------------------------------------------------------------
-
-  /**
-   * Open a modal dialog that lets the user toggle which component types
-   * appear in the palette. Grouped by category with select-all toggles.
-   */
-  private _openSettingsDialog(): void {
-    const registry = this._palette.getRegistry();
-    const currentAllowlist = this._palette.getAllowlist();
-    const allDefs = registry.getAllStandalone();
-
-    // Build a mutable checked set- start from allowlist or all
-    const checked = new Set<string>(
-      currentAllowlist !== null ? currentAllowlist : allDefs.map((d) => d.name),
-    );
-
-    // --- overlay ---
-    const overlay = document.createElement("div");
-    overlay.className = "test-dialog-overlay";
-
-    const dialog = document.createElement("div");
-    dialog.className = "test-dialog";
-    dialog.style.width = "500px";
-
-    // --- header ---
-    const header = document.createElement("div");
-    header.className = "test-dialog-header";
-    const title = document.createElement("span");
-    title.textContent = "Palette Components";
-    const closeBtn = document.createElement("button");
-    closeBtn.textContent = "\u00D7";
-    closeBtn.style.cssText = "background:none;border:none;color:inherit;font-size:18px;cursor:pointer;";
-    closeBtn.addEventListener("click", () => overlay.remove());
-    header.appendChild(title);
-    header.appendChild(closeBtn);
-
-    // --- body ---
-    const body = document.createElement("div");
-    body.style.cssText = "flex:1;overflow-y:auto;padding:8px 16px;max-height:60vh;";
-
-    // "Show all" toggle
-    const showAllRow = document.createElement("label");
-    showAllRow.style.cssText = "display:flex;align-items:center;gap:6px;padding:6px 0;font-weight:600;font-size:12px;border-bottom:1px solid var(--panel-border);margin-bottom:8px;";
-    const showAllCb = document.createElement("input");
-    showAllCb.type = "checkbox";
-    showAllCb.checked = currentAllowlist === null;
-    showAllRow.appendChild(showAllCb);
-    showAllRow.appendChild(document.createTextNode("Show all components (no filter)"));
-    body.appendChild(showAllRow);
-
-    // Container for per-category checkboxes
-    const categoriesContainer = document.createElement("div");
-    categoriesContainer.style.display = showAllCb.checked ? "none" : "";
-
-    // Group definitions by category
-    const byCategory = new Map<string, StandaloneComponentDefinition[]>();
-    for (const def of allDefs) {
-      const cat = def.category;
-      let list = byCategory.get(cat);
-      if (!list) { list = []; byCategory.set(cat, list); }
-      list.push(def);
-    }
-
-    const categoryCheckboxes: { catCb: HTMLInputElement; items: HTMLInputElement[] }[] = [];
-
-    for (const [cat, defs] of byCategory) {
-      const section = document.createElement("div");
-      section.style.cssText = "margin-bottom:6px;";
-
-      // Category header with select-all checkbox
-      const catLabel = document.createElement("label");
-      catLabel.style.cssText = "display:flex;align-items:center;gap:6px;padding:4px 0;font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:0.05em;opacity:0.8;cursor:pointer;";
-      const catCb = document.createElement("input");
-      catCb.type = "checkbox";
-      const allChecked = defs.every((d) => checked.has(d.name));
-      const someChecked = defs.some((d) => checked.has(d.name));
-      catCb.checked = allChecked;
-      catCb.indeterminate = someChecked && !allChecked;
-      catLabel.appendChild(catCb);
-      catLabel.appendChild(document.createTextNode(cat));
-      section.appendChild(catLabel);
-
-      // Individual component checkboxes
-      const itemCbs: HTMLInputElement[] = [];
-      const itemsDiv = document.createElement("div");
-      itemsDiv.style.cssText = "padding-left:20px;";
-      for (const def of defs) {
-        const itemLabel = document.createElement("label");
-        itemLabel.style.cssText = "display:flex;align-items:center;gap:6px;padding:1px 0;font-size:12px;cursor:pointer;";
-        const itemCb = document.createElement("input");
-        itemCb.type = "checkbox";
-        itemCb.checked = checked.has(def.name);
-        itemCb.dataset["typeName"] = def.name;
-        itemCb.addEventListener("change", () => {
-          if (itemCb.checked) checked.add(def.name);
-          else checked.delete(def.name);
-          // Update category checkbox
-          const allNow = defs.every((d) => checked.has(d.name));
-          const someNow = defs.some((d) => checked.has(d.name));
-          catCb.checked = allNow;
-          catCb.indeterminate = someNow && !allNow;
-        });
-        itemLabel.appendChild(itemCb);
-        itemLabel.appendChild(document.createTextNode(def.name));
-        itemsDiv.appendChild(itemLabel);
-        itemCbs.push(itemCb);
-      }
-
-      // Category checkbox toggles all items in that category
-      catCb.addEventListener("change", () => {
-        for (const cb of itemCbs) {
-          cb.checked = catCb.checked;
-          const name = cb.dataset["typeName"]!;
-          if (catCb.checked) checked.add(name);
-          else checked.delete(name);
-        }
-        catCb.indeterminate = false;
-      });
-
-      section.appendChild(itemsDiv);
-      categoriesContainer.appendChild(section);
-      categoryCheckboxes.push({ catCb, items: itemCbs });
-    }
-
-    // "Show all" toggles the category container visibility
-    showAllCb.addEventListener("change", () => {
-      categoriesContainer.style.display = showAllCb.checked ? "none" : "";
-    });
-
-    body.appendChild(categoriesContainer);
-
-    // --- footer ---
-    const footer = document.createElement("div");
-    footer.className = "test-dialog-footer";
-
-    const cancelBtn = document.createElement("button");
-    cancelBtn.textContent = "Cancel";
-    cancelBtn.addEventListener("click", () => overlay.remove());
-
-    const applyBtn = document.createElement("button");
-    applyBtn.textContent = "Apply";
-    applyBtn.className = "primary";
-    applyBtn.addEventListener("click", () => {
-      if (showAllCb.checked) {
-        this._palette.setAllowlist(null);
-        if (this._allowlistChangeHandler) this._allowlistChangeHandler(null);
-      } else {
-        const names = Array.from(checked);
-        this._palette.setAllowlist(names.length > 0 ? names : null);
-        if (this._allowlistChangeHandler) {
-          this._allowlistChangeHandler(names.length > 0 ? names : null);
-        }
-      }
-      this.render();
-      overlay.remove();
-    });
-
-    footer.appendChild(cancelBtn);
-    footer.appendChild(applyBtn);
-
-    dialog.appendChild(header);
-    dialog.appendChild(body);
-    dialog.appendChild(footer);
-    overlay.appendChild(dialog);
-
-    // Close on backdrop click
-    overlay.addEventListener("click", (e) => {
-      if (e.target === overlay) overlay.remove();
-    });
-
-    document.body.appendChild(overlay);
   }
 }

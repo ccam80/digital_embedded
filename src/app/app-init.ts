@@ -25,7 +25,7 @@ import type { MenuToolbarController } from './menu-toolbar.js';
 
 import { createDefaultRegistry } from '../components/register-all.js';
 import { Circuit } from '../core/circuit.js';
-import { ComponentPalette } from '../editor/palette.js';
+import { ComponentPalette, type PaletteConfigStore } from '../editor/palette.js';
 import { PaletteUI } from '../editor/palette-ui.js';
 import { Viewport } from '../editor/viewport.js';
 import { SelectionModel } from '../editor/selection.js';
@@ -144,7 +144,14 @@ export function initApp(search?: string): void {
 
   statusDismiss.addEventListener('click', clearStatus);
 
-  const palette = new ComponentPalette(registry);
+  const paletteStore: PaletteConfigStore = {
+    load: () => appSettings.get(SettingKey.PALETTE_CONFIG),
+    save: (cfg) => {
+      appSettings.set(SettingKey.PALETTE_CONFIG, cfg);
+      appSettings.save();
+    },
+  };
+  const palette = new ComponentPalette(registry, paletteStore);
   if (params.palette) {
     palette.setAllowlist(params.palette);
   }

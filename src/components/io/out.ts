@@ -213,6 +213,7 @@ function outFactory(props: PropertyBag): OutElement {
 
 export const OutDefinition: StandaloneComponentDefinition = {
   name: "Out",
+  displayName: "Digital Output",
   typeId: -1,
   factory: outFactory,
   pinLayout: buildOutPinDeclarations(1),

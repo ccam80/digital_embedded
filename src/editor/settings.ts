@@ -6,6 +6,8 @@
  * listeners allow the UI and engine layers to react to preference changes.
  */
 
+import type { PaletteConfig } from "./palette.js";
+
 // ---------------------------------------------------------------------------
 // SettingKey enum
 // ---------------------------------------------------------------------------
@@ -19,6 +21,7 @@ export enum SettingKey {
   DEFAULT_RADIX = "DEFAULT_RADIX",
   GATE_SHAPE = "GATE_SHAPE",
   SNAP_TO_GRID = "SNAP_TO_GRID",
+  PALETTE_CONFIG = "PALETTE_CONFIG",
 }
 
 // ---------------------------------------------------------------------------
@@ -38,6 +41,7 @@ export interface SettingTypeMap {
   [SettingKey.DEFAULT_RADIX]: Radix;
   [SettingKey.GATE_SHAPE]: GateShape;
   [SettingKey.SNAP_TO_GRID]: boolean;
+  [SettingKey.PALETTE_CONFIG]: PaletteConfig | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -53,6 +57,7 @@ const DEFAULTS: SettingTypeMap = {
   [SettingKey.DEFAULT_RADIX]: "hex",
   [SettingKey.GATE_SHAPE]: "ieee",
   [SettingKey.SNAP_TO_GRID]: true,
+  [SettingKey.PALETTE_CONFIG]: null,
 };
 
 const STORAGE_KEY = "digital-js:settings";

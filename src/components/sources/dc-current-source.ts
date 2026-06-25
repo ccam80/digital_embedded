@@ -242,6 +242,7 @@ export function makeDcCurrentSource(
 
 export const DcCurrentSourceDefinition: StandaloneComponentDefinition = {
   name: "DcCurrentSource",
+  displayName: "DC I Source",
   typeId: -1,
   category: ComponentCategory.SOURCES,
 

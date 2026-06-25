@@ -35,7 +35,7 @@ import { buildColorMap } from '../editor/color-scheme.js';
 import { hitTestElements, hitTestWires } from '../editor/hit-test.js';
 import { snapToGrid } from '../editor/coordinates.js';
 import { LOGIC_FAMILY_PRESETS, getLogicFamilyPreset, defaultLogicFamily } from '../core/logic-family.js';
-import { constructElement } from '../core/registry.js';
+import { constructElement, displayNameOf } from '../core/registry.js';
 import { deriveInterfacePins } from '../components/subcircuit/pin-derivation.js';
 import { openSpiceModelLibraryDialog } from './spice-model-library-dialog.js';
 
@@ -127,7 +127,7 @@ function buildInsertMenu(ctx: AppContext, deps: MTDeps): () => void {
       for (const def of defs) {
         const item = document.createElement('div');
         item.className = 'menu-action';
-        item.textContent = def.name;
+        item.textContent = displayNameOf(def);
         item.addEventListener('click', () => {
           placement.start(def);
           document.querySelectorAll('.menu-item.open').forEach(m => m.classList.remove('open'));

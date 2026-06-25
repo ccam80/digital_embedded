@@ -510,6 +510,13 @@ export function resolvePinLayout(
 export interface StandaloneComponentDefinition extends ComponentDefinition {
   /** Explicitly not internal-only (or absent). */
   internalOnly?: false;
+  /**
+   * Human-facing label shown in the palette, palette settings modal, and Insert
+   * menu. Falls back to `name` when absent (see {@link displayNameOf}). Purely a
+   * presentation concern- `name` remains the serialization identity and registry
+   * lookup key, so two definitions never share a display string by relying on it.
+   */
+  displayName?: string;
   /** Construct a CircuitElement for a placed instance from its properties. */
   factory: (props: PropertyBag) => CircuitElement;
   /** Default pin layout for property panel and compiler- required for
@@ -548,6 +555,16 @@ export interface StandaloneComponentDefinition extends ComponentDefinition {
 /** Type guard: narrows a definition to the user-facing extender. */
 export function isStandalone(def: ComponentDefinition): def is StandaloneComponentDefinition {
   return def.internalOnly !== true;
+}
+
+/**
+ * The human-facing label for a user-facing component: its `displayName` when
+ * declared, otherwise its `name`. Every UI surface (palette, palette settings
+ * modal, Insert menu, search) renders this rather than `name` directly so a
+ * single optional field governs presentation without touching identity.
+ */
+export function displayNameOf(def: StandaloneComponentDefinition): string {
+  return def.displayName ?? def.name;
 }
 
 // ---------------------------------------------------------------------------

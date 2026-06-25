@@ -957,6 +957,7 @@ export function makeAcCurrentSource(
 
 export const AcCurrentSourceDefinition: StandaloneComponentDefinition = {
   name: "AcCurrentSource",
+  displayName: "AC I Source",
   typeId: -1,
   category: ComponentCategory.SOURCES,
 
