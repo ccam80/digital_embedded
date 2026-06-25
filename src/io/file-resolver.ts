@@ -354,19 +354,3 @@ export class ChainResolver implements FileResolver {
 // createDefaultResolver
 // ---------------------------------------------------------------------------
 
-/**
- * Create the default resolver chain for browser use.
- *
- * Order: cache → http
- *
- * The cache is returned so the caller can populate it as subcircuits are
- * loaded, and clear it when the checkpoint changes.
- *
- * @param basePath  HTTP base path for .dig file resolution (default "./")
- * @returns         The chain resolver (cache is embedded inside it)
- */
-export function createDefaultResolver(basePath: string = "./"): FileResolver {
-  const cache = new CacheResolver();
-  const http = new HttpResolver(basePath);
-  return new ChainResolver([cache, http]);
-}

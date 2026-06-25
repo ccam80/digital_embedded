@@ -132,19 +132,6 @@ export function loadDig(xml: string, registry: ComponentRegistry): Circuit {
 }
 
 /**
- * Load a pre-parsed DigCircuit into a Circuit.
- *
- * Accepts a DigCircuit produced by parseDigXml() and delegates directly to
- * loadDigCircuit(). Provided for callers that already hold a parsed structure
- * and want to avoid re-parsing.
- *
- * @throws DigParserError if any elementName is not registered.
- */
-export function loadDigFromParsed(parsed: DigCircuit, registry: ComponentRegistry): Circuit {
-  return loadDigCircuit(parsed, registry);
-}
-
-/**
  * Look up the component in the registry, map its attributes, and instantiate
  * a CircuitElement at the correct grid position.
  *
@@ -301,27 +288,6 @@ function extractMirrorFromEntries(
   // Some .dig files may encode mirror as a string
   if (entry.value.type === "string") return entry.value.value === "true";
   return false;
-}
-
-/**
- * Set `isNegated = true` on each Pin whose label is listed in the config.
- *
- * Apply negation flags from the .dig file's inverter configuration.
- */
-export function applyInverterConfig(
-  element: CircuitElement,
-  config: string[],
-): void {
-  if (config.length === 0) return;
-
-  const negatedSet = new Set(config);
-  const pins = element.getPins();
-
-  for (const pin of pins) {
-    if (negatedSet.has(pin.label)) {
-      (pin as { isNegated: boolean }).isNegated = true;
-    }
-  }
 }
 
 /**

@@ -10,8 +10,8 @@ import {
   NodeResolver,
   ChainResolver,
   ResolverNotFoundError,
-  createDefaultResolver,
 } from "../file-resolver.js";
+import type { FileResolver } from "../file-resolver.js";
 
 // ---------------------------------------------------------------------------
 // EmbeddedResolver
@@ -237,17 +237,3 @@ describe("ChainResolver", () => {
     await expect(chain.resolve("anything")).rejects.toThrow(ResolverNotFoundError);
   });
 });
-
-// ---------------------------------------------------------------------------
-// createDefaultResolver
-// ---------------------------------------------------------------------------
-
-describe("createDefaultResolver", () => {
-  it("returns a FileResolver", () => {
-    const resolver = createDefaultResolver("./");
-    expect(typeof resolver.resolve).toBe("function");
-  });
-});
-
-// Re-import FileResolver type for the test
-type FileResolver = import("../file-resolver.js").FileResolver;

@@ -75,6 +75,71 @@ checked `git log -S` for whether a wiring import ever existed.
 
 ---
 
+## 3. Generic (parameterized) circuit resolution
+
+**Status:** built and fully tested, but the load pipeline never invokes it.
+
+**What exists**
+- `src/io/resolve-generics.ts` — a port of Digital's `ResolveGenerics.java`. For a circuit
+  with `isGeneric: true`, executes its `GenericInitCode`/`GenericCode` HGS scripts to
+  parameterize the circuit at load (bake in widths, counts, generated structure).
+  Exports `isGenericCircuit`, `resolveGenericCircuit`, `GenericResolutionCache`.
+- `src/io/generic-cache.ts` — `GenericCache`, `computeGenericCacheKey` (caches resolved
+  circuits by argument hash).
+
+**Evidence of non-wiring**
+- Analyzer flags every export orphan (test-only); confirmed no static/dynamic/HTML importer.
+- The load path actively **skips** generic elements instead of resolving them:
+  `dig-loader.ts:94` — "Skip unregistered elements gracefully (e.g. GenericInitCode …)".
+  So generic circuits load with their parameterization silently dropped.
+
+**Wire-up task**
+1. In the `.dig` load pipeline (`loadDigCircuit` / `subcircuit-loader`), detect
+   `isGenericCircuit(circuit)` and route through `resolveGenericCircuit(...)` before/at
+   instantiation, backed by `GenericResolutionCache`.
+2. Thread generic args from a parent subcircuit instantiation down to resolution.
+
+---
+
+## 4. Delete stored subcircuit (UI)
+
+**Status:** the data layer exists; no UI calls it.
+
+`src/io/subcircuit-store.ts` exports `storeSubcircuit` / `loadAllSubcircuits` (both wired) and
+`deleteSubcircuit` (orphan — no caller). Wire a "delete stored subcircuit" affordance (e.g. in
+the subcircuit menu / `canvas-subcircuit.ts`) to `deleteSubcircuit`, so the store supports
+removal, not just add/load.
+
+---
+
+## 5. SPICE import flow (disconnected — needs repair, not deletion)
+
+**Status:** the building blocks exist and are tested, but **nothing wires them** — the SPICE
+*import-and-apply* flow is non-functional. Distinct from the wired SPICE *model library*
+browser (`openSpiceModelLibraryDialog`, reached from `menu-toolbar.ts`), which only lists
+`.MODEL`/`.SUBCKT` entries and does not import.
+
+**What exists (all orphan / dead — zero production callers):**
+- `src/app/spice-import-dialog.ts` → `openSpiceImportDialog` (the paste/upload + preview
+  dialog; parses `.MODEL` → `SpiceImportResult` or `.SUBCKT` → `SpiceSubcktImportResult`).
+- `src/app/spice-model-apply.ts` → `applySpiceImportResult`, `applySpiceSubcktImportResult`
+  (apply a parsed result onto a component / circuit).
+- `src/io/spice-model-builder.ts` → `buildSpiceSubcircuit` (build a `Circuit` from a parsed
+  `.SUBCKT`, mapping R/L/C/V/I/Q/M/D/J prefixes to digiTS typeIds).
+
+**Evidence:** none of the above appear in `menu-toolbar.ts`, `postmessage-adapter.ts`, the MCP
+server, or `headless/*`. The intended flow is even documented in `registry.ts:394-402` (UI
+dialog → `applySpiceImportResult`; SUBCKT body → `spice-model-builder`) — but the trigger that
+opens `openSpiceImportDialog` was never wired.
+
+**Repair task** (do NOT delete these — they are the fix): wire a "Import SPICE model / SUBCKT"
+entry (component context menu for `.MODEL`-onto-component; a palette/import action for
+`.SUBCKT`-as-subcircuit) → `openSpiceImportDialog` → `applySpiceImportResult` /
+`applySpiceSubcktImportResult` (+ `buildSpiceSubcircuit`). Confirm against the e2e specs
+`spice-import-flows` / `spice-model-panel`.
+
+---
+
 ## Verified already-wired — NOT on this list
 
 Investigated and excluded because production already reaches them; their "test-only" analyzer

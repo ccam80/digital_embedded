@@ -6,16 +6,12 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "fs";
 import { join } from "path";
 import { parseDigXml } from "../dig-parser.js";
-import { loadDigCircuit, loadDig, loadDigFromParsed, createElementFromDig, createWireFromDig, extractCircuitMetadata, applyInverterConfig, DigParserError } from "../dig-loader.js";
+import { loadDigCircuit, loadDig, createElementFromDig, createWireFromDig, extractCircuitMetadata, DigParserError } from "../dig-loader.js";
 import { ComponentRegistry, ComponentCategory } from "../../core/registry.js";
 import type { StandaloneComponentDefinition, AttributeMapping } from "../../core/registry.js";
-import { PinDirection, makePin, createInverterConfig } from "../../core/pin.js";
-import type { Pin } from "../../core/pin.js";
 import { PropertyBag } from "../../core/properties.js";
-import { AbstractCircuitElement } from "../../core/element.js";
-import type { RenderContext, Rect } from "../../core/renderer-interface.js";
 import type { DigCircuit, DigVisualElement } from "../dig-schema.js";
-import { stringConverter, boolConverter, intConverter, testDataConverter } from "../attribute-map.js";
+import { testDataConverter } from "../attribute-map.js";
 import { CircuitBuilder } from "../../headless/builder.js";
 import { TestElement } from "../../test-fixtures/test-element.js";
 import { noopExecFn } from "../../test-fixtures/execute-stubs.js";
@@ -41,10 +37,10 @@ function makeFactory(typeName: string) {
 // Common attribute mappings for test components
 // ---------------------------------------------------------------------------
 
-const LABEL_MAPPING: AttributeMapping = stringConverter("Label", "label");
-const WIDE_SHAPE_MAPPING: AttributeMapping = boolConverter("wideShape", "wideShape");
-const INPUTS_MAPPING: AttributeMapping = intConverter("Inputs", "inputCount");
-const BITS_MAPPING: AttributeMapping = intConverter("Bits", "bitWidth");
+const LABEL_MAPPING: AttributeMapping = { xmlName: "Label", propertyKey: "label", convert: (v) => v };
+const WIDE_SHAPE_MAPPING: AttributeMapping = { xmlName: "wideShape", propertyKey: "wideShape", convert: (v) => v === "true" };
+const INPUTS_MAPPING: AttributeMapping = { xmlName: "Inputs", propertyKey: "inputCount", convert: (v) => parseInt(v, 10) };
+const BITS_MAPPING: AttributeMapping = { xmlName: "Bits", propertyKey: "bitWidth", convert: (v) => parseInt(v, 10) };
 const TEST_DATA_MAPPING: AttributeMapping = testDataConverter();
 
 function makeDefinition(name: string, extraMappings: AttributeMapping[] = []): StandaloneComponentDefinition {
@@ -174,40 +170,6 @@ describe("DigLoader", () => {
     // Unknown elements are skipped gracefully (not thrown)
     const circuit = loadDigCircuit(parsed, registry);
     expect(circuit.elements).toHaveLength(0);
-  });
-
-  it("inverterConfigApplied", () => {
-    class PinnedElement extends AbstractCircuitElement {
-      private readonly _testPin: Pin;
-      constructor(props: PropertyBag) {
-        super("And", crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
-        this._testPin = makePin(
-          {
-            direction: PinDirection.INPUT,
-            label: "in0",
-            defaultBitWidth: 1,
-            position: { x: 0, y: 1 },
-            isNegatable: true,
-            isClockCapable: false,
-            kind: "signal" as const,
-          },
-          { x: 0, y: 1 },
-          createInverterConfig([]),
-          { clockPins: new Set<string>() },
-        );
-      }
-      getPins(): readonly Pin[] { return [this._testPin]; }
-      draw(_ctx: RenderContext): void { /* no-op */ }
-      getBoundingBox(): Rect { return { x: 0, y: 0, width: 4, height: 4 }; }
-    }
-
-    const element = new PinnedElement(new PropertyBag());
-    const pinsBefore = element.getPins();
-    expect(pinsBefore[0].isNegated).toBe(false);
-
-    applyInverterConfig(element, ["in0"]);
-    const pinsAfter = element.getPins();
-    expect(pinsAfter[0].isNegated).toBe(true);
   });
 
   it("rotationApplied", () => {
@@ -402,9 +364,9 @@ describe("DigLoader", () => {
 
     const registry = new ComponentRegistry();
     registry.register(makeDefinition("TestGate", [
-      intConverter("Inputs", "inputCount"),
-      intConverter("Bits", "bitWidth"),
-      boolConverter("wideShape", "wideShape"),
+      { xmlName: "Inputs", propertyKey: "inputCount", convert: (v) => parseInt(v, 10) },
+      { xmlName: "Bits", propertyKey: "bitWidth", convert: (v) => parseInt(v, 10) },
+      { xmlName: "wideShape", propertyKey: "wideShape", convert: (v) => v === "true" },
     ]));
 
     const circuit = loadDig(xml, registry);
@@ -496,7 +458,7 @@ describe("DigLoader", () => {
       },
       pinLayout: [],
       propertyDefs: [],
-      attributeMap: [intConverter("Bits", "bitWidth")],
+      attributeMap: [{ xmlName: "Bits", propertyKey: "bitWidth", convert: (v) => parseInt(v, 10) }],
       category: ComponentCategory.LOGIC,
       helpText: "GateWithDefault",
       models: {
@@ -523,13 +485,4 @@ describe("DigLoader", () => {
     expect(andEls).toHaveLength(1);
   });
 
-  it("loadDigFromParsed", () => {
-    const xml = readCircuit("and-gate.dig");
-    const parsed = parseDigXml(xml);
-    const registry = buildAndGateRegistry();
-    const circuit = loadDigFromParsed(parsed, registry);
-
-    expect(circuit.elements).toHaveLength(5);
-    expect(circuit.wires).toHaveLength(5);
-  });
 });
