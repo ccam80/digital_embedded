@@ -170,18 +170,3 @@ export class TestEditorPanel {
   }
 }
 
-// ---------------------------------------------------------------------------
-// TestcaseUpdater type- passed to save() to apply editor content
-// ---------------------------------------------------------------------------
-
-/**
- * Callback type for save(). Receives the edited content string and is
- * responsible for updating the Testcase component with the new test data.
- *
- * Typical usage:
- *   editor.save((content) => {
- *     // rebuild the testcase element with new content
- *     testcaseElement.props.set('testData', content);
- *   });
- */
-export type TestcaseUpdater = (content: string) => void;

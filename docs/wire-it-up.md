@@ -140,6 +140,40 @@ entry (component context menu for `.MODEL`-onto-component; a palette/import acti
 
 ---
 
+## 6. In-app test IDE (test editor + runner UI)
+
+**Status:** built and tested, but nothing wires it; the app has no interactive test surface.
+Tests are reachable only via postMessage `sim-run-tests`, MCP `circuit_test`, and the headless
+`TestRunner` — there is no in-app authoring/running UI.
+
+**What exists** (all in `src/testing/`, all sitting on top of the *live* `parser`/`executor`):
+- `test-editor.ts` (`TestEditorPanel`) — CodeMirror 6 editor for Digital test-vector syntax,
+  backed by `test-language.ts` (`tokenizeLine` + `digitalTestLanguage` highlighting).
+- `run-all.ts` (`runAllTests`, `registerRunAllShortcut`) — batch-run every Testcase element in
+  the circuit + the F11 "Run All Tests" action.
+- `results-ui.ts` (`TestResultsPanel`) — pass/fail results table.
+- `batch-runner.ts` (`runBatchTests`), `comparison.ts` (`compareCircuits`), `export.ts`
+  (`exportResultsCsv`), `fixture-generator.ts` (`generateTestFixture`) — batch / compare /
+  CSV-export / fixture infra.
+
+**Evidence of non-wiring**
+- Analyzer flags every export orphan; no static or dynamic importer in `src/app/**` or anywhere
+  in production. No "Run Tests" / test-panel control in `index.html` or `menu-toolbar.ts`.
+- It reuses the live `parser`/`executor` (not an alternate engine) — so the engine work is done;
+  only UI wiring is missing.
+
+**Wire-up task**
+1. Add a test dock/panel hosting `TestEditorPanel` (edit a selected Testcase's `testData`) and
+   `TestResultsPanel` (render results).
+2. Wire the F11 "Run All Tests" action via `registerRunAllShortcut` → `runAllTests` →
+   `TestResultsPanel`.
+3. Surface `runBatchTests` / `compareCircuits` / `exportResultsCsv` from a menu as needed.
+
+**Already deleted (genuinely dead, not part of wire-up):** `TestcaseUpdater`
+(`test-editor.ts`) — a callback type with zero references anywhere (not even a test).
+
+---
+
 ## Verified already-wired — NOT on this list
 
 Investigated and excluded because production already reaches them; their "test-only" analyzer
