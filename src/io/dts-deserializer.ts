@@ -185,6 +185,10 @@ function deserializeDtsCircuit(
     }));
   }
 
+  if (dtsCircuit.solverSettings !== undefined) {
+    metadata.solverSettings = { ...dtsCircuit.solverSettings };
+  }
+
   if (dtsCircuit.attributes !== undefined) {
     const attrs = dtsCircuit.attributes;
     const loadingRaw = attrs['digitalPinLoading'];

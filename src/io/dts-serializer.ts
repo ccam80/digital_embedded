@@ -221,6 +221,13 @@ function circuitToDtsCircuit(circuit: Circuit): DtsCircuit {
     result.attributes = attrs;
   }
 
+  if (
+    circuit.metadata.solverSettings !== undefined &&
+    Object.keys(circuit.metadata.solverSettings).length > 0
+  ) {
+    result.solverSettings = { ...circuit.metadata.solverSettings };
+  }
+
   return result;
 }
 

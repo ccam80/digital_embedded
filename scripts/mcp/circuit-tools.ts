@@ -561,6 +561,51 @@ export function registerCircuitTools(
   );
 
   // ---------------------------------------------------------------------------
+  // circuit_configure
+  // ---------------------------------------------------------------------------
+
+  server.registerTool(
+    "circuit_configure",
+    {
+      title: "Configure Solver Settings",
+      description:
+        "Set per-circuit analog solver overrides (e.g. reltol, abstol, voltTol, gmin, " +
+        "maxTimeStep, temp, trtol, maxIterations, integrationMethod, optran, indVerbosity). " +
+        "Presence encodes givenness: a field set here is applied on circuit_compile and " +
+        "serialized by circuit_save; a given maxTimeStep overrides the speed-derived step. " +
+        "Pass a field value of null to clear (un-give) it. Merges into any existing settings.",
+      inputSchema: {
+        handle: z.string().describe("Circuit handle"),
+        params: z
+          .record(z.union([z.number(), z.string(), z.boolean(), z.null()]))
+          .describe("Partial SimulationParams, e.g. { reltol: 1e-6, maxTimeStep: 1e-3 }. null clears a field."),
+      },
+    },
+    ({ handle, params }) => {
+      const circuit = session.getCircuit(handle);
+      const merged: Record<string, unknown> = { ...(circuit.metadata.solverSettings ?? {}), ...params };
+      for (const k of Object.keys(merged)) {
+        if (merged[k] === null) delete merged[k];
+      }
+      if (Object.keys(merged).length > 0) {
+        circuit.metadata.solverSettings = merged as NonNullable<typeof circuit.metadata.solverSettings>;
+      } else {
+        delete circuit.metadata.solverSettings;
+      }
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text:
+              `Solver settings updated.\n` +
+              JSON.stringify(circuit.metadata.solverSettings ?? {}, null, 2),
+          },
+        ],
+      };
+    },
+  );
+
+  // ---------------------------------------------------------------------------
   // circuit_compile
   // ---------------------------------------------------------------------------
 

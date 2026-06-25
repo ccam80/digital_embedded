@@ -99,6 +99,11 @@ export interface DtsCircuit {
    * sets `node->nsGiven`/`node->nodeset` (cktsetnp.c:29-31, PARM_NS).
    */
   nodesets?: Record<string, number>;
+  /**
+   * Per-circuit analog solver overrides (deltas vs engine defaults). Each key is
+   * a SimulationParams field the user explicitly set; presence encodes givenness.
+   */
+  solverSettings?: Partial<import("../core/analog-engine-interface.js").SimulationParams>;
 }
 
 /**
@@ -311,6 +316,22 @@ function validateDtsCircuit(value: unknown, path: string): void {
     throw new Error(
       `Invalid .dts document: "${path}.description" must be a string when present`,
     );
+  }
+
+  if (circuit['solverSettings'] !== undefined) {
+    const ss = circuit['solverSettings'];
+    if (ss === null || typeof ss !== 'object' || Array.isArray(ss)) {
+      throw new Error(`Invalid .dts document: "${path}.solverSettings" must be an object when present`);
+    }
+    for (const [k, v] of Object.entries(ss as Record<string, unknown>)) {
+      if (k === 'integrationMethod') {
+        if (v !== 'trapezoidal' && v !== 'gear') {
+          throw new Error(`Invalid .dts document: "${path}.solverSettings.integrationMethod" must be "trapezoidal" or "gear"`);
+        }
+      } else if (typeof v !== 'boolean' && (typeof v !== 'number' || !Number.isFinite(v))) {
+        throw new Error(`Invalid .dts document: "${path}.solverSettings.${k}" must be a finite number or boolean`);
+      }
+    }
   }
 
   if (!Array.isArray(circuit['elements'])) {

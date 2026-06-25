@@ -2508,7 +2508,11 @@
           <span>Settings</span>
           <button id="btn-settings-close" style="background:none;border:none;color:var(--fg);cursor:pointer;font-size:18px;padding:0 2px;opacity:0.6;" title="Close">&times;</button>
         </div>
-        <div style="padding:16px;overflow-y:auto;flex:1;">
+        <div class="analysis-tabs">
+          <button class="analysis-tab active" id="settings-tab-general-btn">General</button>
+          <button class="analysis-tab" id="settings-tab-solver-btn">Solver</button>
+        </div>
+        <div id="settings-tab-general" class="analysis-tab-content">
           <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;opacity:0.6;margin-bottom:10px;">Engine</div>
           <div class="prop-row">
             <label class="prop-label" for="setting-snapshot-budget">Snapshot Memory Budget (MB)</label>
@@ -2545,6 +2549,76 @@
             </select>
             <div style="font-size:11px;opacity:0.5;margin-top:2px;">Linear: speed proportional to current. Logarithmic: small currents remain visible alongside large ones.</div>
           </div>
+        </div>
+        <div id="settings-tab-solver" class="analysis-tab-content" style="display:none">
+          <div style="font-size:11px;opacity:0.6;margin-bottom:10px;">Per-circuit solver overrides. Leave a field blank to use the engine default; a value you enter is applied to this circuit and saved with it.</div>
+          <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;opacity:0.6;margin-bottom:10px;">Tolerances</div>
+          <div class="prop-row">
+            <label class="prop-label" for="solver-reltol">Relative tolerance (reltol)</label>
+            <input id="solver-reltol" type="text" placeholder="1e-3" style="width:100%;padding:4px 6px;background:var(--bg);border:1px solid var(--panel-border);color:var(--fg);border-radius:3px;font-size:12px;" />
+          </div>
+          <div class="prop-row" style="margin-top:8px;">
+            <label class="prop-label" for="solver-abstol">Absolute current tolerance (abstol, A)</label>
+            <input id="solver-abstol" type="text" placeholder="1p" style="width:100%;padding:4px 6px;background:var(--bg);border:1px solid var(--panel-border);color:var(--fg);border-radius:3px;font-size:12px;" />
+          </div>
+          <div class="prop-row" style="margin-top:8px;">
+            <label class="prop-label" for="solver-volttol">Absolute voltage tolerance (voltTol, V)</label>
+            <input id="solver-volttol" type="text" placeholder="1u" style="width:100%;padding:4px 6px;background:var(--bg);border:1px solid var(--panel-border);color:var(--fg);border-radius:3px;font-size:12px;" />
+          </div>
+          <div class="prop-row" style="margin-top:8px;">
+            <label class="prop-label" for="solver-gmin">Minimum conductance (gmin, S)</label>
+            <input id="solver-gmin" type="text" placeholder="1p" style="width:100%;padding:4px 6px;background:var(--bg);border:1px solid var(--panel-border);color:var(--fg);border-radius:3px;font-size:12px;" />
+          </div>
+          <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;opacity:0.6;margin:16px 0 10px;">Timestep &amp; Temperature</div>
+          <div class="prop-row">
+            <label class="prop-label" for="solver-maxstep">Max timestep (s)</label>
+            <input id="solver-maxstep" type="text" placeholder="set by speed" style="width:100%;padding:4px 6px;background:var(--bg);border:1px solid var(--panel-border);color:var(--fg);border-radius:3px;font-size:12px;" />
+            <div style="font-size:11px;opacity:0.5;margin-top:2px;">Blank = the live step follows playback speed. A value here is a hard ceiling on every surface.</div>
+          </div>
+          <div class="prop-row" style="margin-top:8px;">
+            <label class="prop-label" for="solver-temp">Temperature (K)</label>
+            <input id="solver-temp" type="text" placeholder="300.15" style="width:100%;padding:4px 6px;background:var(--bg);border:1px solid var(--panel-border);color:var(--fg);border-radius:3px;font-size:12px;" />
+          </div>
+          <div style="font-size:11px;font-weight:600;opacity:0.6;margin:14px 0 8px;cursor:pointer;user-select:none;" id="solver-adv-toggle">&#9654; Advanced</div>
+          <div id="solver-adv" style="display:none">
+            <div class="prop-row">
+              <label class="prop-label" for="solver-trtol">Truncation-error factor (trtol)</label>
+              <input id="solver-trtol" type="text" placeholder="7" style="width:100%;padding:4px 6px;background:var(--bg);border:1px solid var(--panel-border);color:var(--fg);border-radius:3px;font-size:12px;" />
+            </div>
+            <div class="prop-row" style="margin-top:8px;">
+              <label class="prop-label" for="solver-maxiter">DC NR iteration limit</label>
+              <input id="solver-maxiter" type="text" placeholder="100" style="width:100%;padding:4px 6px;background:var(--bg);border:1px solid var(--panel-border);color:var(--fg);border-radius:3px;font-size:12px;" />
+            </div>
+            <div class="prop-row" style="margin-top:8px;">
+              <label class="prop-label" for="solver-tranmaxiter">Transient NR iteration limit</label>
+              <input id="solver-tranmaxiter" type="text" placeholder="10" style="width:100%;padding:4px 6px;background:var(--bg);border:1px solid var(--panel-border);color:var(--fg);border-radius:3px;font-size:12px;" />
+            </div>
+            <div class="prop-row" style="margin-top:8px;">
+              <label class="prop-label" for="solver-integration">Integration method</label>
+              <select id="solver-integration" style="width:100%;padding:4px 6px;background:var(--bg);border:1px solid var(--panel-border);color:var(--fg);border-radius:3px;font-size:12px;">
+                <option value="">(default)</option>
+                <option value="trapezoidal">Trapezoidal</option>
+                <option value="gear">Gear</option>
+              </select>
+            </div>
+            <div class="prop-row" style="margin-top:8px;">
+              <label class="prop-label" for="solver-optran">OP pseudo-transient (optran)</label>
+              <select id="solver-optran" style="width:100%;padding:4px 6px;background:var(--bg);border:1px solid var(--panel-border);color:var(--fg);border-radius:3px;font-size:12px;">
+                <option value="">(default)</option>
+                <option value="on">On</option>
+                <option value="off">Off</option>
+              </select>
+            </div>
+            <div class="prop-row" style="margin-top:8px;">
+              <label class="prop-label" for="solver-opstep">OPtran step size (s)</label>
+              <input id="solver-opstep" type="text" placeholder="100n" style="width:100%;padding:4px 6px;background:var(--bg);border:1px solid var(--panel-border);color:var(--fg);border-radius:3px;font-size:12px;" />
+            </div>
+            <div class="prop-row" style="margin-top:8px;">
+              <label class="prop-label" for="solver-opfinal">OPtran final time (s)</label>
+              <input id="solver-opfinal" type="text" placeholder="10u" style="width:100%;padding:4px 6px;background:var(--bg);border:1px solid var(--panel-border);color:var(--fg);border-radius:3px;font-size:12px;" />
+            </div>
+          </div>
+          <button id="solver-reset" style="margin-top:14px;">Reset to Defaults</button>
         </div>
         <div class="test-dialog-footer">
           <button id="btn-settings-cancel">Cancel</button>

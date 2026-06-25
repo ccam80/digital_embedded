@@ -18,19 +18,18 @@ import { SliderPanel } from '../editor/slider-panel.js';
 import { SliderEngineBridge } from '../editor/slider-engine-bridge.js';
 import type { Wire } from '../core/circuit.js';
 import type { SimulationCoordinator } from '../solver/coordinator-types.js';
+import {
+  loadEngineSettings as loadEngineSettingsFrom,
+  saveEngineSettings as saveEngineSettingsTo,
+} from './engine-settings.js';
+import type { EngineSettings } from './engine-settings.js';
 
 // ---------------------------------------------------------------------------
 // Public types
 // ---------------------------------------------------------------------------
 
-export const SETTINGS_STORAGE_KEY = 'digital-js:engine-settings';
-
-export interface EngineSettings {
-  snapshotBudgetMb: number;
-  oscillationLimit: number;
-  currentSpeedScale: number;
-  currentScaleMode: 'linear' | 'logarithmic';
-}
+export { SETTINGS_STORAGE_KEY } from './engine-settings.js';
+export type { EngineSettings } from './engine-settings.js';
 
 export interface SimulationController {
   compileAndBind(): boolean;
@@ -51,6 +50,12 @@ export interface SimulationController {
   applyCurrentVizSettings(s: EngineSettings): void;
   /** Sync the speed display DOM elements to the current coordinator speed. */
   updateSpeedDisplay(): void;
+  /**
+   * Multiply the playback speed by `factor`, persist the new rate, apply it to
+   * the live coordinator, and refresh the display. Used by the toolbar and the
+   * context-menu speed controls so every speed change goes through one path.
+   */
+  nudgeSpeed(factor: number): void;
   /** Sync the play/pause button icon to the current engine state. */
   updateRunButtonIcon(): void;
   /** Exposed for selection onChange and context menu in app-init */
@@ -124,25 +129,11 @@ export function initSimulationController(
   // -------------------------------------------------------------------------
 
   function loadEngineSettings(): EngineSettings {
-    try {
-      const raw = localStorage.getItem(SETTINGS_STORAGE_KEY);
-      if (raw) {
-        const parsed = JSON.parse(raw) as Partial<EngineSettings>;
-        return {
-          snapshotBudgetMb: typeof parsed.snapshotBudgetMb === 'number' ? parsed.snapshotBudgetMb : 64,
-          oscillationLimit: typeof parsed.oscillationLimit === 'number' ? parsed.oscillationLimit : 1000,
-          currentSpeedScale: typeof parsed.currentSpeedScale === 'number' ? parsed.currentSpeedScale : 200,
-          currentScaleMode: parsed.currentScaleMode === 'logarithmic' ? 'logarithmic' : 'linear',
-        };
-      }
-    } catch (err) {
-      throw new Error(`Failed to load engine settings from localStorage: ${err instanceof Error ? err.message : String(err)}`);
-    }
-    return { snapshotBudgetMb: 64, oscillationLimit: 1000, currentSpeedScale: 200, currentScaleMode: 'linear' };
+    return loadEngineSettingsFrom(localStorage);
   }
 
   function saveEngineSettings(settings: EngineSettings): void {
-    localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(settings));
+    saveEngineSettingsTo(localStorage, settings);
   }
 
   function applyCurrentVizSettings(s: EngineSettings): void {
@@ -409,6 +400,13 @@ export function initSimulationController(
           _activateAnalogVisualization(coordinator);
         }
 
+        // compile() built a fresh coordinator whose playback speed reverted to
+        // the engine default. Re-apply the user's persisted rate so a restart
+        // (Stop -> Run, or any recompile) keeps the chosen speed, then refresh
+        // the speed display to match.
+        coordinator.speed = loadEngineSettings().playbackSpeed;
+        updateSpeedDisplay();
+
         callbacks.rebuildViewersIfOpen();
 
         if (callbacks.applyPreRunState) {
@@ -623,19 +621,36 @@ export function initSimulationController(
     if (speedUnitEl) speedUnitEl.textContent = fmt.unit;
   }
 
-  speedInput?.addEventListener('change', () => {
-    facade.getCoordinator().parseSpeed(speedInput.value);
+  /**
+   * Set the playback rate from the persisted preference (the source of truth),
+   * apply it to the live coordinator, persist it, and refresh the display. The
+   * persisted value- not the coordinator- is authoritative so the rate survives
+   * the fresh coordinator built on each recompile, and so adjustments made while
+   * stopped (coordinator absent) still compound and persist correctly.
+   */
+  function setPlaybackSpeed(rate: number): void {
+    if (!Number.isFinite(rate) || rate <= 0) return;
+    const settings = loadEngineSettings();
+    settings.playbackSpeed = rate;
+    saveEngineSettings(settings);
+    facade.getCoordinator().speed = rate;
     updateSpeedDisplay();
+  }
+
+  function nudgeSpeed(factor: number): void {
+    setPlaybackSpeed(loadEngineSettings().playbackSpeed * factor);
+  }
+
+  speedInput?.addEventListener('change', () => {
+    setPlaybackSpeed(Number(speedInput.value));
   });
 
   document.getElementById('btn-speed-down')?.addEventListener('click', () => {
-    facade.getCoordinator().adjustSpeed(0.1);
-    updateSpeedDisplay();
+    nudgeSpeed(0.1);
   });
 
   document.getElementById('btn-speed-up')?.addEventListener('click', () => {
-    facade.getCoordinator().adjustSpeed(10);
-    updateSpeedDisplay();
+    nudgeSpeed(10);
   });
 
   // -------------------------------------------------------------------------
@@ -869,6 +884,7 @@ export function initSimulationController(
     saveEngineSettings,
     applyCurrentVizSettings,
     updateSpeedDisplay,
+    nudgeSpeed,
     updateRunButtonIcon,
     get activeSliderPanel() { return activeSliderPanel; },
     set activeSliderPanel(v) { activeSliderPanel = v; },

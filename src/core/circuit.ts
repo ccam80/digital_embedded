@@ -14,6 +14,7 @@ import type { LogicFamilyConfig } from "./logic-family.js";
 import { mergeCollinearSegments } from "./wire-utils.js";
 import type { ModelEntry } from "./registry.js";
 import type { SubcircuitDefinition } from "../components/subcircuit/subcircuit.js";
+import type { SimulationParams } from "./analog-engine-interface.js";
 
 // ---------------------------------------------------------------------------
 // SpecConnection- authoritative pin-pair connection from a programmatic build
@@ -221,6 +222,16 @@ export interface CircuitMetadata {
    * Each entry is a full ModelEntry with factory refs- runtime only, never serialized directly.
    */
   models?: Record<string, Record<string, ModelEntry>>;
+
+  /**
+   * Per-circuit analog solver overrides (a partial SimulationParams).
+   * A field is "given" iff it is present here- presence, not value, encodes
+   * givenness, so a given field equal to the engine default still wins (e.g. a
+   * given maxTimeStep overrides the speed-derived live step; absent = speed/
+   * default decides). Applied on every compile() via the coordinator and
+   * serialized into the .dts so each circuit carries its own solver config.
+   */
+  solverSettings?: Partial<SimulationParams>;
 
   /**
    * Circuit-scoped subcircuit definitions.

@@ -38,6 +38,14 @@ import { LOGIC_FAMILY_PRESETS, getLogicFamilyPreset, defaultLogicFamily } from '
 import { constructElement, displayNameOf } from '../core/registry.js';
 import { deriveInterfacePins } from '../components/subcircuit/pin-derivation.js';
 import { openSpiceModelLibraryDialog } from './spice-model-library-dialog.js';
+import { parseSI } from '../editor/si-format.js';
+import type { SimulationParams } from '../core/analog-engine-interface.js';
+
+/**
+ * Set by buildSettingsDialog so the bare-canvas context menu can open the
+ * Settings dialog focused on a given tab (e.g. the Solver tab).
+ */
+let _openSettingsDialog: ((tab?: 'general' | 'solver') => void) | null = null;
 
 // ---------------------------------------------------------------------------
 // Public interface
@@ -645,15 +653,16 @@ function buildContextMenu(ctx: AppContext, deps: MTDeps): void {
       }
 
       items.push(
-        { label: 'Speed \u00d710', action: () => {
-          facade.getCoordinator()?.adjustSpeed(10);
-          simController.updateSpeedDisplay();
-        }, enabled: true },
-        { label: 'Speed \u00f710', action: () => {
-          facade.getCoordinator()?.adjustSpeed(0.1);
-          simController.updateSpeedDisplay();
-        }, enabled: true },
+        { label: 'Speed \u00d710', action: () => { simController.nudgeSpeed(10); }, enabled: true },
+        { label: 'Speed \u00f710', action: () => { simController.nudgeSpeed(0.1); }, enabled: true },
       );
+
+      items.push(separator());
+      items.push({
+        label: 'Solver Settings\u2026',
+        action: () => _openSettingsDialog?.('solver'),
+        enabled: true,
+      });
     }
 
     } catch (err) {
@@ -1160,7 +1169,83 @@ function buildSettingsDialog(ctx: AppContext, deps: MTDeps): void {
     updateLogicFamilyDetails(logicFamilySelect.value);
   });
 
-  function openSettingsDialog(): void {
+  // --- Solver tab ---
+  const genTabBtn = document.getElementById('settings-tab-general-btn');
+  const solTabBtn = document.getElementById('settings-tab-solver-btn');
+  const genPanel = document.getElementById('settings-tab-general');
+  const solPanel = document.getElementById('settings-tab-solver');
+  const solverAdv = document.getElementById('solver-adv');
+  const solverAdvToggle = document.getElementById('solver-adv-toggle');
+
+  type SolverKind = 'num' | 'si' | 'method' | 'optran';
+  const SOLVER_FIELDS: Array<{ key: keyof SimulationParams; id: string; kind: SolverKind }> = [
+    { key: 'reltol', id: 'solver-reltol', kind: 'num' },
+    { key: 'abstol', id: 'solver-abstol', kind: 'si' },
+    { key: 'voltTol', id: 'solver-volttol', kind: 'si' },
+    { key: 'gmin', id: 'solver-gmin', kind: 'si' },
+    { key: 'maxTimeStep', id: 'solver-maxstep', kind: 'si' },
+    { key: 'temp', id: 'solver-temp', kind: 'num' },
+    { key: 'trtol', id: 'solver-trtol', kind: 'num' },
+    { key: 'maxIterations', id: 'solver-maxiter', kind: 'num' },
+    { key: 'transientMaxIterations', id: 'solver-tranmaxiter', kind: 'num' },
+    { key: 'integrationMethod', id: 'solver-integration', kind: 'method' },
+    { key: 'optran', id: 'solver-optran', kind: 'optran' },
+    { key: 'opstepsize', id: 'solver-opstep', kind: 'si' },
+    { key: 'opfinaltime', id: 'solver-opfinal', kind: 'si' },
+  ];
+  const SOLVER_ADV_KEYS = ['trtol', 'maxIterations', 'transientMaxIterations', 'integrationMethod', 'optran', 'opstepsize', 'opfinaltime'];
+
+  function showSettingsTab(tab: 'general' | 'solver'): void {
+    genTabBtn?.classList.toggle('active', tab === 'general');
+    solTabBtn?.classList.toggle('active', tab === 'solver');
+    if (genPanel) genPanel.style.display = tab === 'general' ? '' : 'none';
+    if (solPanel) solPanel.style.display = tab === 'solver' ? '' : 'none';
+  }
+  genTabBtn?.addEventListener('click', () => showSettingsTab('general'));
+  solTabBtn?.addEventListener('click', () => showSettingsTab('solver'));
+
+  function setAdvOpen(open: boolean): void {
+    if (solverAdv) solverAdv.style.display = open ? 'block' : 'none';
+    if (solverAdvToggle) solverAdvToggle.textContent = (open ? '▼' : '▶') + ' Advanced';
+  }
+  solverAdvToggle?.addEventListener('click', () => setAdvOpen(solverAdv?.style.display === 'none'));
+
+  function populateSolver(): void {
+    const ss = (ctx.circuit.metadata.solverSettings ?? {}) as Record<string, unknown>;
+    for (const f of SOLVER_FIELDS) {
+      const el = document.getElementById(f.id) as HTMLInputElement | HTMLSelectElement | null;
+      if (!el) continue;
+      if (!(f.key in ss)) { el.value = ''; continue; }
+      const v = ss[f.key];
+      el.value = f.kind === 'optran' ? (v ? 'on' : 'off') : String(v);
+    }
+    setAdvOpen(SOLVER_ADV_KEYS.some(k => k in ss));
+  }
+
+  function collectSolver(): Partial<SimulationParams> {
+    const out: Record<string, unknown> = {};
+    for (const f of SOLVER_FIELDS) {
+      const el = document.getElementById(f.id) as HTMLInputElement | HTMLSelectElement | null;
+      if (!el) continue;
+      const raw = el.value.trim();
+      if (raw === '') continue; // empty = not given
+      if (f.kind === 'method') out[f.key] = raw;
+      else if (f.kind === 'optran') out[f.key] = raw === 'on';
+      else if (f.kind === 'si') { const n = parseSI(raw); if (!Number.isNaN(n)) out[f.key] = n; }
+      else { const n = Number(raw); if (Number.isFinite(n)) out[f.key] = n; }
+    }
+    return out as Partial<SimulationParams>;
+  }
+
+  document.getElementById('solver-reset')?.addEventListener('click', () => {
+    for (const f of SOLVER_FIELDS) {
+      const el = document.getElementById(f.id) as HTMLInputElement | HTMLSelectElement | null;
+      if (el) el.value = '';
+    }
+    setAdvOpen(false);
+  });
+
+  function openSettingsDialog(tab: 'general' | 'solver' = 'general'): void {
     const s = simController.loadEngineSettings();
     if (snapshotBudgetInput) snapshotBudgetInput.value = String(s.snapshotBudgetMb);
     if (oscillationLimitInput) oscillationLimitInput.value = String(s.oscillationLimit);
@@ -1174,15 +1259,18 @@ function buildSettingsDialog(ctx: AppContext, deps: MTDeps): void {
       logicFamilySelect.value = matchKey;
       updateLogicFamilyDetails(matchKey);
     }
+    populateSolver();
+    showSettingsTab(tab);
     if (settingsOverlay) settingsOverlay.style.display = 'flex';
   }
+  _openSettingsDialog = openSettingsDialog;
 
   function closeSettingsDialog(): void {
     if (settingsOverlay) settingsOverlay.style.display = 'none';
   }
 
-  document.getElementById('btn-settings')?.addEventListener('click', openSettingsDialog);
-  document.getElementById('btn-menu-settings')?.addEventListener('click', openSettingsDialog);
+  document.getElementById('btn-settings')?.addEventListener('click', () => openSettingsDialog());
+  document.getElementById('btn-menu-settings')?.addEventListener('click', () => openSettingsDialog());
   document.getElementById('btn-settings-close')?.addEventListener('click', closeSettingsDialog);
   document.getElementById('btn-settings-cancel')?.addEventListener('click', closeSettingsDialog);
 
@@ -1191,19 +1279,29 @@ function buildSettingsDialog(ctx: AppContext, deps: MTDeps): void {
     const oscLimit = Math.max(100, Math.min(100000, parseInt(oscillationLimitInput?.value ?? '1000', 10) || 1000));
     const speedScale = Math.max(0.1, Math.min(100000, parseFloat(currentSpeedInput?.value ?? '200') || 200));
     const scaleMode = (currentScaleSelect?.value === 'logarithmic' ? 'logarithmic' : 'linear') as 'linear' | 'logarithmic';
-    const newSettings = { snapshotBudgetMb: budgetMb, oscillationLimit: oscLimit, currentSpeedScale: speedScale, currentScaleMode: scaleMode };
+    // Carry forward fields this dialog does not edit (e.g. playbackSpeed, owned
+    // by the toolbar speed control) so saving the dialog never clobbers them.
+    const newSettings = { ...simController.loadEngineSettings(), snapshotBudgetMb: budgetMb, oscillationLimit: oscLimit, currentSpeedScale: speedScale, currentScaleMode: scaleMode };
     simController.saveEngineSettings(newSettings);
     facade.getCoordinator().setSnapshotBudget(budgetMb * 1024 * 1024);
     simController.applyCurrentVizSettings(newSettings);
+    let needsRecompile = false;
     if (logicFamilySelect) {
       const preset = getLogicFamilyPreset(logicFamilySelect.value);
       if (preset) {
         const prev = ctx.circuit.metadata.logicFamily;
-        const changed = !prev || prev.name !== preset.name;
+        if (!prev || prev.name !== preset.name) needsRecompile = true;
         ctx.circuit.metadata.logicFamily = preset;
-        if (changed) simController.hotRecompile();
       }
     }
+    // Solver tab: presence in solverSettings encodes givenness; an empty field
+    // is omitted (engine default / speed decides).
+    const prevSolver = JSON.stringify(ctx.circuit.metadata.solverSettings ?? {});
+    const solver = collectSolver();
+    if (Object.keys(solver).length > 0) ctx.circuit.metadata.solverSettings = solver;
+    else delete ctx.circuit.metadata.solverSettings;
+    if (JSON.stringify(ctx.circuit.metadata.solverSettings ?? {}) !== prevSolver) needsRecompile = true;
+    if (needsRecompile) simController.hotRecompile();
     closeSettingsDialog();
     ctx.showStatus('Settings saved.');
   });

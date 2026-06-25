@@ -119,7 +119,7 @@ export class DefaultSimulatorFacade implements SimulatorFacade {
     this._coordinator = new NullSimulationCoordinator();
 
     const unified = compileUnified(circuit, this._registry);
-    const coordinator = new DefaultSimulationCoordinator(unified, this._registry);
+    const coordinator = new DefaultSimulationCoordinator(unified, this._registry, circuit.metadata.solverSettings);
     this._coordinator = coordinator;
     this._circuit = circuit;
 

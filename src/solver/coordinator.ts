@@ -98,10 +98,17 @@ export class DefaultSimulationCoordinator implements SimulationCoordinator {
   private _captureHookInstalled: boolean = false;
   /** Accumulates limiting events across all NR iterations during setLimitingCapture capture. */
   private _limitingAccumulator: LimitingEvent[] | null = null;
+  /**
+   * Per-circuit solver overrides (presence = given). Applied to the analog
+   * engine at construction; a given maxTimeStep is re-asserted by the streaming
+   * push so the speed-derived outputStep cannot strip it.
+   */
+  private readonly _solverSettings: Partial<SimulationParams>;
 
-  constructor(compiled: CompiledCircuitUnified, registry?: ComponentRegistry) {
+  constructor(compiled: CompiledCircuitUnified, registry?: ComponentRegistry, solverSettings?: Partial<SimulationParams>) {
     this._registry = registry ?? null;
     this._compiled = compiled;
+    this._solverSettings = solverSettings ?? {};
     this._bridges = compiled.bridges;
     this._topLevelBridgeStates = compiled.bridges.map(() => ({ prevBit: 0, prevDaHigh: false, prevDaEn: true }));
 
@@ -129,7 +136,12 @@ export class DefaultSimulationCoordinator implements SimulationCoordinator {
       const engine = new MNAEngine();
       engine.init(compiled.analog);
       this._analog = engine;
-
+      // Apply per-circuit solver overrides (tolerances, gmin, OPtran, temp,
+      // indVerbosity, a given maxTimeStep). The streaming push below re-asserts
+      // a given maxTimeStep so the speed-derived outputStep cannot strip it.
+      if (Object.keys(this._solverSettings).length > 0) {
+        engine.configure(this._solverSettings);
+      }
     } else {
       this._analog = null;
     }
@@ -181,11 +193,18 @@ export class DefaultSimulationCoordinator implements SimulationCoordinator {
   private _pushAnalogStreamingParams(): void {
     if (this._analog === null) return;
     const outputStep = Math.max(1e-12, this._analogSpeed / 60);
-    this._analog.configure({
+    const cfg: Partial<SimulationParams> = {
       tStop: Number.POSITIVE_INFINITY,
       outputStep,
       initTime: 0,
-    });
+    };
+    // A user-given maxTimeStep is a hard ceiling: re-assert it on every speed
+    // push so resolveSimulationParams keeps it (analog-engine.ts:1724 only
+    // strips maxTimeStep when the call omits it) instead of deriving from
+    // outputStep. Absent (not given) => the live step follows playback speed.
+    const givenMax = this._solverSettings.maxTimeStep;
+    if (givenMax != null && givenMax !== 0) cfg.maxTimeStep = givenMax;
+    this._analog.configure(cfg);
   }
 
   get compiled(): CompiledCircuitUnified { return this._compiled; }
