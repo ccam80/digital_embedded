@@ -129,6 +129,25 @@ describe("createTestBridge", () => {
   });
 
   // -------------------------------------------------------------------------
+  // getPlaybackSpeed- reports the live coordinator's effective rate
+  // -------------------------------------------------------------------------
+
+  describe("getPlaybackSpeed", () => {
+    it("reports the coordinator's current playback rate", () => {
+      const coordinator = buildNonEngineCoordinator({ speed: 5 });
+      const bridge: TestBridge = createTestBridge(
+        new Circuit(),
+        makeViewport(),
+        makeCanvas(),
+        makePalette(),
+        makeRegistry(),
+        () => coordinator,
+      );
+      expect(bridge.getPlaybackSpeed()).toBe(5);
+    });
+  });
+
+  // -------------------------------------------------------------------------
   // worldToScreen / screenToWorld basic sanity
   // -------------------------------------------------------------------------
 

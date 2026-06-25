@@ -71,6 +71,9 @@ export interface TestBridge {
     nodeCount: number;
   } | null;
 
+  /** Read the effective playback rate (sim-seconds per wall-second) on the live coordinator. */
+  getPlaybackSpeed(): number;
+
   /** Read a single labeled signal value. Works for both digital and analog domains. */
   readSignalByLabel(label: string): { type: 'digital'; value: number } | { type: 'analog'; voltage: number } | null;
 
@@ -275,6 +278,10 @@ export function createTestBridge(
         nodeVoltages,
         nodeCount: Object.keys(nodeVoltages).length,
       };
+    },
+
+    getPlaybackSpeed(): number {
+      return coordinatorGetter().speed;
     },
 
     readSignalByLabel(label: string): { type: 'digital'; value: number } | { type: 'analog'; voltage: number } | null {

@@ -102,6 +102,8 @@ export interface DataTableDataSource {
 
 export interface TestBridgeDataSource {
   readonly simTime: number | null;
+  /** Current playback rate in sim-seconds per wall-second (matches coordinator.speed). */
+  readonly speed: number;
   readAllSignals(): Map<string, SignalValue>;
   readByLabel(label: string): SignalValue;
 }

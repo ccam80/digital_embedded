@@ -62,6 +62,8 @@ export interface NonEngineCoordinatorOptions {
   resolverContext?: CurrentResolverContext | null;
   /** Initial sim time. `null` = no analog timeline (pure digital / no engine). */
   simTime?: number | null;
+  /** Initial playback rate in sim-seconds per wall-second (defaults to the engine default 1e-3). */
+  speed?: number;
 }
 
 /**
@@ -117,6 +119,7 @@ export function buildNonEngineCoordinator(
   const branchCurrents = new Map<number, number>(opts.branchCurrents ?? []);
   let resolverContext: CurrentResolverContext | null = opts.resolverContext ?? null;
   let simTime: number | null = opts.simTime ?? null;
+  const speed: number = opts.speed ?? 1e-3;
 
   // --- capture ---
   const writeCalls: WriteCall[] = [];
@@ -191,6 +194,10 @@ export function buildNonEngineCoordinator(
 
     get simTime(): number | null {
       return simTime;
+    },
+
+    get speed(): number {
+      return speed;
     },
 
     // --- test mutators ---
