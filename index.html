@@ -743,6 +743,10 @@
       min-width: 180px;
       font-size: 12px;
       font-family: inherit;
+      /* Component menus can be long (edit + slider + trace items); cap to the
+         viewport and scroll so the bottom items stay reachable. */
+      max-height: calc(100vh - 16px);
+      overflow-y: auto;
     }
     .ctx-menu-item {
       display: flex;

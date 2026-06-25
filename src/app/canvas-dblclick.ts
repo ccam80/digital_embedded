@@ -32,11 +32,13 @@ export function registerDblClickHandler(
     const elementHit = hitTestElements(worldPt, ctx.circuit.elements);
     if (!elementHit) return;
 
-    // During simulation, don't open properties for togglable components
+    // While running, don't open properties for togglable components- a
+    // double-click there is a fast double-toggle, not an edit.
     if (ctx.isSimActive() && TOGGLABLE_TYPES.has(elementHit.typeId)) return;
 
-    // Memory components: open hex editor (only during simulation)
-    if (ctx.isSimActive() && MEMORY_TYPES.has(elementHit.typeId)) {
+    // Memory components: open the hex editor on double-click whether or not the
+    // simulation is running (matches the ungated "Edit Memory…" context item).
+    if (MEMORY_TYPES.has(elementHit.typeId)) {
       void memoryEditor.openMemoryEditor(elementHit);
       return;
     }

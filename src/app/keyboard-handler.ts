@@ -111,8 +111,9 @@ export function initKeyboardHandler(ctx: AppContext, deps: KeyboardDeps): void {
       return;
     }
 
-    // Block all edit shortcuts during simulation
-    if (ctx.isSimActive()) return;
+    // Edit shortcuts below stay available while the simulation runs: every edit
+    // path uses hotRecompile(), which snapshots signal state, recompiles, and
+    // resumes the run in place.
 
     // --- Single-letter placement shortcuts (no Ctrl/Meta) ---
     if (!e.ctrlKey && !e.metaKey) {

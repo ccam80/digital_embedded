@@ -103,6 +103,7 @@ export class NullSimulationCoordinator implements SimulationCoordinator {
 
   microStep(): void { /* no-op */ }
   runToBreak(): void { /* no-op */ }
+  prepareSetup(): void { /* no-op */ }
   dcOperatingPoint(): DcOpResult | null { return null; }
   acAnalysis(_params: AcParams): AcResult | null { return null; }
   transferFunction(_params: TfParams): TfResult | null { return null; }

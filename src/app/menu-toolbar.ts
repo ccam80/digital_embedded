@@ -261,6 +261,14 @@ function buildContextMenu(ctx: AppContext, deps: MTDeps): void {
     const elementHit = hitTestElements(worldPt, ctx.circuit.elements);
     const wireHit = !elementHit ? hitTestWires(worldPt, ctx.circuit.wires, HIT_THRESHOLD) : null;
 
+    // Context-menu items that read live engine state (sliders, traces, wire
+    // viewer) need a compiled, bound coordinator. Compile on demand when the
+    // right-click targets a component or wire, so those items are available
+    // whether or not the simulation is running- "running" only governs whether
+    // the transient timeline advances. Empty-canvas right-clicks skip this so
+    // reaching Solver Settings never forces a recompile.
+    const haveCoordinator = (elementHit || wireHit) ? ctx.ensureCompiled() : false;
+
     if (elementHit) {
       if (!selection.isSelected(elementHit)) {
         selection.select(elementHit);
@@ -302,7 +310,7 @@ function buildContextMenu(ctx: AppContext, deps: MTDeps): void {
           separator(),
           {
             label: 'Make Subcircuit\u2026',
-            enabled: selection.getSelectedElements().size >= 2 && !ctx.isSimActive(),
+            enabled: selection.getSelectedElements().size >= 2,
             action: () => {
               const selectedElements = [...selection.getSelectedElements()];
               const selectedWires = [...selection.getSelectedWires()];
@@ -398,12 +406,14 @@ function buildContextMenu(ctx: AppContext, deps: MTDeps): void {
                 ctx.showStatus(`Updated symbol for "${subDef.name}"`);
               });
             },
-            enabled: !ctx.isSimActive(),
+            enabled: true,
           });
         }
 
-        // "Add Slider"- for components with FLOAT properties during analog sim
-        if (simController.activeSliderPanel && simController.isSimActive()) {
+        // "Add Slider"- for analog components with FLOAT properties. Available
+        // whenever the circuit is compiled (the slider panel is created at bind
+        // time), not only while the simulation is running.
+        if (haveCoordinator && simController.activeSliderPanel) {
           const sliderCoord = facade.getCoordinator();
           if (sliderCoord) {
             const sliderProps = sliderCoord.getSliderProperties(elementHit);
@@ -433,9 +443,11 @@ function buildContextMenu(ctx: AppContext, deps: MTDeps): void {
         });
       }
 
-      // "Add to Traces"
-      if (facade.getCoordinator()?.supportsAcSweep()) {
-        const resolverCtx = facade.getCoordinator()?.getCurrentResolverContext() ?? null;
+      // "Add to Traces"- available whether or not the simulation is running.
+      // The compiled coordinator carries the per-pin node resolution; traces add
+      // their scope channels with draw-time labels and fill in once stepping.
+      if (haveCoordinator && facade.getCoordinator().supportsAcSweep()) {
+        const resolverCtx = facade.getCoordinator().getCurrentResolverContext() ?? null;
         viewerController.appendComponentTraceItems(items, elementHit, resolverCtx);
       }
 
@@ -591,12 +603,13 @@ function buildContextMenu(ctx: AppContext, deps: MTDeps): void {
         }
       }
 
-      if (ctx.isSimActive()) {
+      // Wire → viewer items- available whether or not the simulation is
+      // running. The compiled coordinator carries wireSignalMap; the scope
+      // adds the channel now with its draw-time label and fills in on stepping.
+      if (haveCoordinator) {
         const viewCoordinator = facade.getCoordinator();
-        if (viewCoordinator) {
-          if (items.length > 0) items.push(separator());
-          viewerController.appendWireViewerItems(items, wireHit, viewCoordinator);
-        }
+        if (items.length > 0) items.push(separator());
+        viewerController.appendWireViewerItems(items, wireHit, viewCoordinator);
       }
 
     } else {

@@ -314,6 +314,22 @@ export class MNAEngine implements AnalogEngine {
   }
 
   /**
+   * Run the structural setup pass without any analysis.
+   *
+   * Calls `_setup()` (TSTALLOC, matrix sizing, state allocation) which also runs
+   * the post-setup topology detectors (voltage-source-loop, inductor-loop,
+   * competing-voltage-constraints) and emits their `Diagnostic` records through
+   * `onDiagnostic`. Idempotent: `_setup()` early-returns once setup has run, so
+   * a later `step()`/`dcOperatingPoint()`/`acAnalysis()` reuses the same
+   * allocated structure. No Newton-Raphson solve, no operating point, no
+   * timestep- the matrix is allocated and structurally validated, nothing more.
+   */
+  prepareSetup(): void {
+    if (!this._compiled) return;
+    this._setup();
+  }
+
+  /**
    * Advance one transient timestep.
    *
    * Sequence:

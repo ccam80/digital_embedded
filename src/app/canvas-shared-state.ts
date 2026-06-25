@@ -7,6 +7,7 @@
  */
 
 import { TouchGestureTracker } from '../editor/touch-gestures.js';
+import type { CircuitElement } from '../core/element.js';
 
 // ---------------------------------------------------------------------------
 // Drag state machine
@@ -23,6 +24,14 @@ export interface CanvasState {
   dragMode: DragMode;
   dragStart: { x: number; y: number };
   dragStartScreen: { x: number; y: number };
+
+  /**
+   * Interactive element (switch / In / Clock / Port) pressed on pointer-down
+   * that will toggle on pointer-up if the gesture did not turn into a drag.
+   * Cleared the moment a drag begins (then the gesture moves the element
+   * instead) and after the toggle fires. Null when no toggle is pending.
+   */
+  toggleCandidate: CircuitElement | null;
 
   // Pointer tracking (mouse/pen)
   activePointerId: number | null;
@@ -44,6 +53,7 @@ export function createCanvasState(): CanvasState {
     dragMode: 'none',
     dragStart: { x: 0, y: 0 },
     dragStartScreen: { x: 0, y: 0 },
+    toggleCandidate: null,
     activePointerId: null,
     pointerType: 'mouse',
     longPressTimer: null,

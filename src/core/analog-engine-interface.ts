@@ -494,6 +494,18 @@ export interface CompiledAnalogCircuit extends CompiledCircuit {
  */
 export interface AnalogEngine extends Engine {
   // -------------------------------------------------------------------------
+  // Structural setup
+  // -------------------------------------------------------------------------
+
+  /**
+   * Run the structural setup pass (matrix allocation + post-setup topology
+   * detectors) without performing any analysis. Idempotent; a subsequent
+   * `step()`/`dcOperatingPoint()`/`acAnalysis()` reuses the allocated structure.
+   * Emits topology `Diagnostic` records via `onDiagnostic`.
+   */
+  prepareSetup(): void;
+
+  // -------------------------------------------------------------------------
   // DC Analysis
   // -------------------------------------------------------------------------
 

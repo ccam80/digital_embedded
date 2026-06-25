@@ -488,6 +488,19 @@ export class DefaultSimulationCoordinator implements SimulationCoordinator {
   }
 
   /**
+   * Run the analog structural setup pass without any analysis (no DC-OP, no
+   * transient step). Triggers `MNAEngine._setup()`, which allocates the matrix
+   * and runs the post-setup topology detectors; their diagnostics surface
+   * through `getRuntimeDiagnostics()` via the engine's `onDiagnostic` mirror.
+   * No-op for digital-only circuits (no analog backend). Phase-neutral: unlike
+   * `dcOperatingPoint()` it does not park the engine in the `dcop` phase, so the
+   * first transient `step()` still runs the warm-start MODETRANOP cleanly.
+   */
+  prepareSetup(): void {
+    this._analog?.prepareSetup();
+  }
+
+  /**
    * Standalone DC operating-point analysis (matches ngspice `.op` →
    * `dcop.c::DCop` → `CKTop(MODEDCOP|MODEINITJCT, MODEDCOP|MODEINITFLOAT)`).
    * Each invocation runs a fresh DCOP- ngspice rebuilds the bias point

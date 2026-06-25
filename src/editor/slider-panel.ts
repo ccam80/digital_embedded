@@ -68,6 +68,15 @@ export class SliderPanel {
    */
   constructor(container: HTMLElement) {
     this._container = container;
+    // The panel exists whenever an analog circuit is bound (even before Run),
+    // but stays hidden until it actually holds a slider so an empty bar never
+    // occupies canvas space.
+    this._syncVisibility();
+  }
+
+  /** Show the container only while it holds at least one slider row. */
+  private _syncVisibility(): void {
+    this._container.style.display = this._sliders.length > 0 ? "" : "none";
   }
 
   /**
@@ -174,6 +183,7 @@ export class SliderPanel {
     };
 
     this._sliders.push(entry);
+    this._syncVisibility();
 
     // Wire up the change handler
     input.addEventListener("input", () => {
@@ -210,6 +220,7 @@ export class SliderPanel {
     const entry = this._sliders[idx];
     entry.container.parentNode?.removeChild(entry.container);
     this._sliders.splice(idx, 1);
+    this._syncVisibility();
   }
 
   /**
@@ -220,6 +231,7 @@ export class SliderPanel {
       entry.container.parentNode?.removeChild(entry.container);
     }
     this._sliders = [];
+    this._syncVisibility();
   }
 
   /**
@@ -236,6 +248,7 @@ export class SliderPanel {
       }
     }
     this._sliders = kept;
+    this._syncVisibility();
   }
 
   /**

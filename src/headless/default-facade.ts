@@ -395,6 +395,16 @@ export class DefaultSimulatorFacade implements SimulatorFacade {
   }
 
   /**
+   * Run the analog structural setup pass (matrix allocation + topology
+   * detectors) without any analysis. No-op for digital-only circuits. The
+   * editor calls this after compile to surface topology diagnostics without
+   * running a non-transient DC operating point.
+   */
+  prepareSetup(): void {
+    this._coordinator.prepareSetup();
+  }
+
+  /**
    * Run a DC transfer-function analysis (ngspice `.tf`), or null if no analog
    * backend. Delegates to the coordinator, mirroring `getDcOpResult()`.
    */

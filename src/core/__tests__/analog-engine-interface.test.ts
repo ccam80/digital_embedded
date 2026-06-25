@@ -187,6 +187,7 @@ describe("AnalogEngineTypes", () => {
       removeChangeListener(_listener: EngineChangeListener): void {},
 
       // AnalogEngine-specific methods and properties
+      prepareSetup(): void {},
       dcOperatingPoint(): DcOpResult {
         return {
           converged: true,

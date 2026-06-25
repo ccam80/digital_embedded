@@ -248,7 +248,8 @@ export function initSimulationController(
 
     const sliderContainer = document.getElementById('slider-panel');
     if (sliderContainer) {
-      sliderContainer.style.display = '';
+      // SliderPanel reveals its own container once it holds a slider, so the
+      // panel can exist from bind time without showing an empty bar.
       activeSliderPanel = new SliderPanel(sliderContainer);
       new SliderEngineBridge(activeSliderPanel, coordinator);
     }
@@ -349,12 +350,16 @@ export function initSimulationController(
 
         binding.bind(circuit, coordinator, unified.wireSignalMap, unified.pinSignalMap);
 
-        // Drive DC OP- this triggers MNAEngine._setup(), which runs post-setup
-        // topology detectors (voltage-source-loop, inductor-loop,
-        // competing-voltage-constraints) and emits via the engine's
-        // DiagnosticCollector. The coordinator mirrors those emissions into its
-        // own collector (see coordinator.ts onDiagnostic wiring).
-        const dcResult = facade.getDcOpResult();
+        // Run the structural setup pass- this triggers MNAEngine._setup(), which
+        // runs the post-setup topology detectors (voltage-source-loop,
+        // inductor-loop, competing-voltage-constraints) and emits via the
+        // engine's DiagnosticCollector. The coordinator mirrors those emissions
+        // into its own collector (see coordinator.ts onDiagnostic wiring). No
+        // operating point is computed: the engine is transient-only, so the bias
+        // point is the warm-start MODETRANOP that step() runs on its first call.
+        // A standalone .op remains available via getDcOpResult() for the
+        // MCP/headless analysis tools.
+        facade.prepareSetup();
         ctx.compiledDirty = false;
 
         // Read runtime diagnostics emitted during init/setup/dcOp.
@@ -391,10 +396,17 @@ export function initSimulationController(
           return false;
         }
 
-        if (dcResult && !dcResult.converged) {
-          ctx.showStatus('Warning: DC operating point did not converge- results may be inaccurate', true);
-        } else if (compileTimeAllDiags.length === 0 && runtimeDiags.length === 0) {
+        if (compileTimeAllDiags.length === 0 && runtimeDiags.length === 0) {
           ctx.clearStatus();
+        }
+
+        // Activate analog visualization (voltage colouring, current-flow
+        // animation, slider panel) at bind time rather than at Run. The editor
+        // is "live at t=0" whenever a compiled+bound coordinator exists; running
+        // only advances the transient timeline. disposeAnalog() above tore down
+        // any prior pass, so this re-activates cleanly on each compile.
+        if (coordinator.supportsDcOp()) {
+          _activateAnalogVisualization(coordinator);
         }
 
         callbacks.rebuildViewersIfOpen();
@@ -583,8 +595,8 @@ export function initSimulationController(
     ctx.selection.clear();
     coordinator.start();
 
-    _activateAnalogVisualization(coordinator);
-
+    // Analog visualization is activated at bind time (see compileAndBind), so
+    // it is already live here- starting only advances the transient timeline.
     _startRenderLoop(coordinator);
   }
 
@@ -641,6 +653,7 @@ export function initSimulationController(
       const msg = err instanceof Error ? err.message : String(err);
       ctx.showStatus(`Simulation error: ${msg}`, true);
     }
+    renderPipeline.markScopeDirty();
     renderPipeline.scheduleRender();
   });
 
@@ -672,6 +685,7 @@ export function initSimulationController(
         ctx.showStatus(`Simulation error: ${msg}`, true);
       }
     }
+    renderPipeline.markScopeDirty();
     renderPipeline.scheduleRender();
   });
 

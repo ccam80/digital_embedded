@@ -201,6 +201,15 @@ export interface SimulationCoordinator {
   /** Run until a breakpoint or halt condition. No-op if not supported. */
   runToBreak(): void;
 
+  /**
+   * Run the structural setup pass (matrix allocation + topology detectors)
+   * without any analysis. No-op for digital-only circuits. Topology diagnostics
+   * surface via getRuntimeDiagnostics(). Used by the editor to validate a
+   * freshly compiled circuit without running a (non-transient) DC operating
+   * point.
+   */
+  prepareSetup(): void;
+
   /** DC operating-point analysis. Returns null if no analog domain. */
   dcOperatingPoint(): DcOpResult | null;
 

@@ -314,6 +314,10 @@ export function initViewerController(ctx: AppContext, renderPipeline: RenderPipe
     }
 
     _syncTracesToMetadata();
+
+    // Paint the panels now (draw-time labels/axes) even when the simulation is
+    // not running; while running the render loop repaints every frame anyway.
+    renderPipeline.markScopeDirty();
   }
 
   // -------------------------------------------------------------------------
@@ -482,7 +486,6 @@ export function initViewerController(ctx: AppContext, renderPipeline: RenderPipe
     resolverCtx: CurrentResolverContext | null,
   ): void {
     const label = _elementLabel(element);
-    const pins = element.getPins();
 
     if (resolverCtx) {
       let elementIndex = -1;
@@ -607,18 +610,10 @@ export function initViewerController(ctx: AppContext, renderPipeline: RenderPipe
           enabled: true,
         });
       }
-    } else {
-      if (pins.length === 0) return;
-      if (items.length > 0) items.push(separator());
-
-      items.push({
-        label: `Trace Voltages: ${label} (starts on Run)`,
-        action: () => {
-          ctx.showStatus(`Probe queued- start simulation to view traces`, false);
-        },
-        enabled: true,
-      });
     }
+    // No `else`: callers compile on demand before reaching here, so an analog
+    // element always has a resolverCtx. When it is null (compilation failed),
+    // no trace items are offered rather than a placeholder that does nothing.
   }
 
   function attachScopeContextMenu(

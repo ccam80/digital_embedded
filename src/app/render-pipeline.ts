@@ -34,6 +34,13 @@ export interface RenderState {
   boxSelect: BoxSelectState;
   currentFlowAnimator: CurrentFlowAnimator | null;
   scopePanels: ScopePanelEntry[];
+  /**
+   * One-shot request to repaint scope panels on the next frame while the
+   * simulation is not running (e.g. after adding a trace or single-stepping).
+   * While running, panels repaint every frame regardless. Cleared after each
+   * paint.
+   */
+  scopeDirty: boolean;
 }
 
 export interface RenderPipeline {
@@ -45,6 +52,8 @@ export interface RenderPipeline {
   sizeCanvasInContainer(cvs: HTMLCanvasElement): boolean;
   populateDiagnosticOverlays(diags: Diagnostic[], wireToNodeId: Map<Wire, number>): void;
   clearDiagnosticOverlays(): void;
+  /** Request a one-shot scope-panel repaint on the next frame (used when stopped). */
+  markScopeDirty(): void;
   readonly state: RenderState;
 }
 
@@ -66,6 +75,7 @@ export function initRenderPipeline(ctx: AppContext, search?: string): RenderPipe
     },
     currentFlowAnimator: null,
     scopePanels: [],
+    scopeDirty: false,
   };
 
   // -------------------------------------------------------------------------
@@ -112,8 +122,12 @@ export function initRenderPipeline(ctx: AppContext, search?: string): RenderPipe
   // Frame profiling- enabled via ?profile query param or console: _enableFrameProfile()
   let _frameProfileEnabled = search?.includes('profile') ?? false;
   let _frameProfileSamples: number[] = [];
-  (window as any)._enableFrameProfile = () => { _frameProfileEnabled = true; _frameProfileSamples = []; };
-  (window as any)._disableFrameProfile = () => {
+  const profileWindow = window as unknown as {
+    _enableFrameProfile?: () => void;
+    _disableFrameProfile?: () => void;
+  };
+  profileWindow._enableFrameProfile = () => { _frameProfileEnabled = true; _frameProfileSamples = []; };
+  profileWindow._disableFrameProfile = () => {
     _frameProfileEnabled = false;
     if (_frameProfileSamples.length > 0) {
       const sorted = _frameProfileSamples.slice().sort((a, b) => a - b);
@@ -266,15 +280,19 @@ export function initRenderPipeline(ctx: AppContext, search?: string): RenderPipe
       ctx2d.restore();
     }
 
-    // Render scope panels when simulation is running (new data from onStep)
-    // or when resized. Skip during idle zoom/pan to avoid expensive redraws.
+    // Render scope panels when the simulation is running (new data from
+    // onStep), when resized, or when a one-shot repaint was requested while
+    // stopped (trace added, single-step). Skip during idle zoom/pan to avoid
+    // expensive redraws.
     const simRunning = ctx.isSimActive();
+    const scopeDirty = state.scopeDirty;
     for (const sp of state.scopePanels) {
       const resized = sizeCanvasInContainer(sp.canvas);
-      if (resized || simRunning) {
+      if (resized || simRunning || scopeDirty) {
         sp.panel.render();
       }
     }
+    state.scopeDirty = false;
 
     if (_frameProfileEnabled) {
       const dt = performance.now() - _t0;
@@ -380,6 +398,11 @@ export function initRenderPipeline(ctx: AppContext, search?: string): RenderPipe
     state.diagnosticOverlays = [];
   }
 
+  function markScopeDirty(): void {
+    state.scopeDirty = true;
+    scheduleRender();
+  }
+
   // -------------------------------------------------------------------------
   // Return pipeline interface
   // -------------------------------------------------------------------------
@@ -393,6 +416,7 @@ export function initRenderPipeline(ctx: AppContext, search?: string): RenderPipe
     sizeCanvasInContainer,
     populateDiagnosticOverlays,
     clearDiagnosticOverlays,
+    markScopeDirty,
     state,
   };
 }

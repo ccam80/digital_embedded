@@ -22,6 +22,74 @@ import type { Wire } from '../core/circuit.js';
 import { Circuit } from '../core/circuit.js';
 
 // ---------------------------------------------------------------------------
+// Interactive-component helpers (switch / In / Clock / Port)
+// ---------------------------------------------------------------------------
+
+/** Component types a left-click toggles/cycles rather than only selecting. */
+const INTERACTIVE_TYPES = new Set(['Switch', 'SwitchDT', 'In', 'Clock', 'Port']);
+
+function isInteractive(el: import('../core/element.js').CircuitElement): boolean {
+  return INTERACTIVE_TYPES.has(el.typeId);
+}
+
+/**
+ * Drive a switch open/closed through the bound engine. When the simulation is
+ * not advancing, a single step propagates the change so the result is visible
+ * immediately; while running, the next frame's step picks it up.
+ */
+function setSwitchClosed(
+  elementHit: import('../core/element.js').CircuitElement,
+  closed: boolean,
+  ctx: AppContext,
+  renderPipeline: RenderPipeline,
+): void {
+  const eng = ctx.facade.getCoordinator();
+  elementHit.setAttribute('closed', closed);
+  eng.setComponentProperty(elementHit, 'closed', closed ? 1 : 0);
+  if (eng.getState() !== EngineState.RUNNING) {
+    ctx.facade.step(eng, { clockAdvance: false });
+  }
+  renderPipeline.scheduleRender();
+}
+
+/**
+ * Toggle/cycle an interactive component (latching switch, In, Clock, Port). The
+ * circuit is compiled on demand, so this works whether or not the simulation is
+ * running- "running" only governs whether the transient timeline advances. When
+ * the engine is not advancing, a single step propagates the new input value.
+ */
+function interactWithElement(
+  elementHit: import('../core/element.js').CircuitElement,
+  ctx: AppContext,
+  renderPipeline: RenderPipeline,
+): void {
+  if (!ctx.ensureCompiled()) return;
+  const eng = ctx.facade.getCoordinator();
+
+  if (elementHit.typeId === 'Switch' || elementHit.typeId === 'SwitchDT') {
+    const current = (elementHit.getAttribute('closed') as boolean | undefined) ?? false;
+    setSwitchClosed(elementHit, !current, ctx, renderPipeline);
+    return;
+  }
+
+  // In / Clock / Port: toggle (1-bit) or increment-wrap (bus) the driven value,
+  // written straight to the signal array via binding.setInput.
+  const bitWidth = (elementHit.getAttribute('bitWidth') as number | undefined) ?? 1;
+  const current = ctx.binding.isBound
+    ? ctx.binding.getPinValue(elementHit, 'out')
+    : ((elementHit.getAttribute('defaultValue') as number | undefined) ?? 0);
+  const newVal = bitWidth === 1
+    ? (current === 0 ? 1 : 0)
+    : ((current + 1) & ((1 << bitWidth) - 1));
+  elementHit.setAttribute('defaultValue', newVal);
+  ctx.binding.setInput(elementHit, 'out', BitVector.fromNumber(newVal, bitWidth));
+  if (eng.getState() !== EngineState.RUNNING) {
+    ctx.facade.step(eng, { clockAdvance: elementHit.typeId !== 'Clock' && elementHit.typeId !== 'Port' });
+  }
+  renderPipeline.scheduleRender();
+}
+
+// ---------------------------------------------------------------------------
 // Wire-completion helper (fixes D6)
 // ---------------------------------------------------------------------------
 
@@ -92,6 +160,13 @@ function finishPointerDrag(
   ctx: AppContext,
   renderPipeline: RenderPipeline,
 ): void {
+  // A select-drag that never moved is a click on an interactive component-
+  // toggle/cycle it. Any drag movement cleared toggleCandidate in pointermove.
+  if (state.dragMode === 'select-drag' && state.toggleCandidate) {
+    interactWithElement(state.toggleCandidate, ctx, renderPipeline);
+  }
+  state.toggleCandidate = null;
+
   if (state.dragMode === 'wire-drag') {
     ctx.wireDrag.finish(ctx.circuit);
     ctx.hotRecompile();
@@ -249,56 +324,6 @@ export function registerPointerHandlers(
       return;
     }
 
-    if (ctx.isSimActive()) {
-      const elementHit = hitTestElements(worldPt, ctx.circuit.elements, hitMargin);
-      if (elementHit) {
-        ctx.selection.clear();
-        ctx.selection.select(elementHit);
-
-        const eng = ctx.facade.getCoordinator();
-
-        if (elementHit.typeId === 'Switch' || elementHit.typeId === 'SwitchDT') {
-          // Hot-load switch state via setComponentProperty (analog: setParam→setClosed,
-          // digital: layout.setProperty). No recompile needed.
-          const toggleSwitch = (closed: boolean): void => {
-            elementHit.setAttribute('closed', closed);
-            eng.setComponentProperty(elementHit, 'closed', closed ? 1 : 0);
-            if (eng.getState() !== EngineState.RUNNING) {
-              ctx.facade.step(eng, { clockAdvance: false });
-            }
-            renderPipeline.scheduleRender();
-          };
-          const momentary = (elementHit.getAttribute('momentary') as boolean | undefined) ?? false;
-          if (momentary) {
-            toggleSwitch(true);
-            document.addEventListener('pointerup', () => toggleSwitch(false), { once: true });
-          } else {
-            const current = (elementHit.getAttribute('closed') as boolean | undefined) ?? false;
-            toggleSwitch(!current);
-          }
-        } else if (elementHit.typeId === 'In' || elementHit.typeId === 'Clock' || elementHit.typeId === 'Port') {
-          // Hot-load digital input via binding.setInput (writes directly to signal
-          // array, equivalent to analog setParam). No recompile needed.
-          const bitWidth = (elementHit.getAttribute('bitWidth') as number | undefined) ?? 1;
-          const current = ctx.binding.isBound
-            ? ctx.binding.getPinValue(elementHit, 'out')
-            : ((elementHit.getAttribute('defaultValue') as number | undefined) ?? 0);
-          const newVal = bitWidth === 1
-            ? (current === 0 ? 1 : 0)
-            : ((current + 1) & ((1 << bitWidth) - 1));
-          elementHit.setAttribute('defaultValue', newVal);
-          ctx.binding.setInput(elementHit, 'out', BitVector.fromNumber(newVal, bitWidth));
-          if (eng.getState() !== EngineState.RUNNING) {
-            ctx.facade.step(eng, { clockAdvance: elementHit.typeId !== 'Clock' && elementHit.typeId !== 'Port' });
-          }
-        }
-      } else {
-        ctx.selection.clear();
-      }
-      renderPipeline.scheduleRender();
-      return;
-    }
-
     if (ctx.wireDrawing.isActive()) {
       const pinHit = hitTestPins(worldPt, ctx.circuit.elements, hitThreshold);
       if (pinHit) {
@@ -342,6 +367,29 @@ export function registerPointerHandlers(
       } else if (!ctx.selection.isSelected(elementHit)) {
         ctx.selection.select(elementHit);
       }
+
+      // Interactive components (switch / In / Clock / Port): a momentary switch
+      // presses now and releases on pointer-up; everything else toggles on a
+      // click that does not become a drag (fired from finishPointerDrag).
+      // Dragging still moves the component- the toggle is cancelled the moment
+      // the pointer moves. Works whether or not the simulation is running.
+      state.toggleCandidate = null;
+      if (!e.shiftKey && isInteractive(elementHit)) {
+        const momentary = (elementHit.getAttribute('momentary') as boolean | undefined) ?? false;
+        if (momentary && (elementHit.typeId === 'Switch' || elementHit.typeId === 'SwitchDT')) {
+          if (ctx.ensureCompiled()) {
+            setSwitchClosed(elementHit, true, ctx, renderPipeline);
+            document.addEventListener(
+              'pointerup',
+              () => setSwitchClosed(elementHit, false, ctx, renderPipeline),
+              { once: true },
+            );
+          }
+        } else {
+          state.toggleCandidate = elementHit;
+        }
+      }
+
       state.dragMode = 'select-drag';
       state.dragStart = worldPt;
       // Snapshot which wire endpoints are connected to selected elements' pins
@@ -466,6 +514,8 @@ export function registerPointerHandlers(
       const dx = snappedWorld.x - snappedStart.x;
       const dy = snappedWorld.y - snappedStart.y;
       if (dx !== 0 || dy !== 0) {
+        // The gesture became a drag- it moves the component instead of toggling.
+        state.toggleCandidate = null;
         const selectedElements = ctx.selection.getSelectedElements();
         const selectedWires = ctx.selection.getSelectedWires();
 

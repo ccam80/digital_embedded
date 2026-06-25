@@ -220,4 +220,45 @@ test.describe('component differential voltage trace', () => {
     // Half of the 5 V AC amplitude drops across R1 (equal divider) — a clear swing.
     expect(r1Trace!.max - r1Trace!.min).toBeGreaterThan(0.1);
   });
+
+  test('Trace menu populates and adds a channel with the sim never started', async ({ page }) => {
+    await page.goto('/');
+    await page.locator('#sim-canvas').waitFor({ state: 'visible' });
+    await page.waitForTimeout(400);
+
+    await loadXml(page, RC_XML);
+
+    // No viewer opened, no steps run- the simulation has never started. The
+    // trace menu must still populate from the compiled circuit alone (it used
+    // to gate on a running engine / a warm-up DC-OP and only offered a no-op
+    // "starts on Run" placeholder).
+    const r1 = await bodyCenter(page, 'R1');
+    await page.mouse.click(r1.x, r1.y, { button: 'right' });
+    await page.locator('.ctx-menu').waitFor({ state: 'visible' });
+
+    // The real differential trace item exists (not the old placeholder).
+    const traceItem = page.locator('.ctx-menu-label', { hasText: /^Trace Voltage: R1$/ });
+    await expect(traceItem).toBeVisible();
+    await expect(page.locator('.ctx-menu-label', { hasText: /starts on Run/ })).toHaveCount(0);
+
+    // Adding it opens the scope with the channel present (draw-time label).
+    await traceItem.click();
+    await expect(page.locator('#viewer-panel')).toBeVisible();
+
+    // Stepping after the channel was added (while stopped) fills it with data,
+    // proving the channel was created pre-run and is wired to the engine.
+    await page.evaluate(() => { for (let i = 0; i < 800; i++) window.postMessage({ type: 'sim-step' }, '*'); });
+    await page.waitForTimeout(600);
+
+    const stats = await page.evaluate(() => {
+      const bridge = (window as unknown as { __test: {
+        getTraceStats(): Array<{ label: string; min: number; max: number; mean: number }> | null;
+      } }).__test;
+      return bridge.getTraceStats();
+    });
+    expect(stats).not.toBeNull();
+    const r1Trace = stats!.find(s => s.label.includes('R1'));
+    expect(r1Trace, `trace stats: ${JSON.stringify(stats)}`).toBeDefined();
+    expect(r1Trace!.max - r1Trace!.min).toBeGreaterThan(0.1);
+  });
 });
